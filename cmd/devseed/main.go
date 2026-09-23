@@ -152,6 +152,16 @@ func seedMolts(ctx context.Context, s *store.Store, crabs []*store.Crab) {
 	if _, err := s.Reply(ctx, crabs[1], barnacles, "Barnacles are just crabs who love their rocks!"); err != nil {
 		log.Fatal(err)
 	}
+	quote, err := s.Quote(ctx, crabs[2], ready, "He has been saying this since six in the morning.")
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := s.AddToTrenches(ctx, quote, followerIDs(ctx, s, crabs[2])); err != nil {
+		log.Fatal(err)
+	}
+	if err := s.ClearFanout(ctx, quote); err != nil {
+		log.Fatal(err)
+	}
 }
 
 // seedNotifications gives spongebob the notifications the seeded likes,

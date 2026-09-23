@@ -50,13 +50,20 @@ type Molt struct {
 	ReplyToAuthor   string `dynamodbav:"reply_to_author,omitempty"`
 	ReplyToAuthorID string `dynamodbav:"reply_to_author_id,omitempty"`
 
+	QuoteOf   string `dynamodbav:"quote_of,omitempty"` // quoted molt ID
+	QuoteOfPK string `dynamodbav:"quote_of_pk,omitempty"`
+	QuoteOfSK string `dynamodbav:"quote_of_sk,omitempty"`
+
 	ReplyCount  int `dynamodbav:"reply_count"`
 	LikeCount   int `dynamodbav:"like_count"`
 	RemoltCount int `dynamodbav:"remolt_count"`
+	QuoteCount  int `dynamodbav:"quote_count"`
 
 	// Not stored; filled in for display.
 	EntryID        string `dynamodbav:"-"` // ID of the list entry (the remolt) when showing an original
 	Liked          bool   `dynamodbav:"-"` // the viewer has liked it
+	RemoltedAs     string `dynamodbav:"-"` // ID of the viewer's remolt of it, if any
+	Quoted         *Molt  `dynamodbav:"-"` // the quoted molt, or nil when it's gone
 	RemoltedByID   string `dynamodbav:"-"`
 	AuthorName     string `dynamodbav:"-"` // display names, looked up by ID
 	RemoltedByName string `dynamodbav:"-"`
@@ -150,10 +157,11 @@ func (s *Store) Remolt(ctx context.Context, by *Crab, original *Molt) (*Molt, er
 	return m, nil
 }
 
-// DeleteMolt soft-deletes a molt, reply or remolt owned by crab c and erases
-// its text. It leaves the feeds that point at it: every read skips deleted
-// items, and trench entries expire on their own. Deleting a remolt frees the
-// crab to remolt it again; deleting a reply takes it off its parent's thread.
+// DeleteMolt soft-deletes a molt, reply, quote or remolt owned by crab c and
+// erases its text. It leaves the feeds that point at it: every read skips
+// deleted items, and trench entries expire on their own. Deleting a remolt
+// frees the crab to remolt it again; deleting a reply or quote takes it off
+// its parent's list.
 func (s *Store) DeleteMolt(ctx context.Context, c *Crab, m *Molt) error {
 	if m.OwnerID != c.ID {
 		return ErrNotAllowed
@@ -167,6 +175,9 @@ func (s *Store) DeleteMolt(ctx context.Context, c *Crab, m *Molt) error {
 	case m.ReplyTo != "":
 		parentPK, parentSK, counter = m.ReplyToPK, m.ReplyToSK, "reply_count"
 		unlink = types.Delete{TableName: s.tableName(), Key: keyOf(replyPointerPK(m.ReplyTo), replyPointerSK(m.ID))}
+	case m.QuoteOf != "":
+		parentPK, parentSK, counter = m.QuoteOfPK, m.QuoteOfSK, "quote_count"
+		unlink = types.Delete{TableName: s.tableName(), Key: keyOf(quotePointerPK(m.QuoteOf), quotePointerSK(m.ID))}
 	}
 	items := []types.TransactWriteItem{
 		{Update: &types.Update{

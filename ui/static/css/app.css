@@ -45,6 +45,7 @@
 .kb-notification-like { fill: var(--like); }
 .kb-notification-remolt { fill: var(--remolt); }
 .kb-notification-reply { fill: var(--reply); }
+.kb-notification-quote { fill: var(--remolt); }
 .kb-notification-follow { color: var(--primary); }
 
 .kb-notification-snippet:hover {
@@ -126,6 +127,30 @@
 .kb-crabmin-fields dd {
   margin: 0;
   overflow-wrap: anywhere;
+}
+
+/* The remolt button opens Crabber's Remolt / Quote Molt dropdown. */
+.kb-remolt-menu > summary {
+  display: block;
+  padding: 10px;
+  fill: var(--light-faded);
+}
+
+.kb-remolt-menu > summary.active-remolt,
+.kb-remolt-menu > summary.active-remolt .mini-molt-action-counter {
+  color: var(--remolt);
+  fill: var(--remolt);
+}
+
+.kb-remolt-menu .kb-menu-items {
+  left: 0;
+  right: auto;
+  min-width: 160px;
+}
+
+.kb-avatar-sm {
+  width: 20px;
+  height: 20px;
 }
 
 .kb-menu-danger,

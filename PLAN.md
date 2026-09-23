@@ -244,6 +244,7 @@ As implemented in `internal/store/keys.go` (the single source for every key form
 | Remolt marker | `RM#<crabID>` | `RM#<moltID>` | — (one remolt per crab per molt) |
 | Reply (a molt) | `M#<authorCrabID>` | `MR#<moltID>` | GSI5 as for molts; no GSI3 or fan-out, so replies stay out of the sea and trenches |
 | Reply pointer | `RP#<parentMoltID>` | `RP#<replyMoltID>` | — (a thread is a base-table query plus one batch read; replaced the old `MC#` comments) |
+| Quote pointer | `QP#<quotedMoltID>` | `QP#<quoteMoltID>` | — (the quote itself is an ordinary molt with `quote_of`; the quotes list is a query plus one batch read) |
 | Like | `L#<crabID>` | `L#<moltID>` | GSI7 `L#<moltID>` (who liked a molt) |
 | Follow | `F#<followerID>` | `F#<followeeID>` | GSI6 `F#<followeeID>` (followers of a crab) |
 | Trench (feed) entry | `T#<crabID>` | `T#<moltID>` | — (stores the molt's key, so a feed page is one `BatchGetItem`; `expires_at` 90 days) |

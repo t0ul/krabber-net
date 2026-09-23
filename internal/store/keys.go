@@ -19,6 +19,8 @@ import (
 //	Reply             M#<authorCrabID>       MR#<moltID>          GSI5 as for molts (no day or fan-out keys:
 //	                                                              replies stay out of the Sea and trenches)
 //	Reply pointer     RP#<parentMoltID>      RP#<replyMoltID>
+//	Quote             a molt (keys as above) with quote_of set
+//	Quote pointer     QP#<quotedMoltID>      QP#<quoteMoltID>
 //	Remolt marker     RM#<crabID>            RM#<moltID>
 //	Like              L#<crabID>             L#<moltID>           GSI7 L#<moltID> / L#<crabID>
 //	Follow            F#<followerID>         F#<followeeID>       GSI6 F#<followeeID> / F#<followerID>
@@ -68,6 +70,8 @@ func remoltMarkerSK(moltID string) string      { return "RM#" + moltID }
 func replySK(moltID string) string             { return "MR#" + moltID }
 func replyPointerPK(parentID string) string    { return "RP#" + parentID }
 func replyPointerSK(replyID string) string     { return "RP#" + replyID }
+func quotePointerPK(quotedID string) string    { return "QP#" + quotedID }
+func quotePointerSK(quoteID string) string     { return "QP#" + quoteID }
 func likePK(crabID string) string              { return "L#" + crabID }
 func likeSK(moltID string) string              { return "L#" + moltID }
 func likesOnKey(moltID string) string          { return "L#" + moltID }

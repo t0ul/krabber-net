@@ -39,14 +39,7 @@ func (app *App) moltCreatePost(w http.ResponseWriter, r *http.Request) {
 		app.serverError(w, r, err)
 		return
 	}
-	// Own trench is written here so a refresh shows the molt immediately;
-	// follower fan-out stays in the background (and writes the owner again).
-	if err := app.store.AddToTrenches(r.Context(), m, []string{m.OwnerID}); err != nil {
-		app.log.Warn("write own trench", "err", err, "molt", m.ID)
-	}
-	app.fanout.Enqueue(m)
-	app.dir.addMolt(*m)
-	m.AuthorName = currentCrab(r).Name()
+	app.publish(r, m)
 
 	if !isHTMX(r) {
 		http.Redirect(w, r, moltReturnPath(r), http.StatusSeeOther)
@@ -54,6 +47,18 @@ func (app *App) moltCreatePost(w http.ResponseWriter, r *http.Request) {
 	}
 	app.renderTemplate(w, r, http.StatusOK, fragmentPage, "molt",
 		map[string]any{"M": m, "D": app.newTemplateData(r)})
+}
+
+// publish sends a molt the signed-in crab just wrote to the feeds. The own
+// trench is written here so a refresh shows the molt immediately; follower
+// fan-out stays in the background (and writes the owner again).
+func (app *App) publish(r *http.Request, m *store.Molt) {
+	if err := app.store.AddToTrenches(r.Context(), m, []string{m.OwnerID}); err != nil {
+		app.log.Warn("write own trench", "err", err, "molt", m.ID)
+	}
+	app.fanout.Enqueue(m)
+	app.dir.addMolt(*m)
+	m.AuthorName = currentCrab(r).Name()
 }
 
 // moltReturnPath sends a non-htmx compose back to the feed it was posted from.
@@ -90,7 +95,7 @@ func (app *App) moltLikePost(w http.ResponseWriter, r *http.Request) {
 	if liked {
 		app.notify(r, m.AuthorID, store.NotifyLike, m.ID, m.Content)
 	}
-	app.renderActions(w, r, m, &liked)
+	app.renderActions(w, r, m, actionState{liked: &liked})
 }
 
 // remoltPost shares a molt (remolting a remolt shares the original) and
@@ -100,6 +105,7 @@ func (app *App) remoltPost(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	var st actionState
 	re, err := app.store.Remolt(r.Context(), currentCrab(r), m)
 	switch {
 	case errors.Is(err, store.ErrAlreadyExists), errors.Is(err, store.ErrNotAllowed):
@@ -107,10 +113,33 @@ func (app *App) remoltPost(w http.ResponseWriter, r *http.Request) {
 		app.serverError(w, r, err)
 		return
 	default:
+		st.remoltedAs = &re.ID
 		app.fanout.Enqueue(re)
 		app.notify(r, m.AuthorID, store.NotifyRemolt, m.ID, m.Content)
 	}
-	app.renderActions(w, r, m, nil)
+	app.renderActions(w, r, m, st)
+}
+
+// unremoltPost undoes the viewer's remolt of the molt in the URL and returns
+// its refreshed action bar. The remolt's own entry in any list goes too.
+func (app *App) unremoltPost(w http.ResponseWriter, r *http.Request) {
+	m, ok := app.moltFromPath(w, r)
+	if !ok {
+		return
+	}
+	id, err := app.store.UndoRemolt(r.Context(), currentCrab(r), m)
+	switch {
+	case errors.Is(err, store.ErrNotFound):
+	case err != nil:
+		app.serverError(w, r, err)
+		return
+	default:
+		app.dir.removeMolt(id)
+		trigger, _ := json.Marshal(map[string]any{"moltDeleted": map[string]any{"id": id, "remolt": true}})
+		w.Header().Set("HX-Trigger", string(trigger))
+	}
+	none := ""
+	app.renderActions(w, r, m, actionState{remoltedAs: &none})
 }
 
 // notify queues a notification from the signed-in crab to recipientID.
@@ -187,25 +216,47 @@ func (app *App) moltFromPath(w http.ResponseWriter, r *http.Request) (*store.Mol
 	return m, true
 }
 
+// actionState is what the viewer just changed on a molt, so the refreshed
+// action bar doesn't depend on reading their own write back.
+type actionState struct {
+	liked      *bool
+	remoltedAs *string
+}
+
 // renderActions re-reads the molt (consistently, so counts include the write
 // that just happened) and renders its action bar.
-func (app *App) renderActions(w http.ResponseWriter, r *http.Request, m *store.Molt, liked *bool) {
+func (app *App) renderActions(w http.ResponseWriter, r *http.Request, m *store.Molt, st actionState) {
 	if !isHTMX(r) {
 		http.Redirect(w, r, "/molt/view/"+m.ID, http.StatusSeeOther)
 		return
 	}
-	fresh, err := app.store.MoltByKey(r.Context(), m.PK, m.SK)
+	fresh, err := app.freshMolt(r, m, st)
 	if err != nil {
 		app.serverError(w, r, err)
 		return
 	}
-	if liked != nil {
-		fresh.Liked = *liked
-	} else if ids, err := app.store.LikedIDs(r.Context(), currentCrab(r).ID, []string{fresh.ID}); err == nil {
-		fresh.Liked = ids[fresh.ID]
-	}
 	data := templateData{IsAuthenticated: true, CSRFToken: csrfToken(r), CrabID: currentCrab(r).ID}
 	app.renderTemplate(w, r, http.StatusOK, fragmentPage, "molt-actions", map[string]any{"M": fresh, "D": data})
+}
+
+// freshMolt re-reads m with the viewer's like and remolt filled in.
+func (app *App) freshMolt(r *http.Request, m *store.Molt, st actionState) (*store.Molt, error) {
+	fresh, err := app.store.MoltByKey(r.Context(), m.PK, m.SK)
+	if err != nil {
+		return nil, err
+	}
+	c := currentCrab(r)
+	if st.liked != nil {
+		fresh.Liked = *st.liked
+	} else if ids, err := app.store.LikedIDs(r.Context(), c.ID, []string{fresh.ID}); err == nil {
+		fresh.Liked = ids[fresh.ID]
+	}
+	if st.remoltedAs != nil {
+		fresh.RemoltedAs = *st.remoltedAs
+	} else if ids, err := app.store.RemoltedIDs(r.Context(), c.ID, []string{fresh.ID}); err == nil {
+		fresh.RemoltedAs = ids[fresh.ID]
+	}
+	return fresh, nil
 }
 
 func (app *App) moltView(w http.ResponseWriter, r *http.Request) {
@@ -308,13 +359,10 @@ func (app *App) replyCreatePost(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/molt/view/"+parent.ID, http.StatusSeeOther)
 		return
 	}
-	fresh, err := app.store.MoltByKey(r.Context(), parent.PK, parent.SK)
+	fresh, err := app.freshMolt(r, parent, actionState{})
 	if err != nil {
 		app.serverError(w, r, err)
 		return
-	}
-	if ids, err := app.store.LikedIDs(r.Context(), currentCrab(r).ID, []string{fresh.ID}); err == nil {
-		fresh.Liked = ids[fresh.ID]
 	}
 	reply.AuthorName = currentCrab(r).Name()
 	app.renderTemplate(w, r, http.StatusOK, fragmentPage, "reply-created",

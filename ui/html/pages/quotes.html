@@ -1,0 +1,12 @@
+{{define "title"}}Quote Molts{{end}}
+
+{{define "page"}}
+{{ template "shell-top" . }}
+    <div id="content-heading" class="border-dark border-bottom p-2">
+        <h6 class="m-1"><a href="/molt/view/{{ .Molt.ID }}" class="text-primary mr-2" aria-label="Back">
+            <svg width="20" height="20"><use href="/static/img/sprites.svg?version=1704178675#arrow-left"></use></svg>
+        </a><strong>Quote Molts</strong></h6>
+    </div>
+    {{ template "molt-list" . }}
+{{ template "shell-bottom" . }}
+{{end}}

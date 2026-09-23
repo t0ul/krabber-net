@@ -10,8 +10,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
-// replyPointer lists a reply on its parent's thread.
-type replyPointer struct {
+// moltPointer lists a reply on its parent's thread, or a quote on the quoted
+// molt's quotes page.
+type moltPointer struct {
 	PK     string `dynamodbav:"PK"`
 	SK     string `dynamodbav:"SK"`
 	MoltPK string `dynamodbav:"molt_pk"`
@@ -47,7 +48,7 @@ func (s *Store) Reply(ctx context.Context, author *Crab, parent *Molt, content s
 	if err != nil {
 		return nil, err
 	}
-	pointer, err := marshal(replyPointer{
+	pointer, err := marshal(moltPointer{
 		PK: replyPointerPK(parent.ID), SK: replyPointerSK(id), MoltPK: m.PK, MoltSK: m.SK,
 	})
 	if err != nil {
@@ -70,23 +71,30 @@ func (s *Store) Reply(ctx context.Context, author *Crab, parent *Molt, content s
 
 // Replies returns the replies on a molt, oldest first, skipping deleted ones.
 func (s *Store) Replies(ctx context.Context, parentID string, limit int) ([]Molt, error) {
-	pointers, err := queryAll[replyPointer](ctx, s.db, &dynamodb.QueryInput{
+	replies, err := s.pointedMolts(ctx, replyPointerPK(parentID), true, limit)
+	if err != nil {
+		return nil, fmt.Errorf("replies: %w", err)
+	}
+	slices.Reverse(replies)
+	return replies, nil
+}
+
+// pointedMolts loads the molts listed in a pointer partition, newest first.
+// oldest picks which end of the partition a limit keeps.
+func (s *Store) pointedMolts(ctx context.Context, pk string, oldest bool, limit int) ([]Molt, error) {
+	pointers, err := queryAll[moltPointer](ctx, s.db, &dynamodb.QueryInput{
 		TableName:                 s.tableName(),
 		KeyConditionExpression:    aws.String("PK = :pk"),
-		ExpressionAttributeValues: map[string]types.AttributeValue{":pk": str(replyPointerPK(parentID))},
+		ExpressionAttributeValues: map[string]types.AttributeValue{":pk": str(pk)},
+		ScanIndexForward:          aws.Bool(oldest),
 		Limit:                     pageLimit(limit),
 	}, limit)
 	if err != nil {
-		return nil, fmt.Errorf("replies: %w", err)
+		return nil, err
 	}
 	keys := make([][2]string, 0, len(pointers))
 	for _, p := range pointers {
 		keys = append(keys, [2]string{p.MoltPK, p.MoltSK})
 	}
-	replies, err := s.MoltsByKeys(ctx, keys)
-	if err != nil {
-		return nil, err
-	}
-	slices.Reverse(replies)
-	return replies, nil
+	return s.MoltsByKeys(ctx, keys)
 }

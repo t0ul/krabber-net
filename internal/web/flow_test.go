@@ -826,6 +826,74 @@ func TestAuthorNames(t *testing.T) {
 	}
 }
 
+func TestQuotes(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	h.signupAndActivate("karen", "karen@krabber.test", "computer-wife!")
+	h.signupAndActivate("plankton", "plankton@krabber.test", "formula-thief!")
+	karenID := currentID(t, h, "karen")
+
+	h.login("karen@krabber.test", "computer-wife!")
+	tok := h.csrf("/trench")
+	h.post("/molt/create", url.Values{"csrf_token": {tok}, "content": {"Dinner is ready"}}, "HX-Request", "true")
+	molts, _ := h.store.MoltsByOwner(ctx, karenID, 1)
+	root := molts[0].ID
+	h.post("/crab/logout", url.Values{"csrf_token": {tok}})
+
+	h.login("plankton@krabber.test", "formula-thief!")
+	tok = h.csrf("/trench")
+	if _, body, _ := h.get("/sea"); !strings.Contains(body, `href="/molt/quote/`+root+`"`) || strings.Contains(body, "Liked by") {
+		t.Error("the remolt menu has no Quote Molt link, or the old Liked by link is back")
+	}
+	if status, body, _ := h.get("/molt/quote/" + root); status != http.StatusOK || !strings.Contains(body, "Quoting") || !strings.Contains(body, `data-quoted-id="`+root+`"`) {
+		t.Fatalf("quote page: %d", status)
+	}
+	if status, body, _ := h.post("/molt/quote/"+root, url.Values{"csrf_token": {tok}, "content": {"  "}}); status != http.StatusUnprocessableEntity || !strings.Contains(body, "Say something about it.") {
+		t.Fatalf("blank quote: %d", status)
+	}
+	status, _, hdr := h.post("/molt/quote/"+root, url.Values{"csrf_token": {tok}, "content": {"Chum again?"}})
+	if status != http.StatusSeeOther || !strings.HasPrefix(hdr.Get("Location"), "/molt/view/") {
+		t.Fatalf("quote: %d %q", status, hdr.Get("Location"))
+	}
+	quote := strings.TrimPrefix(hdr.Get("Location"), "/molt/view/")
+	if _, body, _ := h.get("/molt/view/" + quote); !strings.Contains(body, "Chum again?") || !strings.Contains(body, `data-quoted-id="`+root+`"`) {
+		t.Error("the quote's thread doesn't show the quoted molt")
+	}
+	if _, body, _ := h.get("/sea"); !strings.Contains(body, `data-molt-id="`+quote+`"`) || !strings.Contains(body, `data-quoted-id="`+root+`"`) {
+		t.Error("the quote isn't in the Sea with its preview")
+	}
+	if _, body, _ := h.get("/molt/view/" + root); !strings.Contains(body, `href="/molt/view/`+root+`/quotes"`) {
+		t.Error("the thread doesn't link to its quotes")
+	}
+	if _, body, _ := h.get("/molt/view/" + root + "/quotes"); !strings.Contains(body, `data-molt-id="`+quote+`"`) {
+		t.Error("the quotes page doesn't list the quote")
+	}
+
+	// The remolt menu turns into Undo Remolt, and back.
+	_, body, _ := h.post("/remolt/"+root, url.Values{"csrf_token": {tok}}, "HX-Request", "true")
+	if !strings.Contains(body, "active-remolt") || !strings.Contains(body, `hx-post="/unremolt/`+root+`"`) {
+		t.Fatalf("after remolt: %s", body)
+	}
+	_, body, hdr = h.post("/unremolt/"+root, url.Values{"csrf_token": {tok}}, "HX-Request", "true")
+	if strings.Contains(body, "active-remolt") || !strings.Contains(body, `hx-post="/remolt/`+root+`"`) || !strings.Contains(hdr.Get("HX-Trigger"), "moltDeleted") {
+		t.Fatalf("after undo: %s", body)
+	}
+	if got, _ := h.store.MoltByID(ctx, root); got.RemoltCount != 0 || got.QuoteCount != 1 {
+		t.Fatalf("counts: %d remolts, %d quotes", got.RemoltCount, got.QuoteCount)
+	}
+	h.post("/crab/logout", url.Values{"csrf_token": {tok}})
+
+	h.login("karen@krabber.test", "computer-wife!")
+	tok = h.csrf("/trench")
+	if _, body, _ := h.get("/notifications"); !strings.Contains(body, "quoted your molt") {
+		t.Error("no quote notification")
+	}
+	h.post("/molt/delete/"+root, url.Values{"csrf_token": {tok}}, "HX-Request", "true")
+	if _, body, _ := h.get("/molt/view/" + quote); !strings.Contains(body, "This molt is unavailable.") || !strings.Contains(body, "Chum again?") {
+		t.Error("a quote of a deleted molt doesn't say so")
+	}
+}
+
 // TestNavLayout keeps the nav in Crabber's order: main pages, the Molt button,
 // then the muted extras.
 func TestNavLayout(t *testing.T) {

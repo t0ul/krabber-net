@@ -281,6 +281,9 @@ func (app *App) withLikes(r *http.Request, molts []store.Molt) ([]store.Molt, er
 		return nil, err
 	}
 	app.withNames(r, molts)
+	if err := app.withQuoted(r, molts); err != nil {
+		return nil, err
+	}
 	c := currentCrab(r)
 	if c == nil || len(molts) == 0 {
 		return molts, nil
@@ -293,8 +296,43 @@ func (app *App) withLikes(r *http.Request, molts []store.Molt) ([]store.Molt, er
 	if err != nil {
 		return nil, err
 	}
+	remolted, err := app.store.RemoltedIDs(r.Context(), c.ID, ids)
+	if err != nil {
+		return nil, err
+	}
 	for i := range molts {
 		molts[i].Liked = liked[molts[i].ID]
+		molts[i].RemoltedAs = remolted[molts[i].ID]
 	}
 	return molts, nil
+}
+
+// withQuoted attaches the quoted molt to each quote. A quoted molt that was
+// deleted, removed or written by a hidden crab stays nil.
+func (app *App) withQuoted(r *http.Request, molts []store.Molt) error {
+	var keys [][2]string
+	for _, m := range molts {
+		if m.QuoteOf != "" {
+			keys = append(keys, [2]string{m.QuoteOfPK, m.QuoteOfSK})
+		}
+	}
+	if len(keys) == 0 {
+		return nil
+	}
+	quoted, err := app.store.MoltsByKeys(r.Context(), keys)
+	if err != nil {
+		return err
+	}
+	quoted = app.visibleMolts(r, quoted)
+	app.withNames(r, quoted)
+	byID := make(map[string]*store.Molt, len(quoted))
+	for i := range quoted {
+		byID[quoted[i].ID] = &quoted[i]
+	}
+	for i := range molts {
+		if q, ok := byID[molts[i].QuoteOf]; ok {
+			molts[i].Quoted = q
+		}
+	}
+	return nil
 }

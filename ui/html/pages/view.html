@@ -32,8 +32,16 @@
             </div>
             {{ template "molt-menu" (dict "M" . "D" $d "Thread" true) }}
         </div>
-        <p class="large-molt-text mb-2">{{ .Content }}</p>
+        <p class="large-molt-text mb-2 molt-text">{{ .Content }}</p>
+        {{ if .QuoteOf }}{{ template "quoted-molt" .Quoted }}{{ end }}
         <div class="text-muted small pb-2 border-bottom border-dark">{{ template "time" .CreatedAt }}</div>
+        {{ if or .RemoltCount .QuoteCount .LikeCount }}
+        <div class="d-flex flex-row border-dark border-bottom w-100 py-2 kb-molt-stats">
+            {{ if .RemoltCount }}<span class="text-muted mr-3"><span class="text-light font-weight-bold">{{ .RemoltCount }}</span> Remolt{{ if ne .RemoltCount 1 }}s{{ end }}</span>{{ end }}
+            {{ if .QuoteCount }}<a href="/molt/view/{{ .ID }}/quotes" class="text-muted mr-3"><span class="text-light font-weight-bold">{{ .QuoteCount }}</span> Quote{{ if ne .QuoteCount 1 }}s{{ end }}</a>{{ end }}
+            {{ if .LikeCount }}<a href="/molt/likes/view/{{ .ID }}" class="text-muted mr-3"><span class="text-light font-weight-bold">{{ .LikeCount }}</span> Like{{ if ne .LikeCount 1 }}s{{ end }}</a>{{ end }}
+        </div>
+        {{ end }}
         <div id="thread-actions">{{ template "molt-actions" (dict "M" . "D" $d) }}</div>
     </div>
 

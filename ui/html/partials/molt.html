@@ -51,8 +51,32 @@
                 <a class="zindex-front text-light molt-text" href="/molt/view/{{ $m.ID }}">{{ $m.Content }}</a>
             </p>
         </div>
+        {{ if $m.QuoteOf }}{{ template "quoted-molt" $m.Quoted }}{{ end }}
         {{ template "molt-actions" . }}
     </div>
+</div>
+{{end}}
+
+{{/* The quoted molt inside a quote, without its actions; takes the quoted
+     molt, or nil when it's gone. */}}
+{{define "quoted-molt"}}
+<div class="quoted-molt rounded-media mb-2 zindex-front">
+    {{ with . }}
+    <div class="mini-molt px-3 py-2 absolute-container" data-quoted-id="{{ .ID }}">
+        <div class="mini-molt-credentials">
+            <div class="mini-molt-credentials-text">
+                <a class="zindex-front" href="/crabs/{{ .Author }}"><img class="kb-avatar kb-avatar-sm profile-picture mr-1" src="/static/img/crab_illustration.jpg" width="20" height="20" loading="lazy" alt=""></a>
+                <a class="mini-molt-display-name zindex-front" href="/crabs/{{ .Author }}">{{ or .AuthorName .Author }}</a>
+                <span class="mini-molt-username">@{{ .Author }}</span>
+                <span class="mini-molt-timestamp">· {{ template "time" .CreatedAt }}</span>
+            </div>
+        </div>
+        <div class="mini-molt-content"><p class="mb-0 molt-text">{{ .Content }}</p></div>
+        <a class="absolute-fill" href="/molt/view/{{ .ID }}" aria-label="Open the quoted molt"></a>
+    </div>
+    {{ else }}
+    <div class="px-3 py-2 text-muted">This molt is unavailable.</div>
+    {{ end }}
 </div>
 {{end}}
 
@@ -74,21 +98,11 @@
 {{define "molt-menu"}}{{ $m := .M }}{{ $d := .D }}
 {{ if $d.IsAuthenticated }}
 {{ $own := eq $m.AuthorID $d.CrabID }}
-{{ $ownRemolt := and $m.Remolt $m.EntryID (eq $m.RemoltedBy $d.CrabName) }}
 <details class="kb-menu zindex-front">
     <summary class="mini-molt-action reply rounded-circle" title="More" aria-label="More options">
         <svg class="mini-molt-action-icon" width="19" height="19"><use href="/static/img/sprites.svg?version=1704178675#more-horizontal"></use></svg>
     </summary>
     <div class="kb-menu-items">
-        {{ if $ownRemolt }}
-        <form hx-post="/molt/delete/{{ $m.EntryID }}" hx-swap="none" hx-confirm="Undo this remolt?">
-            <input type='hidden' name='csrf_token' value='{{ $d.CSRFToken }}'>
-            <button type="submit" class="kb-menu-item">
-                <svg width="19" height="19"><use href="/static/img/sprites.svg?version=1704178675#repeat"></use></svg>
-                Undo remolt
-            </button>
-        </form>
-        {{ end }}
         {{ if $own }}
         <form hx-post="/molt/delete/{{ $m.ID }}{{ if .Thread }}?from=thread{{ end }}" hx-swap="none" hx-confirm="Delete this molt? This can't be undone.">
             <input type='hidden' name='csrf_token' value='{{ $d.CSRFToken }}'>
@@ -122,13 +136,35 @@
         <span class="mini-molt-action-counter ml-1">{{ $m.ReplyCount }}</span>
     </a>
     {{ if $d.IsAuthenticated }}
-    <form hx-post="/remolt/{{ $m.ID }}" hx-target="closest .mini-molt-actions" hx-swap="outerHTML">
-        <input type='hidden' name='csrf_token' value='{{ $d.CSRFToken }}'>
-        <button class="mini-molt-action remolt zindex-front action-button" type="submit" title="Remolt">
+    <details class="kb-menu kb-remolt-menu zindex-front">
+        <summary class="mini-molt-action remolt{{ if $m.RemoltedAs }} active-remolt{{ end }}" title="Remolt" aria-label="Remolt options">
             <svg class="mini-molt-action-icon" width="19" height="19"><use href="/static/img/sprites.svg?version=1704178675#repeat"></use></svg>
             <span class="mini-molt-action-counter ml-1">{{ $m.RemoltCount }}</span>
-        </button>
-    </form>
+        </summary>
+        <div class="kb-menu-items">
+            {{ if $m.RemoltedAs }}
+            <form hx-post="/unremolt/{{ $m.ID }}" hx-target="closest .mini-molt-actions" hx-swap="outerHTML">
+                <input type='hidden' name='csrf_token' value='{{ $d.CSRFToken }}'>
+                <button type="submit" class="kb-menu-item kb-menu-danger">
+                    <svg width="19" height="19"><use href="/static/img/sprites.svg?version=1704178675#repeat"></use></svg>
+                    Undo Remolt
+                </button>
+            </form>
+            {{ else }}
+            <form hx-post="/remolt/{{ $m.ID }}" hx-target="closest .mini-molt-actions" hx-swap="outerHTML">
+                <input type='hidden' name='csrf_token' value='{{ $d.CSRFToken }}'>
+                <button type="submit" class="kb-menu-item">
+                    <svg width="19" height="19"><use href="/static/img/sprites.svg?version=1704178675#repeat"></use></svg>
+                    Remolt
+                </button>
+            </form>
+            {{ end }}
+            <a class="kb-menu-item" href="/molt/quote/{{ $m.ID }}">
+                <svg width="19" height="19"><use href="/static/img/sprites.svg?version=1704178675#pencil"></use></svg>
+                Quote Molt
+            </a>
+        </div>
+    </details>
     <form hx-post="/molt/like/{{ $m.ID }}" hx-target="closest .mini-molt-actions" hx-swap="outerHTML">
         <input type='hidden' name='csrf_token' value='{{ $d.CSRFToken }}'>
         <button class="mini-molt-action like zindex-front action-button{{ if $m.Liked }} liked{{ end }}" type="submit" title="{{ if $m.Liked }}Unlike{{ else }}Like{{ end }}">
@@ -146,7 +182,6 @@
         <span class="mini-molt-action-counter ml-1">{{ $m.LikeCount }}</span>
     </span>
     {{ end }}
-    <a class="mini-molt-action zindex-front text-muted small align-self-center" href="/molt/likes/view/{{ $m.ID }}">Liked by</a>
 </div>
 {{end}}
 

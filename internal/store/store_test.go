@@ -699,6 +699,105 @@ func TestReplies(t *testing.T) {
 	}
 }
 
+func TestQuotes(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+	author := mustCrab(t, s, "plankton")
+	karen := mustCrab(t, s, "karen")
+	m, err := s.CreateMolt(ctx, author, "the formula will be mine")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var quotes []*Molt
+	for i := range 2 {
+		q, err := s.Quote(ctx, karen, m, fmt.Sprintf("quote %d", i))
+		if err != nil {
+			t.Fatal(err)
+		}
+		quotes = append(quotes, q)
+	}
+	if _, err := s.Quote(ctx, karen, &Molt{ID: "x", Remolt: true}, "no"); !errors.Is(err, ErrNotAllowed) {
+		t.Fatalf("quote a remolt: %v", err)
+	}
+	if got, _ := s.MoltByID(ctx, m.ID); got.QuoteCount != 2 {
+		t.Fatalf("quote count: %d", got.QuoteCount)
+	}
+	list, err := s.Quotes(ctx, m.ID, 10)
+	if err != nil || len(list) != 2 || list[0].ID != quotes[1].ID || list[0].QuoteOf != m.ID {
+		t.Fatalf("quotes, newest first: %+v, %v", list, err)
+	}
+
+	// Quotes are ordinary molts: on the timeline, in the Sea and queued for trenches.
+	if own, _ := s.MoltsByOwner(ctx, karen.ID, 10); len(own) != 2 {
+		t.Fatalf("quotes on the timeline: %d", len(own))
+	}
+	if sea, _ := s.Sea(ctx, 25); len(sea) != 3 {
+		t.Fatalf("sea has %d molts, want the original and both quotes", len(sea))
+	}
+	if pending, _ := s.PendingFanouts(ctx, time.Now().Add(time.Hour), 10); len(pending) != 3 {
+		t.Fatalf("fan-out queue has %d molts", len(pending))
+	}
+
+	// Deleting a quote takes it off the list and fixes the count.
+	if err := s.DeleteMolt(ctx, karen, quotes[1]); err != nil {
+		t.Fatal(err)
+	}
+	if list, _ := s.Quotes(ctx, m.ID, 10); len(list) != 1 {
+		t.Fatalf("quotes after delete: %+v", list)
+	}
+	if got, _ := s.MoltByID(ctx, m.ID); got.QuoteCount != 1 {
+		t.Fatalf("quote count after delete: %d", got.QuoteCount)
+	}
+
+	// Purging the quoter gives the count back.
+	tomb, err := s.DeleteAccount(ctx, reload(t, s, karen))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.PurgeCrab(ctx, tomb.ID); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := s.MoltByID(ctx, m.ID); got.QuoteCount != 0 {
+		t.Fatalf("quote count after purge: %d", got.QuoteCount)
+	}
+	if list, _ := s.Quotes(ctx, m.ID, 10); len(list) != 0 {
+		t.Fatalf("quotes after purge: %+v", list)
+	}
+}
+
+func TestRemoltedIDsAndUndo(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+	author := mustCrab(t, s, "plankton")
+	karen := mustCrab(t, s, "karen")
+	a, _ := s.CreateMolt(ctx, author, "one")
+	b, _ := s.CreateMolt(ctx, author, "two")
+	re, err := s.Remolt(ctx, karen, a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.RemoltedIDs(ctx, karen.ID, []string{a.ID, b.ID, a.ID})
+	if err != nil || len(got) != 1 || got[a.ID] != re.ID {
+		t.Fatalf("remolted ids: %v, %v", got, err)
+	}
+	if _, err := s.UndoRemolt(ctx, karen, b); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("undo a remolt that isn't there: %v", err)
+	}
+	id, err := s.UndoRemolt(ctx, reload(t, s, karen), a)
+	if err != nil || id != re.ID {
+		t.Fatalf("undo: %q, %v", id, err)
+	}
+	if got, _ := s.MoltByID(ctx, a.ID); got.RemoltCount != 0 {
+		t.Fatalf("remolt count after undo: %d", got.RemoltCount)
+	}
+	if got, _ := s.RemoltedIDs(ctx, karen.ID, []string{a.ID}); len(got) != 0 {
+		t.Fatalf("still remolted: %v", got)
+	}
+	if _, err := s.Remolt(ctx, reload(t, s, karen), a); err != nil {
+		t.Fatalf("remolt again after undo: %v", err)
+	}
+}
+
 func TestRateLimitWindows(t *testing.T) {
 	s := newTestStore(t)
 	ctx := context.Background()

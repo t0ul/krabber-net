@@ -118,10 +118,10 @@ func (s *Store) PurgeCrab(ctx context.Context, crabID string) error {
 	return nil
 }
 
-// purgeMolts deletes the crab's molts, replies and remolts. Molts and replies
-// take their likes, reports and thread listing with them (other crabs'
-// replies stay, pointing at a missing parent); replies and remolts give back
-// the parent's count.
+// purgeMolts deletes the crab's molts, replies, quotes and remolts. Molts take
+// their likes, reports and reply and quote listings with them (other crabs'
+// replies and quotes stay, pointing at a missing molt); replies, quotes and
+// remolts give back the parent's count.
 func (s *Store) purgeMolts(ctx context.Context, tomb *Crab) error {
 	molts, err := queryAll[Molt](ctx, s.db, &dynamodb.QueryInput{
 		TableName:                 s.tableName(),
@@ -133,7 +133,7 @@ func (s *Store) purgeMolts(ctx context.Context, tomb *Crab) error {
 	}
 	for _, m := range molts {
 		if !m.Remolt {
-			for _, pk := range []string{replyPointerPK(m.ID), reportPK(m.ID)} {
+			for _, pk := range []string{replyPointerPK(m.ID), quotePointerPK(m.ID), reportPK(m.ID)} {
 				if err := s.deletePartition(ctx, pk); err != nil {
 					return err
 				}
@@ -159,6 +159,11 @@ func (s *Store) purgeMolts(ctx context.Context, tomb *Crab) error {
 			err = s.batchDelete(ctx, [][2]string{{replyPointerPK(m.ReplyTo), replyPointerSK(m.ID)}})
 			if err == nil {
 				err = s.deleteAndCount(ctx, m.PK, m.SK, m.ReplyToPK, m.ReplyToSK, "reply_count")
+			}
+		case m.QuoteOf != "":
+			err = s.batchDelete(ctx, [][2]string{{quotePointerPK(m.QuoteOf), quotePointerSK(m.ID)}})
+			if err == nil {
+				err = s.deleteAndCount(ctx, m.PK, m.SK, m.QuoteOfPK, m.QuoteOfSK, "quote_count")
 			}
 		default:
 			err = s.batchDelete(ctx, [][2]string{{m.PK, m.SK}})
