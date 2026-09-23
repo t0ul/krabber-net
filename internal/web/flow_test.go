@@ -44,6 +44,12 @@ func (c *capturedMail) Send(_ context.Context, m mail.Message) error {
 	return nil
 }
 
+func (c *capturedMail) count() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return len(c.msgs)
+}
+
 func (c *capturedMail) last(t *testing.T) mail.Message {
 	t.Helper()
 	c.mu.Lock()
@@ -580,6 +586,53 @@ func TestBlocking(t *testing.T) {
 	h.post("/unblock/"+planktonID, url.Values{"csrf_token": {tok}}, "HX-Request", "true")
 	if _, body, _ := h.get("/sea"); !strings.Contains(body, "Give me the formula") {
 		t.Error("unblock should bring plankton's molt back")
+	}
+}
+
+func TestPasswordReset(t *testing.T) {
+	h := newHarness(t)
+	h.signupAndActivate("pearl", "pearl@krabber.test", "whale-of-a-time")
+	h.login("pearl@krabber.test", "whale-of-a-time")
+	signedIn := h.client
+	h.client = h.newClient()
+	sent := h.mail.count()
+
+	// Unknown emails get the same answer and no email.
+	tok := h.csrf("/crab/forgot")
+	status, _, hdr := h.post("/crab/forgot", url.Values{"csrf_token": {tok}, "email": {"nobody@krabber.test"}})
+	if status != http.StatusSeeOther || hdr.Get("Location") != "/crab/reset" || h.mail.count() != sent {
+		t.Fatalf("unknown email: %d %s, %d emails", status, hdr.Get("Location"), h.mail.count()-sent)
+	}
+	h.post("/crab/forgot", url.Values{"csrf_token": {tok}, "email": {"PEARL@krabber.test"}})
+	msg := h.mail.last(t)
+	m := regexp.MustCompile(`token=([A-Z2-7]{26})`).FindStringSubmatch(msg.Text)
+	if h.mail.count() != sent+1 || m == nil || !strings.Contains(msg.Subject, "Reset") {
+		t.Fatalf("reset email: %+v", msg)
+	}
+
+	// A rejected password keeps the token usable.
+	tok = h.csrf("/crab/reset?token=" + m[1])
+	if status, _, _ := h.post("/crab/reset", url.Values{"csrf_token": {tok}, "token": {m[1]}, "password": {"short"}, "confirm_password": {"short"}}); status != http.StatusUnprocessableEntity {
+		t.Fatalf("short password: %d", status)
+	}
+	status, _, hdr = h.post("/crab/reset", url.Values{"csrf_token": {tok}, "token": {m[1]}, "password": {"daddy-buy-me"}, "confirm_password": {"daddy-buy-me"}})
+	if status != http.StatusSeeOther || hdr.Get("Location") != "/crab/login" {
+		t.Fatalf("reset: %d %s", status, hdr.Get("Location"))
+	}
+	tok = h.csrf("/crab/reset")
+	if status, body, _ := h.post("/crab/reset", url.Values{"csrf_token": {tok}, "token": {m[1]}, "password": {"again-and-again"}, "confirm_password": {"again-and-again"}}); status != http.StatusUnprocessableEntity || !strings.Contains(body, "invalid or has expired") {
+		t.Fatalf("token reused: %d", status)
+	}
+
+	if status, _ := h.login("pearl@krabber.test", "whale-of-a-time"); status == http.StatusSeeOther {
+		t.Fatal("old password still works")
+	}
+	if status, _ := h.login("pearl@krabber.test", "daddy-buy-me"); status != http.StatusSeeOther {
+		t.Fatalf("new password: %d", status)
+	}
+	h.client = signedIn
+	if status, _, _ := h.get("/trench"); status != http.StatusSeeOther {
+		t.Fatalf("old session survived the reset: %d", status)
 	}
 }
 
