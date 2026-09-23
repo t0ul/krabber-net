@@ -600,6 +600,25 @@ func TestLikes(t *testing.T) {
 	if err != nil || got.LikeCount != 1 {
 		t.Fatalf("counters: %+v, %v", got, err)
 	}
+
+	// Likes from before likes stored the molt's key are found by molt ID.
+	older, err := s.CreateMolt(ctx, author, "phase one")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.LikeMolt(ctx, liker, older); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.db.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+		TableName: s.tableName(), Key: keyOf(likePK(liker.ID), likeSK(older.ID)),
+		UpdateExpression: aws.String("REMOVE molt_pk, molt_sk"),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	liked, err := s.LikedMolts(ctx, liker.ID, 10)
+	if err != nil || len(liked) != 2 || liked[0].ID != older.ID || liked[1].ID != m.ID {
+		t.Fatalf("liked molts: %+v, %v", liked, err)
+	}
 }
 
 func TestReplies(t *testing.T) {

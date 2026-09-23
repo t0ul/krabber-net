@@ -46,6 +46,8 @@ func (app *App) Routes() http.Handler {
 	mux.HandleFunc("POST /settings/delete", app.requireAuthentication(app.settingsDeletePost))
 	mux.HandleFunc("GET /crabs", app.requireAuthentication(app.allCrabs))
 	mux.HandleFunc("GET /crabs/{name}", app.profile)
+	mux.HandleFunc("GET /crabs/{name}/replies", app.profileReplies)
+	mux.HandleFunc("GET /crabs/{name}/likes", app.profileLikes)
 	mux.HandleFunc("GET /crabs/{name}/followers", app.followersList)
 	mux.HandleFunc("GET /crabs/{name}/following", app.followingList)
 	mux.HandleFunc("GET /search", app.searchPage)

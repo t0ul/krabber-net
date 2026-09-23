@@ -53,7 +53,16 @@
             <a class="ml-3 text-light" href="/crabs/{{ $p.UserName }}/followers"><strong>{{ $p.FollowerCount }}</strong> <span class="text-muted">followers</span></a>
         </div>
     </div>
-    {{ if eq $p.ID .CrabID }}{{ template "compose" . }}{{ end }}
+    {{ if not .IsBlocking }}
+    <nav class="kb-tabs d-flex border-bottom border-dark" aria-label="Profile">
+        {{ template "profile-tab" (dict "Href" (print "/crabs/" $p.UserName) "Label" "Molts" "Active" (eq .Tab "molts")) }}
+        {{ template "profile-tab" (dict "Href" (print "/crabs/" $p.UserName "/replies") "Label" "Replies" "Active" (eq .Tab "replies")) }}
+        {{ template "profile-tab" (dict "Href" (print "/crabs/" $p.UserName "/likes") "Label" "Likes" "Active" (eq .Tab "likes")) }}
+    </nav>
+    {{ end }}
+    {{ if and (eq $p.ID .CrabID) (eq .Tab "molts") }}{{ template "compose" . }}{{ end }}
     {{ template "molt-list" . }}
 {{ template "shell-bottom" . }}
 {{end}}
+
+{{define "profile-tab"}}<a class="kb-tab flex-fill text-center py-2{{ if .Active }} active{{ end }}" href="{{ .Href }}"{{ if .Active }} aria-current="page"{{ end }}>{{ .Label }}</a>{{end}}

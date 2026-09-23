@@ -84,22 +84,48 @@ func (app *App) notificationBadge(w http.ResponseWriter, r *http.Request) {
 	app.renderTemplate(w, r, http.StatusOK, fragmentPage, "notification-badge", n)
 }
 
-// profile shows a crab's page: counts, follow button and their molts.
-func (app *App) profile(w http.ResponseWriter, r *http.Request) {
+// Profile tabs.
+const (
+	tabMolts   = "molts"
+	tabReplies = "replies"
+	tabLikes   = "likes"
+)
+
+func (app *App) profile(w http.ResponseWriter, r *http.Request) { app.profileTab(w, r, tabMolts) }
+func (app *App) profileReplies(w http.ResponseWriter, r *http.Request) {
+	app.profileTab(w, r, tabReplies)
+}
+func (app *App) profileLikes(w http.ResponseWriter, r *http.Request) { app.profileTab(w, r, tabLikes) }
+
+// profileTab shows a crab's page: counts, follow button, and one tab of
+// their molts, replies or likes.
+func (app *App) profileTab(w http.ResponseWriter, r *http.Request, tab string) {
 	p, ok := app.crabFromName(w, r)
 	if !ok {
 		return
 	}
 	data := app.newTemplateData(r)
 	data.Profile = p
-	data.EmptyMessage = "@" + p.UserName + " hasn't molted yet."
+	data.Tab = tab
 	if _, blocking := blocksOf(r).Blocking[p.ID]; blocking {
 		data.IsBlocking = true
 		data.EmptyMessage = "You blocked @" + p.UserName + ". Unblock them to see their molts."
 		app.render(w, r, http.StatusOK, "profile.html", data)
 		return
 	}
-	molts, err := app.store.MoltsByOwner(r.Context(), p.ID, pageSize)
+	var molts []store.Molt
+	var err error
+	switch tab {
+	case tabReplies:
+		data.EmptyMessage = "@" + p.UserName + " hasn't replied to anyone yet."
+		molts, err = app.store.RepliesByOwner(r.Context(), p.ID, pageSize)
+	case tabLikes:
+		data.EmptyMessage = "@" + p.UserName + " hasn't liked any molts yet."
+		molts, err = app.store.LikedMolts(r.Context(), p.ID, pageSize)
+	default:
+		data.EmptyMessage = "@" + p.UserName + " hasn't molted yet."
+		molts, err = app.store.MoltsByOwner(r.Context(), p.ID, pageSize)
+	}
 	if err == nil {
 		molts, err = app.withLikes(r, molts)
 	}

@@ -303,3 +303,20 @@
   margin-top: -0.1rem;
   margin-bottom: 0.25rem;
 }
+
+.kb-tab {
+  color: var(--gray, #8899a6);
+  font-weight: 700;
+  border-bottom: 3px solid transparent;
+}
+
+.kb-tab:hover {
+  color: var(--light, #f8f9fa);
+  text-decoration: none;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.kb-tab.active {
+  color: var(--light, #f8f9fa);
+  border-bottom-color: var(--primary);
+}

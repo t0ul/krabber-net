@@ -727,6 +727,55 @@ func TestReplyThread(t *testing.T) {
 	}
 }
 
+func TestProfileTabs(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	h.signupAndActivate("karen", "karen@krabber.test", "computer-wife!")
+	h.signupAndActivate("plankton", "plankton@krabber.test", "formula-thief!")
+	karenID, planktonID := currentID(t, h, "karen"), currentID(t, h, "plankton")
+
+	h.login("karen@krabber.test", "computer-wife!")
+	tok := h.csrf("/trench")
+	h.post("/molt/create", url.Values{"csrf_token": {tok}, "content": {"Dinner is ready"}}, "HX-Request", "true")
+	h.post("/crab/logout", url.Values{"csrf_token": {tok}})
+	molts, _ := h.store.MoltsByOwner(ctx, karenID, 1)
+	root := `data-molt-id="` + molts[0].ID + `"`
+
+	h.login("plankton@krabber.test", "formula-thief!")
+	tok = h.csrf("/trench")
+	h.post("/molt/create", url.Values{"csrf_token": {tok}, "content": {"Phase one"}}, "HX-Request", "true")
+	h.post("/molt/reply/"+molts[0].ID, url.Values{"csrf_token": {tok}, "content": {"Is it chum?"}}, "HX-Request", "true")
+	h.post("/molt/like/"+molts[0].ID, url.Values{"csrf_token": {tok}}, "HX-Request", "true")
+	own, _ := h.store.MoltsByOwner(ctx, planktonID, 1)
+	replies, _ := h.store.RepliesByOwner(ctx, planktonID, 1)
+	mine, reply := `data-molt-id="`+own[0].ID+`"`, `data-molt-id="`+replies[0].ID+`"`
+
+	for path, want := range map[string]struct {
+		has, hasNot []string
+		active      string
+	}{
+		"/crabs/plankton":         {[]string{mine, `name="content"`}, []string{reply, root}, `/crabs/plankton" aria-current="page"`},
+		"/crabs/plankton/replies": {[]string{reply, "Replying to"}, []string{mine, root, `hx-post="/molt/create"`}, `/crabs/plankton/replies" aria-current="page"`},
+		"/crabs/plankton/likes":   {[]string{root, "liked"}, []string{mine, reply}, `/crabs/plankton/likes" aria-current="page"`},
+		"/crabs/karen/replies":    {[]string{"hasn&#39;t replied to anyone yet"}, []string{reply}, `/crabs/karen/replies" aria-current="page"`},
+	} {
+		status, body, _ := h.get(path)
+		if status != http.StatusOK || !strings.Contains(body, want.active) {
+			t.Errorf("%s: %d, active tab missing", path, status)
+		}
+		for _, s := range want.has {
+			if !strings.Contains(body, s) {
+				t.Errorf("%s: missing %q", path, s)
+			}
+		}
+		for _, s := range want.hasNot {
+			if strings.Contains(body, s) {
+				t.Errorf("%s: shouldn't have %q", path, s)
+			}
+		}
+	}
+}
+
 func TestSitePages(t *testing.T) {
 	h := newHarness(t)
 	for _, path := range []string{"/no-such-page", "/molt/view/nope", "/crabs/nobody"} {

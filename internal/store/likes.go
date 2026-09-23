@@ -21,6 +21,8 @@ type Like struct {
 	CrabID    string    `dynamodbav:"crab_id"`
 	CrabName  string    `dynamodbav:"crab_name"`
 	MoltID    string    `dynamodbav:"molt_id"`
+	MoltPK    string    `dynamodbav:"molt_pk,omitempty"`
+	MoltSK    string    `dynamodbav:"molt_sk,omitempty"`
 	CreatedAt time.Time `dynamodbav:"created_at"`
 }
 
@@ -35,6 +37,8 @@ func (s *Store) LikeMolt(ctx context.Context, c *Crab, m *Molt) error {
 		CrabID:    c.ID,
 		CrabName:  c.UserName,
 		MoltID:    m.ID,
+		MoltPK:    m.PK,
+		MoltSK:    m.SK,
 		CreatedAt: s.now(),
 	})
 	if err != nil {
@@ -134,4 +138,31 @@ func (s *Store) LikesOn(ctx context.Context, moltID string, limit int) ([]Like, 
 		return nil, fmt.Errorf("likes on molt: %w", err)
 	}
 	return likes, nil
+}
+
+// LikedMolts returns the molts and replies a crab liked, newest molt first
+// (the like partition is sorted by molt ID, not by when the like happened).
+func (s *Store) LikedMolts(ctx context.Context, crabID string, limit int) ([]Molt, error) {
+	likes, err := queryAll[Like](ctx, s.db, &dynamodb.QueryInput{
+		TableName:                 s.tableName(),
+		KeyConditionExpression:    aws.String("PK = :pk"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{":pk": str(likePK(crabID))},
+		ScanIndexForward:          aws.Bool(false),
+		Limit:                     pageLimit(limit),
+	}, limit)
+	if err != nil {
+		return nil, fmt.Errorf("liked molts: %w", err)
+	}
+	keys := make([][2]string, 0, len(likes))
+	for _, l := range likes {
+		if l.MoltPK == "" { // liked before likes stored the molt's key
+			if l.MoltPK, l.MoltSK, err = s.moltKey(ctx, l.MoltID); errors.Is(err, ErrNotFound) {
+				continue
+			} else if err != nil {
+				return nil, err
+			}
+		}
+		keys = append(keys, [2]string{l.MoltPK, l.MoltSK})
+	}
+	return s.MoltsByKeys(ctx, keys)
 }
