@@ -35,6 +35,9 @@ type Crab struct {
 	FollowerCount  int `dynamodbav:"follower_count"`
 	FollowingCount int `dynamodbav:"following_count"`
 	MoltCount      int `dynamodbav:"molt_count"`
+	// BlockLinks counts blocks this crab made or received; at 0 nothing
+	// needs filtering and the block query is skipped.
+	BlockLinks int `dynamodbav:"block_links"`
 
 	// SessionsValidAfter (Unix seconds) invalidates every session created
 	// before it: set on password change, reset and ban.

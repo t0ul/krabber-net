@@ -300,6 +300,64 @@ func TestDeleteMoltAndRemolt(t *testing.T) {
 	}
 }
 
+func TestBlocks(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+	a := mustCrab(t, s, "bubblebass")
+	b := mustCrab(t, s, "spongebob")
+	for _, pair := range [][2]*Crab{{a, b}, {b, a}} {
+		if err := s.Follow(ctx, pair[0], pair[1]); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := s.Block(ctx, a, b); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Block(ctx, a, b); !errors.Is(err, ErrAlreadyExists) {
+		t.Fatalf("second block: %v", err)
+	}
+	a, b = reload(t, s, a), reload(t, s, b)
+	if a.FollowerCount+a.FollowingCount+b.FollowerCount+b.FollowingCount != 0 || a.BlockLinks != 1 || b.BlockLinks != 1 {
+		t.Fatalf("after block: a=%+v b=%+v", a, b)
+	}
+	if err := s.Follow(ctx, b, a); !errors.Is(err, ErrBlocked) {
+		t.Fatalf("follow blocker: %v", err)
+	}
+	if err := s.Follow(ctx, a, b); !errors.Is(err, ErrBlocked) {
+		t.Fatalf("follow blocked: %v", err)
+	}
+	ab, _ := s.BlocksOf(ctx, a.ID)
+	bb, _ := s.BlocksOf(ctx, b.ID)
+	if ab.Blocking[b.ID] != "spongebob" || !bb.BlockedBy[a.ID] || !ab.Hides(b.ID) || !bb.Hides(a.ID) || bb.Hides("someone") {
+		t.Fatalf("blocks: a=%+v b=%+v", ab, bb)
+	}
+
+	// Blocking back is its own block; undoing one leaves the other.
+	if err := s.Block(ctx, b, a); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Unblock(ctx, a, b); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Unblock(ctx, a, b); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("second unblock: %v", err)
+	}
+	ab, _ = s.BlocksOf(ctx, a.ID)
+	if len(ab.Blocking) != 0 || !ab.BlockedBy[b.ID] {
+		t.Fatalf("after unblock: %+v", ab)
+	}
+	if err := s.Unblock(ctx, b, a); err != nil {
+		t.Fatal(err)
+	}
+	if a, b = reload(t, s, a), reload(t, s, b); a.BlockLinks != 0 || b.BlockLinks != 0 {
+		t.Fatalf("block links: %d %d", a.BlockLinks, b.BlockLinks)
+	}
+	if err := s.Follow(ctx, a, b); err != nil {
+		t.Fatalf("follow after unblock: %v", err)
+	}
+}
+
 func TestEmptySea(t *testing.T) {
 	s := newTestStore(t)
 	molts, err := s.Sea(context.Background(), 25)

@@ -3,6 +3,7 @@ package web
 import (
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 	"unicode"
@@ -51,6 +52,10 @@ func (app *App) renderSettings(w http.ResponseWriter, r *http.Request, status in
 	f.Password.Current, f.Password.New, f.Password.Confirm = "", "", ""
 	data := app.newTemplateData(r)
 	data.Form = f
+	for id, name := range blocksOf(r).Blocking {
+		data.Blocked = append(data.Blocked, store.Crab{ID: id, UserName: name})
+	}
+	sort.Slice(data.Blocked, func(i, j int) bool { return data.Blocked[i].UserName < data.Blocked[j].UserName })
 	app.render(w, r, status, "settings.html", data)
 }
 

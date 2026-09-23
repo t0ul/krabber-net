@@ -158,9 +158,10 @@ func (app *App) sidebarFor(r *http.Request) sidebar {
 		me = c.ID
 	}
 	followed := app.following(r)
+	blocks := blocksOf(r)
 	var fresh, rest []store.Crab
 	for _, c := range crabs {
-		if c.ID == me {
+		if c.ID == me || blocks.Hides(c.ID) {
 			continue
 		}
 		if followed[c.ID] {
@@ -178,7 +179,7 @@ func (app *App) sidebarFor(r *http.Request) sidebar {
 	}
 
 	var scored, recentOriginals []store.Molt
-	for _, m := range recent {
+	for _, m := range visibleMolts(r, recent) {
 		if m.Remolt {
 			continue
 		}

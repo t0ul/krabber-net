@@ -22,7 +22,14 @@ type ctxKey int
 const (
 	ctxCrab ctxKey = iota
 	ctxClientIP
+	ctxBlocks
 )
+
+// blocksOf returns the signed-in crab's blocks (empty when there are none).
+func blocksOf(r *http.Request) store.Blocks {
+	b, _ := r.Context().Value(ctxBlocks).(store.Blocks)
+	return b
+}
 
 // currentCrab returns the signed-in crab, or nil.
 func currentCrab(r *http.Request) *store.Crab {
@@ -51,7 +58,16 @@ func (app *App) authenticate(next http.Handler) http.Handler {
 		case !c.CanSignIn() || app.sessions.GetInt64(ctx, sessionAuthAt) < c.SessionsValidAfter:
 			app.endSession(r)
 		default:
-			r = r.WithContext(context.WithValue(ctx, ctxCrab, c))
+			ctx = context.WithValue(ctx, ctxCrab, c)
+			if c.BlockLinks > 0 {
+				b, err := app.store.BlocksOf(ctx, c.ID)
+				if err != nil {
+					app.serverError(w, r, err)
+					return
+				}
+				ctx = context.WithValue(ctx, ctxBlocks, b)
+			}
+			r = r.WithContext(ctx)
 		}
 		next.ServeHTTP(w, r)
 	})

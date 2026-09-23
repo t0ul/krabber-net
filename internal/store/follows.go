@@ -45,14 +45,17 @@ func (s *Store) Follow(ctx context.Context, follower, followee *Crab) error {
 	if err != nil {
 		return err
 	}
-	err = s.transact(ctx,
+	items := append([]types.TransactWriteItem{
 		s.putNew(item),
 		s.addCounter(follower.PK, follower.SK, "following_count", 1),
 		s.addCounter(followee.PK, followee.SK, "follower_count", 1),
-	)
+	}, s.notBlocked(follower.ID, followee.ID)...)
+	err = s.transact(ctx, items...)
 	switch {
 	case cancelledAt(err, 0):
 		return ErrAlreadyExists
+	case cancelledAt(err, 3), cancelledAt(err, 4):
+		return ErrBlocked
 	case err != nil:
 		return fmt.Errorf("follow: %w", err)
 	}

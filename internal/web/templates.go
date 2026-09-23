@@ -41,6 +41,8 @@ type templateData struct {
 
 	Profile     *store.Crab
 	IsFollowing bool
+	IsBlocking  bool
+	Blocked     []store.Crab
 	CrabRows    []crabRow
 	ListTitle   string
 	ListBack    string
@@ -205,7 +207,7 @@ func (app *App) newTemplateData(r *http.Request) templateData {
 // withLikes resolves remolts to their originals and marks which molts the
 // viewer has liked.
 func (app *App) withLikes(r *http.Request, molts []store.Molt) ([]store.Molt, error) {
-	molts, err := app.store.ResolveRemolts(r.Context(), molts)
+	molts, err := app.store.ResolveRemolts(r.Context(), visibleMolts(r, molts))
 	if err != nil {
 		return nil, err
 	}

@@ -65,5 +65,21 @@
         <small class="form-text text-muted mb-3">Changing it signs you out on every other device.</small>
         <button type="submit" class="btn btn-secondary rounded-pill">Change password</button>
     </form>
+
+    <div class="px-3 py-3 border-bottom border-dark">
+        <h2 class="h6 font-weight-bold mb-3">Blocked crabs</h2>
+        {{ range .Blocked }}
+        <div class="d-flex align-items-center py-1">
+            {{ template "avatar" .UserName }}
+            <span class="ml-3 font-weight-bold">@{{ .UserName }}</span>
+            <form class="ml-auto" hx-post="/unblock/{{ .ID }}" hx-swap="none">
+                <input type='hidden' name='csrf_token' value='{{ $.CSRFToken }}'>
+                <button type="submit" class="btn btn-sm btn-outline-light rounded-pill">Unblock</button>
+            </form>
+        </div>
+        {{ else }}
+        <div class="text-muted small">You haven't blocked anyone. You can block a crab from their profile or any of their molts.</div>
+        {{ end }}
+    </div>
 {{ template "shell-bottom" . }}
 {{end}}

@@ -61,7 +61,6 @@
 {{ if $d.IsAuthenticated }}
 {{ $own := eq $m.AuthorID $d.CrabID }}
 {{ $ownRemolt := and $m.Remolt $m.EntryID (eq $m.RemoltedBy $d.CrabName) }}
-{{ if or $own $ownRemolt }}
 <details class="kb-menu zindex-front">
     <summary class="mini-molt-action reply rounded-circle" title="More" aria-label="More options">
         <svg class="mini-molt-action-icon" width="19" height="19"><use href="/static/img/sprites.svg?version=1704178675#more-horizontal"></use></svg>
@@ -84,10 +83,11 @@
                 Delete molt
             </button>
         </form>
+        {{ else }}
+        {{ template "block-button" (dict "ID" $m.AuthorID "Name" $m.Author "D" $d) }}
         {{ end }}
     </div>
 </details>
-{{ end }}
 {{ end }}
 {{end}}
 
@@ -134,6 +134,16 @@
 {{ if not .Molts }}
 <div class="p-4 text-center text-muted" id="empty-list">{{ .EmptyMessage }}</div>
 {{ end }}
+{{end}}
+
+{{define "block-button"}}
+<form hx-post="/{{ if .Blocking }}unblock{{ else }}block{{ end }}/{{ .ID }}"{{ if not .Blocking }} hx-confirm="Block @{{ .Name }}? You'll unfollow each other and stop seeing each other's molts."{{ end }} hx-swap="none">
+    <input type='hidden' name='csrf_token' value='{{ .D.CSRFToken }}'>
+    <button type="submit" class="kb-menu-item{{ if not .Blocking }} kb-menu-danger{{ end }}">
+        <svg width="19" height="19"><use href="/static/img/sprites.svg?version=1704178675#{{ if .Blocking }}eye{{ else }}eye-close{{ end }}"></use></svg>
+        {{ if .Blocking }}Unblock{{ else }}Block{{ end }} @{{ .Name }}
+    </button>
+</form>
 {{end}}
 
 {{define "follow-button"}}{{ $c := .C }}{{ $d := .D }}

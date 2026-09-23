@@ -66,7 +66,12 @@ func (app *App) notifications(w http.ResponseWriter, r *http.Request) {
 	}
 	data := app.newTemplateData(r)
 	data.Unread = 0
-	data.Notifications = notes
+	b := blocksOf(r)
+	for _, n := range notes {
+		if !b.Hides(n.ActorID) {
+			data.Notifications = append(data.Notifications, n)
+		}
+	}
 	app.render(w, r, http.StatusOK, "notifications.html", data)
 }
 
@@ -85,6 +90,15 @@ func (app *App) profile(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	data := app.newTemplateData(r)
+	data.Profile = p
+	data.EmptyMessage = "@" + p.UserName + " hasn't molted yet."
+	if _, blocking := blocksOf(r).Blocking[p.ID]; blocking {
+		data.IsBlocking = true
+		data.EmptyMessage = "You blocked @" + p.UserName + ". Unblock them to see their molts."
+		app.render(w, r, http.StatusOK, "profile.html", data)
+		return
+	}
 	molts, err := app.store.MoltsByOwner(r.Context(), p.ID, pageSize)
 	if err == nil {
 		molts, err = app.withLikes(r, molts)
@@ -93,10 +107,7 @@ func (app *App) profile(w http.ResponseWriter, r *http.Request) {
 		app.serverError(w, r, err)
 		return
 	}
-	data := app.newTemplateData(r)
-	data.Profile = p
 	data.Molts = molts
-	data.EmptyMessage = "@" + p.UserName + " hasn't molted yet."
 	if c := currentCrab(r); c != nil && c.ID != p.ID {
 		if data.IsFollowing, err = app.store.IsFollowing(r.Context(), c.ID, p.ID); err != nil {
 			app.serverError(w, r, err)
@@ -144,6 +155,7 @@ func (app *App) followList(w http.ResponseWriter, r *http.Request, followers boo
 		}
 		data.CrabRows = append(data.CrabRows, crabRow{Crab: c, Following: followed[id]})
 	}
+	data.CrabRows = visibleCrabs(r, data.CrabRows)
 	data.ListBack = "/crabs/" + p.UserName
 	if followers {
 		data.ListTitle = "Crabs following @" + p.UserName
@@ -166,6 +178,7 @@ func (app *App) allCrabs(w http.ResponseWriter, r *http.Request) {
 			data.CrabRows = append(data.CrabRows, crabRow{Crab: c, Following: followed[c.ID]})
 		}
 	}
+	data.CrabRows = visibleCrabs(r, data.CrabRows)
 	sort.SliceStable(data.CrabRows, func(i, j int) bool {
 		return data.CrabRows[i].Crab.FollowerCount > data.CrabRows[j].Crab.FollowerCount
 	})
@@ -187,7 +200,7 @@ func (app *App) searchPage(w http.ResponseWriter, r *http.Request) {
 			app.serverError(w, r, err)
 			return
 		}
-		data.CrabRows = rows
+		data.CrabRows = visibleCrabs(r, rows)
 		data.Molts = molts
 		data.EmptyMessage = "No molts match “" + q + "”."
 	}
@@ -214,10 +227,14 @@ func (app *App) setFollow(w http.ResponseWriter, r *http.Request, follow bool) {
 		if err == nil {
 			app.notify(r, followee.ID, store.NotifyFollow, "", "")
 		}
+		if errors.Is(err, store.ErrBlocked) {
+			follow = false
+		}
 	} else {
 		err = app.store.Unfollow(r.Context(), currentCrab(r), followee)
 	}
-	if err != nil && !errors.Is(err, store.ErrAlreadyExists) && !errors.Is(err, store.ErrNotAllowed) && !errors.Is(err, store.ErrNotFound) {
+	if err != nil && !errors.Is(err, store.ErrAlreadyExists) && !errors.Is(err, store.ErrNotAllowed) &&
+		!errors.Is(err, store.ErrNotFound) && !errors.Is(err, store.ErrBlocked) {
 		app.serverError(w, r, err)
 		return
 	}
@@ -236,8 +253,13 @@ func (app *App) crabFromPath(w http.ResponseWriter, r *http.Request) (*store.Cra
 	return app.checkCrab(w, r, c, err)
 }
 
+// crabFromName loads the crab named in the URL; crabs who blocked the viewer
+// don't exist as far as the viewer can tell.
 func (app *App) crabFromName(w http.ResponseWriter, r *http.Request) (*store.Crab, bool) {
 	c, err := app.store.CrabByUsername(r.Context(), r.PathValue("name"))
+	if err == nil && blocksOf(r).BlockedBy[c.ID] {
+		err = store.ErrNotFound
+	}
 	return app.checkCrab(w, r, c, err)
 }
 

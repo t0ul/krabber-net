@@ -26,6 +26,7 @@ import (
 //	Notification      N#<recipientID>        N#<notificationID>
 //	Notified-once     NO#<recipientID>       <type>#<actorID>#<moltID>
 //	Unread counter    NC#<crabID>            NC#
+//	Block             B#<crabID>             B#out#<otherID> (blocking) / B#in#<otherID> (blocked by)
 //
 // Molt, comment and other generated IDs are KSUIDs, so sorting by SK sorts by time.
 
@@ -77,6 +78,9 @@ func notificationOnceSK(kind, actorID, moltID string) string {
 }
 func notificationCounterPK(crabID string) string { return "NC#" + crabID }
 func notificationCounterSK() string              { return "NC#" }
+func blockPK(crabID string) string               { return "B#" + crabID }
+func blockOutSK(otherID string) string           { return "B#out#" + otherID }
+func blockInSK(otherID string) string            { return "B#in#" + otherID }
 
 // NormalizeEmail lowercases and trims an email address so that one mailbox
 // maps to exactly one account.

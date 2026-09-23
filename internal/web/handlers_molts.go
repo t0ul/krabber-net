@@ -116,7 +116,7 @@ func (app *App) remoltPost(w http.ResponseWriter, r *http.Request) {
 // notify queues a notification from the signed-in crab to recipientID.
 func (app *App) notify(r *http.Request, recipientID, kind, moltID, text string) {
 	c := currentCrab(r)
-	if app.notifier == nil || c == nil {
+	if app.notifier == nil || c == nil || blocksOf(r).Hides(recipientID) {
 		return
 	}
 	app.notifier.Notify(store.Notification{
@@ -167,6 +167,9 @@ func (app *App) moltFromPath(w http.ResponseWriter, r *http.Request) (*store.Mol
 	m, err := app.store.MoltByID(r.Context(), r.PathValue("id"))
 	if err == nil && m.Remolt {
 		m, err = app.store.MoltByID(r.Context(), m.RemoltOf)
+	}
+	if err == nil && blocksOf(r).Hides(m.AuthorID) {
+		err = store.ErrNotFound
 	}
 	switch {
 	case errors.Is(err, store.ErrNotFound):
@@ -219,10 +222,16 @@ func (app *App) moltView(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	shown := molts[0]
-	shown.Comments, err = app.store.CommentsOn(r.Context(), shown.ID, 100)
+	comments, err := app.store.CommentsOn(r.Context(), shown.ID, 100)
 	if err != nil {
 		app.serverError(w, r, err)
 		return
+	}
+	b := blocksOf(r)
+	for _, c := range comments {
+		if !b.Hides(c.AuthorID) {
+			shown.Comments = append(shown.Comments, c)
+		}
 	}
 	data := app.newTemplateData(r)
 	data.Molt = shown
@@ -236,7 +245,12 @@ func (app *App) moltLikesView(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	data := app.newTemplateData(r)
-	data.Likes = likes
+	b := blocksOf(r)
+	for _, l := range likes {
+		if !b.Hides(l.CrabID) {
+			data.Likes = append(data.Likes, l)
+		}
+	}
 	app.render(w, r, http.StatusOK, "likes.html", data)
 }
 

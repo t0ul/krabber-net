@@ -515,6 +515,74 @@ func TestSettings(t *testing.T) {
 	}
 }
 
+func TestBlocking(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	h.signupAndActivate("sandy", "sandy@krabber.test", "karate-chop!")
+	h.signupAndActivate("plankton", "plankton@krabber.test", "formula-thief!")
+	sandyID, planktonID := currentID(t, h, "sandy"), currentID(t, h, "plankton")
+
+	h.login("plankton@krabber.test", "formula-thief!")
+	tok := h.csrf("/trench")
+	h.post("/follow/"+sandyID, url.Values{"csrf_token": {tok}}, "HX-Request", "true")
+	h.post("/molt/create", url.Values{"csrf_token": {tok}, "content": {"Give me the formula"}}, "HX-Request", "true")
+	h.post("/crab/logout", url.Values{"csrf_token": {tok}})
+
+	h.login("sandy@krabber.test", "karate-chop!")
+	tok = h.csrf("/trench")
+	h.post("/molt/create", url.Values{"csrf_token": {tok}, "content": {"Hi-yah! Texas pride"}}, "HX-Request", "true")
+	sandyMolts, _ := h.store.MoltsByOwner(ctx, sandyID, 1)
+	if _, body, _ := h.get("/sea"); !strings.Contains(body, "Give me the formula") || !strings.Contains(body, "Block @plankton") {
+		t.Fatal("before block: plankton's molt or its block option missing from the sea")
+	}
+	status, _, hdr := h.post("/block/"+planktonID, url.Values{"csrf_token": {tok}}, "HX-Request", "true")
+	if status != http.StatusNoContent || hdr.Get("HX-Refresh") != "true" {
+		t.Fatalf("block: %d", status)
+	}
+	for _, path := range []string{"/sea", "/crabs", "/search?q=formula"} {
+		if _, body, _ := h.get(path); strings.Contains(body, "Give me the formula") || strings.Contains(body, `href="/crabs/plankton"`) {
+			t.Errorf("%s still shows plankton", path)
+		}
+	}
+	if _, body, _ := h.get("/crabs/plankton"); !strings.Contains(body, "You blocked @plankton") || !strings.Contains(body, "/unblock/"+planktonID) {
+		t.Error("blocked profile should offer unblock")
+	}
+	if _, body, _ := h.get("/settings"); !strings.Contains(body, "/unblock/"+planktonID) {
+		t.Error("settings should list the block")
+	}
+	if c, _ := h.store.CrabByUsername(ctx, "sandy"); c.FollowerCount != 0 {
+		t.Errorf("follow survived the block: %d followers", c.FollowerCount)
+	}
+	h.post("/crab/logout", url.Values{"csrf_token": {tok}})
+
+	// Plankton can't find, follow or touch Sandy.
+	h.login("plankton@krabber.test", "formula-thief!")
+	tok = h.csrf("/trench")
+	if status, _, _ := h.get("/crabs/sandy"); status != http.StatusNotFound {
+		t.Errorf("blocker's profile: %d", status)
+	}
+	if _, body, _ := h.get("/sea"); strings.Contains(body, "Texas pride") {
+		t.Error("blocked crab sees the blocker's molt")
+	}
+	if status, _, _ := h.post("/molt/like/"+sandyMolts[0].ID, url.Values{"csrf_token": {tok}}, "HX-Request", "true"); status != http.StatusNotFound {
+		t.Errorf("like blocker's molt: %d", status)
+	}
+	if _, body, _ := h.post("/follow/"+sandyID, url.Values{"csrf_token": {tok}}, "HX-Request", "true"); !strings.Contains(body, ">Follow<") {
+		t.Errorf("follow blocker: %s", body)
+	}
+	if ok, _ := h.store.IsFollowing(ctx, planktonID, sandyID); ok {
+		t.Error("follow went through")
+	}
+	h.post("/crab/logout", url.Values{"csrf_token": {tok}})
+
+	h.login("sandy@krabber.test", "karate-chop!")
+	tok = h.csrf("/trench")
+	h.post("/unblock/"+planktonID, url.Values{"csrf_token": {tok}}, "HX-Request", "true")
+	if _, body, _ := h.get("/sea"); !strings.Contains(body, "Give me the formula") {
+		t.Error("unblock should bring plankton's molt back")
+	}
+}
+
 func currentID(t *testing.T, h *harness, name string) string {
 	t.Helper()
 	c, err := h.store.CrabByUsername(context.Background(), name)
