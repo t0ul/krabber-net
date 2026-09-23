@@ -69,6 +69,7 @@ type Molt struct {
 	EntryID        string        `dynamodbav:"-"` // ID of the list entry (the remolt) when showing an original
 	Liked          bool          `dynamodbav:"-"` // the viewer has liked it
 	RemoltedAs     string        `dynamodbav:"-"` // ID of the viewer's remolt of it, if any
+	Bookmarked     bool          `dynamodbav:"-"` // the viewer has bookmarked it
 	Quoted         *Molt         `dynamodbav:"-"` // the quoted molt, or nil when it's gone
 	ContentHTML    template.HTML `dynamodbav:"-"` // Content with mentions and crabtags linked
 	RemoltedByID   string        `dynamodbav:"-"`

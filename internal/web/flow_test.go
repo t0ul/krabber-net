@@ -942,6 +942,48 @@ func TestMentionsAndCrabtags(t *testing.T) {
 	}
 }
 
+func TestBookmarks(t *testing.T) {
+	h := newHarness(t)
+	h.signupAndActivate("karen", "karen@krabber.test", "computer-wife!")
+	h.signupAndActivate("plankton", "plankton@krabber.test", "formula-thief!")
+	h.login("karen@krabber.test", "computer-wife!")
+	tok := h.csrf("/trench")
+	h.post("/molt/create", url.Values{"csrf_token": {tok}, "content": {"Secret formula, don't look"}}, "HX-Request", "true")
+	h.post("/crab/logout", url.Values{"csrf_token": {tok}})
+	molts, _ := h.store.MoltsByOwner(context.Background(), currentID(t, h, "karen"), 1)
+	id := molts[0].ID
+
+	h.login("plankton@krabber.test", "formula-thief!")
+	tok = h.csrf("/trench")
+	if _, body, _ := h.get("/bookmarks"); !strings.Contains(body, "@plankton") || !strings.Contains(body, "You have no bookmarks.") {
+		t.Error("empty bookmarks page")
+	}
+	if _, body, _ := h.get("/sea"); !strings.Contains(body, "Add Molt to Bookmarks") {
+		t.Error("the molt menu has no bookmark item")
+	}
+	_, body, _ := h.post("/molt/bookmark/"+id, url.Values{"csrf_token": {tok}}, "HX-Request", "true")
+	if !strings.Contains(body, "Remove Molt from Bookmarks") || strings.Contains(body, "<html") {
+		t.Errorf("bookmark response: %s", body)
+	}
+	if _, body, _ := h.get("/bookmarks"); !strings.Contains(body, "Secret formula") || !strings.Contains(body, "Remove Molt from Bookmarks") {
+		t.Error("the bookmarked molt isn't on the bookmarks page")
+	}
+	_, body, _ = h.post("/molt/bookmark/"+id, url.Values{"csrf_token": {tok}}, "HX-Request", "true")
+	if !strings.Contains(body, "Add Molt to Bookmarks") {
+		t.Errorf("unbookmark response: %s", body)
+	}
+	if _, body, _ := h.get("/bookmarks"); strings.Contains(body, "Secret formula") {
+		t.Error("the removed bookmark is still listed")
+	}
+	if status, _, _ := h.post("/molt/bookmark/nope", url.Values{"csrf_token": {tok}}, "HX-Request", "true"); status != http.StatusNotFound {
+		t.Errorf("bookmark a missing molt: %d", status)
+	}
+	h.post("/crab/logout", url.Values{"csrf_token": {tok}})
+	if status, _, hdr := h.get("/bookmarks"); status/100 != 3 || !strings.HasPrefix(hdr.Get("Location"), "/crab/login") {
+		t.Errorf("signed-out bookmarks: %d %s", status, hdr.Get("Location"))
+	}
+}
+
 // TestNavLayout keeps the nav in Crabber's order: main pages, the Molt button,
 // then the muted extras.
 func TestNavLayout(t *testing.T) {
@@ -951,7 +993,7 @@ func TestNavLayout(t *testing.T) {
 	_, body, _ := h.get("/trench")
 	nav := body[strings.Index(body, `id="nav-panel"`):strings.Index(body, `id="add-panel"`)]
 	last := -1
-	for _, want := range []string{`href="/trench"`, `href="/sea"`, `href="/notifications"`, `href="/crabs/karen"`, `id="molt-btn"`, `href="/settings"`, `action="/crab/logout"`} {
+	for _, want := range []string{`href="/trench"`, `href="/sea"`, `href="/notifications"`, `href="/bookmarks"`, `href="/crabs/karen"`, `id="molt-btn"`, `href="/settings"`, `action="/crab/logout"`} {
 		i := strings.Index(nav, want)
 		if i <= last {
 			t.Fatalf("nav: %s is missing or out of order", want)

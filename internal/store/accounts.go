@@ -97,6 +97,7 @@ func (s *Store) PurgeCrab(ctx context.Context, crabID string) error {
 	}
 	for _, pk := range []string{
 		moltPK(crabID), remoltMarkerPK(crabID), likePK(crabID), followPK(crabID), blockPK(crabID),
+		bookmarkPK(crabID), bookmarkListPK(crabID),
 		trenchPK(crabID), notificationPK(crabID), notificationOncePK(crabID), notificationCounterPK(crabID),
 	} {
 		if err := s.deletePartition(ctx, pk); err != nil {

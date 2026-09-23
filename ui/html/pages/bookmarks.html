@@ -1,0 +1,10 @@
+{{define "title"}}Bookmarks{{end}}
+
+{{define "page"}}
+{{ template "shell-top" . }}
+    <div class="border-dark border-bottom p-2" id="content-heading">
+        <h6 class="m-1"><strong>Bookmarks</strong><br><small class="text-muted">@{{ .CrabName }}</small></h6>
+    </div>
+    {{ template "molt-list" . }}
+{{ template "shell-bottom" . }}
+{{end}}

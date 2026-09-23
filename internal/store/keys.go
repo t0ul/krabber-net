@@ -24,6 +24,8 @@ import (
 //	Crabtag pointer   TG#<lowercase tag>     TG#<moltID>
 //	Remolt marker     RM#<crabID>            RM#<moltID>
 //	Like              L#<crabID>             L#<moltID>           GSI7 L#<moltID> / L#<crabID>
+//	Bookmark marker   BK#<crabID>            BK#<moltID>          (holds list_sk, the entry below)
+//	Bookmark entry    BL#<crabID>            BL#<ksuid>           (sorted by when the crab bookmarked)
 //	Follow            F#<followerID>         F#<followeeID>       GSI6 F#<followeeID> / F#<followerID>
 //	Trench entry      T#<crabID>             T#<moltID>
 //	Token             CT#<sha256 hex>        CT#<scope>
@@ -78,6 +80,10 @@ func tagSK(moltID string) string               { return "TG#" + moltID }
 func likePK(crabID string) string              { return "L#" + crabID }
 func likeSK(moltID string) string              { return "L#" + moltID }
 func likesOnKey(moltID string) string          { return "L#" + moltID }
+func bookmarkPK(crabID string) string          { return "BK#" + crabID }
+func bookmarkSK(moltID string) string          { return "BK#" + moltID }
+func bookmarkListPK(crabID string) string      { return "BL#" + crabID }
+func bookmarkListSK(id string) string          { return "BL#" + id }
 func followPK(followerID string) string        { return "F#" + followerID }
 func followSK(followeeID string) string        { return "F#" + followeeID }
 func followersKey(followeeID string) string    { return "F#" + followeeID }

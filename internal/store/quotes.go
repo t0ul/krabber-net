@@ -4,11 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
@@ -58,47 +54,6 @@ func (s *Store) Quotes(ctx context.Context, quotedID string, limit int) ([]Molt,
 		return nil, fmt.Errorf("quotes: %w", err)
 	}
 	return quotes, nil
-}
-
-// RemoltedIDs returns, for each of moltIDs the crab has remolted, the ID of
-// the crab's remolt.
-func (s *Store) RemoltedIDs(ctx context.Context, crabID string, moltIDs []string) (map[string]string, error) {
-	out := map[string]string{}
-	for start := 0; start < len(moltIDs); start += 100 {
-		end := min(start+100, len(moltIDs))
-		var ka types.KeysAndAttributes
-		seen := map[string]bool{}
-		for _, id := range moltIDs[start:end] {
-			if !seen[id] {
-				seen[id] = true
-				ka.Keys = append(ka.Keys, keyOf(remoltMarkerPK(crabID), remoltMarkerSK(id)))
-			}
-		}
-		ka.ProjectionExpression = aws.String("SK, molt_id")
-		req := map[string]types.KeysAndAttributes{s.table: ka}
-		err := retryUnprocessed(ctx, 5, func() (int, error) {
-			res, err := s.db.BatchGetItem(ctx, &dynamodb.BatchGetItemInput{RequestItems: req})
-			if err != nil {
-				return 0, err
-			}
-			var markers []struct {
-				SK     string `dynamodbav:"SK"`
-				MoltID string `dynamodbav:"molt_id"`
-			}
-			if err := attributevalue.UnmarshalListOfMaps(res.Responses[s.table], &markers); err != nil {
-				return 0, err
-			}
-			for _, mk := range markers {
-				out[strings.TrimPrefix(mk.SK, remoltMarkerSK(""))] = mk.MoltID
-			}
-			req = res.UnprocessedKeys
-			return len(req[s.table].Keys), nil
-		})
-		if err != nil {
-			return nil, fmt.Errorf("remolted ids: %w", err)
-		}
-	}
-	return out, nil
 }
 
 // UndoRemolt deletes the crab's remolt of original. It returns the ID of the

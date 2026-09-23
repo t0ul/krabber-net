@@ -438,7 +438,7 @@ func TestDeleteAccount(t *testing.T) {
 	if m, err := s.MoltByKey(ctx, hi.PK, hi.SK); err != nil || m.LikeCount != 0 || m.RemoltCount != 0 || m.ReplyCount != 0 {
 		t.Fatalf("friend's molt: %+v, %v", m, err)
 	}
-	if liked, _ := s.LikedIDs(ctx, friend.ID, []string{bye.ID}); liked[bye.ID] {
+	if marks, _ := s.MarksOn(ctx, friend.ID, []string{bye.ID}); marks[bye.ID].Liked {
 		t.Fatal("like on the deleted molt survived")
 	}
 	if _, err := s.MoltByID(ctx, bye.ID); !errors.Is(err, ErrNotFound) {
@@ -571,8 +571,8 @@ func TestProfilesFollowListsAndLikeToggle(t *testing.T) {
 	if err != nil || fresh.LikeCount != 1 {
 		t.Fatalf("like count after like/unlike/like: %+v, %v", fresh, err)
 	}
-	if ids, _ := s.LikedIDs(ctx, b.ID, []string{m.ID, "other"}); !ids[m.ID] || ids["other"] {
-		t.Fatalf("liked ids: %v", ids)
+	if marks, _ := s.MarksOn(ctx, b.ID, []string{m.ID, "other"}); !marks[m.ID].Liked || marks["other"].Liked {
+		t.Fatalf("likes: %v", marks)
 	}
 }
 
@@ -820,20 +820,86 @@ func TestCrabtags(t *testing.T) {
 	}
 }
 
-func TestRemoltedIDsAndUndo(t *testing.T) {
+func TestBookmarks(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+	author := mustCrab(t, s, "plankton")
+	karen := mustCrab(t, s, "karen")
+	older, _ := s.CreateMolt(ctx, author, "older")
+	newer, _ := s.CreateMolt(ctx, author, "newer")
+	gone, _ := s.CreateMolt(ctx, author, "gone")
+	for _, m := range []*Molt{newer, older, gone} {
+		if err := s.Bookmark(ctx, karen, m); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := s.Bookmark(ctx, karen, older); !errors.Is(err, ErrAlreadyExists) {
+		t.Fatalf("bookmark twice: %v", err)
+	}
+	re, _ := s.Remolt(ctx, karen, newer)
+	if err := s.Bookmark(ctx, karen, re); !errors.Is(err, ErrNotAllowed) {
+		t.Fatalf("bookmark a remolt: %v", err)
+	}
+	if err := s.DeleteMolt(ctx, reload(t, s, author), gone); err != nil {
+		t.Fatal(err)
+	}
+
+	// Most recently bookmarked first, whatever the molts' age; deleted skipped.
+	got, err := s.Bookmarks(ctx, karen.ID, 10)
+	if err != nil || len(got) != 2 || got[0].ID != older.ID || got[1].ID != newer.ID {
+		t.Fatalf("bookmarks: %+v, %v", got, err)
+	}
+	if on, err := s.ToggleBookmark(ctx, karen, older); err != nil || on {
+		t.Fatalf("toggle off: %v, %v", on, err)
+	}
+	if err := s.Unbookmark(ctx, karen, older.ID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("unbookmark twice: %v", err)
+	}
+	if got, _ := s.Bookmarks(ctx, karen.ID, 10); len(got) != 1 || got[0].ID != newer.ID {
+		t.Fatalf("bookmarks after removing one: %+v", got)
+	}
+
+	tomb, err := s.DeleteAccount(ctx, reload(t, s, karen))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.PurgeCrab(ctx, tomb.ID); err != nil {
+		t.Fatal(err)
+	}
+	for _, pk := range []string{bookmarkPK(karen.ID), bookmarkListPK(karen.ID)} {
+		items, err := queryAll[moltPointer](ctx, s.db, &dynamodb.QueryInput{
+			TableName:                 s.tableName(),
+			KeyConditionExpression:    aws.String("PK = :pk"),
+			ExpressionAttributeValues: map[string]types.AttributeValue{":pk": str(pk)},
+		}, 0)
+		if err != nil || len(items) != 0 {
+			t.Fatalf("%s after purge: %d items, %v", pk, len(items), err)
+		}
+	}
+}
+
+func TestMarksAndUndoRemolt(t *testing.T) {
 	s := newTestStore(t)
 	ctx := context.Background()
 	author := mustCrab(t, s, "plankton")
 	karen := mustCrab(t, s, "karen")
 	a, _ := s.CreateMolt(ctx, author, "one")
 	b, _ := s.CreateMolt(ctx, author, "two")
+	c, _ := s.CreateMolt(ctx, author, "three")
 	re, err := s.Remolt(ctx, karen, a)
 	if err != nil {
 		t.Fatal(err)
 	}
-	got, err := s.RemoltedIDs(ctx, karen.ID, []string{a.ID, b.ID, a.ID})
-	if err != nil || len(got) != 1 || got[a.ID] != re.ID {
-		t.Fatalf("remolted ids: %v, %v", got, err)
+	if err := s.LikeMolt(ctx, karen, a); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Bookmark(ctx, karen, c); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.MarksOn(ctx, karen.ID, []string{a.ID, b.ID, a.ID, c.ID})
+	want := map[string]Marks{a.ID: {Liked: true, RemoltedAs: re.ID}, c.ID: {Bookmarked: true}}
+	if err != nil || len(got) != 2 || got[a.ID] != want[a.ID] || got[c.ID] != want[c.ID] {
+		t.Fatalf("marks: %+v, %v", got, err)
 	}
 	if _, err := s.UndoRemolt(ctx, karen, b); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("undo a remolt that isn't there: %v", err)
@@ -845,7 +911,7 @@ func TestRemoltedIDsAndUndo(t *testing.T) {
 	if got, _ := s.MoltByID(ctx, a.ID); got.RemoltCount != 0 {
 		t.Fatalf("remolt count after undo: %d", got.RemoltCount)
 	}
-	if got, _ := s.RemoltedIDs(ctx, karen.ID, []string{a.ID}); len(got) != 0 {
+	if got, _ := s.MarksOn(ctx, karen.ID, []string{a.ID}); got[a.ID].RemoltedAs != "" {
 		t.Fatalf("still remolted: %v", got)
 	}
 	if _, err := s.Remolt(ctx, reload(t, s, karen), a); err != nil {

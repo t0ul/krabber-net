@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
@@ -87,43 +86,6 @@ func (s *Store) ToggleLike(ctx context.Context, c *Crab, m *Molt) (bool, error) 
 		return false, nil
 	}
 	return err == nil, err
-}
-
-// LikedIDs reports which of the given molts the crab has liked.
-func (s *Store) LikedIDs(ctx context.Context, crabID string, moltIDs []string) (map[string]bool, error) {
-	out := map[string]bool{}
-	for start := 0; start < len(moltIDs); start += 100 {
-		end := min(start+100, len(moltIDs))
-		var ka types.KeysAndAttributes
-		seen := map[string]bool{}
-		for _, id := range moltIDs[start:end] {
-			if !seen[id] {
-				seen[id] = true
-				ka.Keys = append(ka.Keys, keyOf(likePK(crabID), likeSK(id)))
-			}
-		}
-		ka.ProjectionExpression = aws.String("molt_id")
-		req := map[string]types.KeysAndAttributes{s.table: ka}
-		err := retryUnprocessed(ctx, 5, func() (int, error) {
-			res, err := s.db.BatchGetItem(ctx, &dynamodb.BatchGetItemInput{RequestItems: req})
-			if err != nil {
-				return 0, err
-			}
-			var likes []Like
-			if err := attributevalue.UnmarshalListOfMaps(res.Responses[s.table], &likes); err != nil {
-				return 0, err
-			}
-			for _, l := range likes {
-				out[l.MoltID] = true
-			}
-			req = res.UnprocessedKeys
-			return len(req[s.table].Keys), nil
-		})
-		if err != nil {
-			return nil, fmt.Errorf("liked ids: %w", err)
-		}
-	}
-	return out, nil
 }
 
 // LikesOn returns who liked a molt.

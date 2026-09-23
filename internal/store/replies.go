@@ -90,6 +90,16 @@ func (s *Store) Replies(ctx context.Context, parentID string, limit int) ([]Molt
 // pointedMolts loads the molts listed in a pointer partition, newest first.
 // oldest picks which end of the partition a limit keeps.
 func (s *Store) pointedMolts(ctx context.Context, pk string, oldest bool, limit int) ([]Molt, error) {
+	keys, err := s.pointerKeys(ctx, pk, oldest, limit)
+	if err != nil {
+		return nil, err
+	}
+	return s.MoltsByKeys(ctx, keys)
+}
+
+// pointerKeys returns the molt keys in a pointer partition, in SK order
+// (reversed unless oldest).
+func (s *Store) pointerKeys(ctx context.Context, pk string, oldest bool, limit int) ([][2]string, error) {
 	pointers, err := queryAll[moltPointer](ctx, s.db, &dynamodb.QueryInput{
 		TableName:                 s.tableName(),
 		KeyConditionExpression:    aws.String("PK = :pk"),
@@ -104,5 +114,5 @@ func (s *Store) pointedMolts(ctx context.Context, pk string, oldest bool, limit 
 	for _, p := range pointers {
 		keys = append(keys, [2]string{p.MoltPK, p.MoltSK})
 	}
-	return s.MoltsByKeys(ctx, keys)
+	return keys, nil
 }

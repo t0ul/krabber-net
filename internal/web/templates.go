@@ -312,17 +312,13 @@ func (app *App) withLikes(r *http.Request, molts []store.Molt) ([]store.Molt, er
 	for _, m := range molts {
 		ids = append(ids, m.ID)
 	}
-	liked, err := app.store.LikedIDs(r.Context(), c.ID, ids)
-	if err != nil {
-		return nil, err
-	}
-	remolted, err := app.store.RemoltedIDs(r.Context(), c.ID, ids)
+	marks, err := app.store.MarksOn(r.Context(), c.ID, ids)
 	if err != nil {
 		return nil, err
 	}
 	for i := range molts {
-		molts[i].Liked = liked[molts[i].ID]
-		molts[i].RemoltedAs = remolted[molts[i].ID]
+		mk := marks[molts[i].ID]
+		molts[i].Liked, molts[i].RemoltedAs, molts[i].Bookmarked = mk.Liked, mk.RemoltedAs, mk.Bookmarked
 	}
 	return molts, nil
 }

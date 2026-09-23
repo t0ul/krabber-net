@@ -267,16 +267,17 @@ func (app *App) freshMolt(r *http.Request, m *store.Molt, st actionState) (*stor
 	if err != nil {
 		return nil, err
 	}
-	c := currentCrab(r)
+	marks, err := app.store.MarksOn(r.Context(), currentCrab(r).ID, []string{fresh.ID})
+	if err != nil {
+		return nil, err
+	}
+	mk := marks[fresh.ID]
+	fresh.Liked, fresh.RemoltedAs, fresh.Bookmarked = mk.Liked, mk.RemoltedAs, mk.Bookmarked
 	if st.liked != nil {
 		fresh.Liked = *st.liked
-	} else if ids, err := app.store.LikedIDs(r.Context(), c.ID, []string{fresh.ID}); err == nil {
-		fresh.Liked = ids[fresh.ID]
 	}
 	if st.remoltedAs != nil {
 		fresh.RemoltedAs = *st.remoltedAs
-	} else if ids, err := app.store.RemoltedIDs(r.Context(), c.ID, []string{fresh.ID}); err == nil {
-		fresh.RemoltedAs = ids[fresh.ID]
 	}
 	return fresh, nil
 }
