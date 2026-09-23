@@ -235,7 +235,7 @@ func (app *App) sidebarFor(r *http.Request) sidebar {
 	return sb
 }
 
-func score(m store.Molt) int { return 2*m.LikeCount + 3*m.RemoltCount + m.CommentCount }
+func score(m store.Molt) int { return 2*m.LikeCount + 3*m.RemoltCount + m.ReplyCount }
 
 // search matches crabs by name and the last week's molts by content.
 func (app *App) search(r *http.Request, q string) ([]crabRow, []store.Molt) {

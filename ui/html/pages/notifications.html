@@ -22,7 +22,7 @@
         <div class="kb-notification-icon kb-notification-{{ .Type }} mr-3">
             {{ if eq .Type "like" }}<svg width="22" height="22"><use href="/static/img/sprites.svg?version=1704178675#heart-f"></use></svg>
             {{ else if eq .Type "remolt" }}<svg width="22" height="22"><use href="/static/img/sprites.svg?version=1704178675#repeat"></use></svg>
-            {{ else if eq .Type "comment" }}<svg width="22" height="22"><use href="/static/img/sprites.svg?version=1704178675#message-f"></use></svg>
+            {{ else if eq .Type "reply" }}<svg width="22" height="22"><use href="/static/img/sprites.svg?version=1704178675#message-f"></use></svg>
             {{ else }}<svg width="22" height="22"><use href="{{ asset "img/sprites.svg" }}#crab"></use></svg>{{ end }}
         </div>
         <div class="flex-grow-1 min-w-0">
@@ -34,7 +34,7 @@
                 <a href="/crabs/{{ .Actor }}" class="text-light font-weight-bold">@{{ .Actor }}</a>
                 {{ if eq .Type "like" }}liked your molt
                 {{ else if eq .Type "remolt" }}remolted your molt
-                {{ else if eq .Type "comment" }}commented on your molt
+                {{ else if eq .Type "reply" }}replied to your molt
                 {{ else }}followed you{{ end }}
             </div>
             {{ if .MoltID }}
@@ -44,7 +44,7 @@
     </div>
     {{ end }}
     {{ else }}
-    <div class="p-4 text-center text-muted">Nothing yet. When crabs like, remolt, comment on your molts or follow you, it shows up here.</div>
+    <div class="p-4 text-center text-muted">Nothing yet. When crabs like, remolt or reply to your molts, or follow you, it shows up here.</div>
     {{ end }}
 {{ template "shell-bottom" . }}
 {{end}}

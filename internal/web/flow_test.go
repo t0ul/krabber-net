@@ -443,7 +443,7 @@ func TestNotifications(t *testing.T) {
 	for range 3 { // like, unlike, like: one notification
 		h.post("/molt/like/"+id, url.Values{"csrf_token": {tok}}, "HX-Request", "true")
 	}
-	h.post("/comment/"+id, url.Values{"csrf_token": {tok}, "comment": {"Coming, my love"}}, "HX-Request", "true")
+	h.post("/molt/reply/"+id, url.Values{"csrf_token": {tok}, "content": {"Coming, my love"}}, "HX-Request", "true")
 	h.post("/crab/logout", url.Values{"csrf_token": {tok}})
 
 	h.login("karen@krabber.test", "computer-wife!")
@@ -452,7 +452,7 @@ func TestNotifications(t *testing.T) {
 		t.Fatalf("badge before reading: %v", got)
 	}
 	_, body, _ = h.get("/notifications")
-	for _, want := range []string{"followed you", "liked your molt", "commented on your molt", "Coming, my love", "/molt/view/" + id} {
+	for _, want := range []string{"followed you", "liked your molt", "replied to your molt", "Coming, my love", "/molt/view/" + id} {
 		if !strings.Contains(body, want) {
 			t.Errorf("notifications page missing %q", want)
 		}
@@ -539,7 +539,7 @@ func TestDeleteAccountFlow(t *testing.T) {
 	h.login("squidward@krabber.test", "clarinet-solo")
 	tok = h.csrf("/trench")
 	h.post("/molt/create", url.Values{"csrf_token": {tok}, "content": {"Clarinet recital tonight"}}, "HX-Request", "true")
-	h.post("/comment/"+sandyMolts[0].ID, url.Values{"csrf_token": {tok}, "comment": {"Keep it down"}}, "HX-Request", "true")
+	h.post("/molt/reply/"+sandyMolts[0].ID, url.Values{"csrf_token": {tok}, "content": {"Keep it down"}}, "HX-Request", "true")
 	squidMolts, _ := h.store.MoltsByOwner(ctx, squidID, 1)
 
 	status, body, _ := h.post("/settings/delete", url.Values{"csrf_token": {tok}, "password": {"wrong-note"}})
@@ -566,7 +566,7 @@ func TestDeleteAccountFlow(t *testing.T) {
 		t.Error("sea still shows the deleted crab's molt")
 	}
 	if _, body, _ := h.get("/molt/view/" + sandyMolts[0].ID); strings.Contains(body, "Keep it down") {
-		t.Error("the deleted crab's comment is still shown")
+		t.Error("the deleted crab's reply is still shown")
 	}
 	for _, path := range []string{"/crabs/squidward", "/molt/view/" + squidMolts[0].ID} {
 		if status, _, _ := h.get(path); status != http.StatusNotFound {
@@ -670,6 +670,60 @@ func TestReporting(t *testing.T) {
 	}
 	if msg := h.mail.last(t); msg.To != "plankton@krabber.test" || !strings.Contains(msg.Text, "Spam about the Krusty Krab") || !strings.Contains(msg.Subject, "banned") {
 		t.Fatalf("ban email: %+v", msg)
+	}
+}
+
+func TestReplyThread(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	h.signupAndActivate("karen", "karen@krabber.test", "computer-wife!")
+	h.signupAndActivate("plankton", "plankton@krabber.test", "formula-thief!")
+	karenID, planktonID := currentID(t, h, "karen"), currentID(t, h, "plankton")
+
+	h.login("karen@krabber.test", "computer-wife!")
+	tok := h.csrf("/trench")
+	h.post("/molt/create", url.Values{"csrf_token": {tok}, "content": {"Dinner is ready"}}, "HX-Request", "true")
+	molts, _ := h.store.MoltsByOwner(ctx, karenID, 1)
+	root := molts[0].ID
+	h.post("/crab/logout", url.Values{"csrf_token": {tok}})
+
+	h.login("plankton@krabber.test", "formula-thief!")
+	tok = h.csrf("/trench")
+	if status, _, _ := h.post("/molt/reply/"+root, url.Values{"csrf_token": {tok}, "content": {" "}}, "HX-Request", "true"); status != http.StatusUnprocessableEntity {
+		t.Fatalf("blank reply: %d", status)
+	}
+	status, body, _ := h.post("/molt/reply/"+root, url.Values{"csrf_token": {tok}, "content": {"Is it chum again?"}}, "HX-Request", "true")
+	if status != http.StatusOK || !strings.Contains(body, "Is it chum again?") || !strings.Contains(body, `id="thread-actions" hx-swap-oob="true"`) {
+		t.Fatalf("reply: %d %s", status, body)
+	}
+	replies, _ := h.store.RepliesByOwner(ctx, planktonID, 1)
+	reply := replies[0].ID
+	if _, body, _ := h.get("/crabs/plankton"); strings.Contains(body, "Is it chum again?") {
+		t.Error("the reply shows on the Molts timeline")
+	}
+	if _, body, _ := h.get("/sea"); strings.Contains(body, "/molt/view/"+reply) {
+		t.Error("the reply shows in the Sea")
+	}
+	h.post("/crab/logout", url.Values{"csrf_token": {tok}})
+
+	h.login("karen@krabber.test", "computer-wife!")
+	tok = h.csrf("/trench")
+	h.post("/molt/reply/"+reply, url.Values{"csrf_token": {tok}, "content": {"Yes. Eat it."}}, "HX-Request", "true")
+	if _, body, _ := h.get("/molt/view/" + root); !strings.Contains(body, "Is it chum again?") || strings.Contains(body, "No replies yet") {
+		t.Error("the thread doesn't list the reply")
+	}
+	nested, _ := h.store.RepliesByOwner(ctx, karenID, 1)
+	_, body, _ = h.get("/molt/view/" + nested[0].ID)
+	for _, want := range []string{"Dinner is ready", "Is it chum again?", "Yes. Eat it.", "Replying to", `href="/molt/view/` + reply + `"`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("nested reply's thread is missing %q", want)
+		}
+	}
+
+	// Deleting the root leaves the replies, with a note where it was.
+	h.post("/molt/delete/"+root, url.Values{"csrf_token": {tok}}, "HX-Request", "true")
+	if _, body, _ := h.get("/molt/view/" + reply); !strings.Contains(body, "was deleted or isn't available") || !strings.Contains(body, "Is it chum again?") {
+		t.Error("a reply to a deleted molt doesn't say so")
 	}
 }
 

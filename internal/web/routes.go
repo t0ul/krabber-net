@@ -55,7 +55,7 @@ func (app *App) Routes() http.Handler {
 	mux.HandleFunc("GET /molt/report/{id}", app.requireAuthentication(app.reportPage))
 	mux.HandleFunc("POST /molt/report/{id}", app.requireAuthentication(app.reportPost))
 	mux.HandleFunc("POST /remolt/{id}", app.requireAuthentication(app.remoltPost))
-	mux.HandleFunc("POST /comment/{id}", app.requireAuthentication(app.commentCreatePost))
+	mux.HandleFunc("POST /molt/reply/{id}", app.requireAuthentication(app.replyCreatePost))
 	mux.HandleFunc("POST /follow/{id}", app.requireAuthentication(app.followPost))
 	mux.HandleFunc("POST /unfollow/{id}", app.requireAuthentication(app.unfollowPost))
 

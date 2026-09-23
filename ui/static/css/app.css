@@ -44,7 +44,7 @@
 
 .kb-notification-like { fill: var(--like); }
 .kb-notification-remolt { fill: var(--remolt); }
-.kb-notification-comment { fill: var(--reply); }
+.kb-notification-reply { fill: var(--reply); }
 .kb-notification-follow { color: var(--primary); }
 
 .kb-notification-snippet:hover {
@@ -297,4 +297,9 @@
 
 .kb-error {
   max-width: 36rem;
+}
+
+.kb-replying-to {
+  margin-top: -0.1rem;
+  margin-bottom: 0.25rem;
 }

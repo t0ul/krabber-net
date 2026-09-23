@@ -388,7 +388,9 @@ func TestDeleteAccount(t *testing.T) {
 	hi, err := s.CreateMolt(ctx, friend, "I'm ready!")
 	must(err)
 	must(s.LikeMolt(ctx, friend, bye))
-	_, err = s.AddComment(ctx, friend, bye, "Bye!")
+	_, err = s.Reply(ctx, friend, bye, "Bye!")
+	must(err)
+	_, err = s.Reply(ctx, gone, hi, "Ready for what?")
 	must(err)
 	_, err = s.Remolt(ctx, fan, bye)
 	must(err)
@@ -432,7 +434,7 @@ func TestDeleteAccount(t *testing.T) {
 	if friend.FollowerCount != 0 || fan.FollowingCount != 0 || rival.BlockLinks != 0 {
 		t.Fatalf("counters: friend=%+v fan=%+v rival=%+v", friend, fan, rival)
 	}
-	if m, err := s.MoltByKey(ctx, hi.PK, hi.SK); err != nil || m.LikeCount != 0 || m.RemoltCount != 0 {
+	if m, err := s.MoltByKey(ctx, hi.PK, hi.SK); err != nil || m.LikeCount != 0 || m.RemoltCount != 0 || m.ReplyCount != 0 {
 		t.Fatalf("friend's molt: %+v, %v", m, err)
 	}
 	if liked, _ := s.LikedIDs(ctx, friend.ID, []string{bye.ID}); liked[bye.ID] {
@@ -441,7 +443,7 @@ func TestDeleteAccount(t *testing.T) {
 	if _, err := s.MoltByID(ctx, bye.ID); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("deleted crab's molt: %v", err)
 	}
-	for _, pk := range []string{moltPK(tomb.ID), commentPK(bye.ID), likePK(tomb.ID), followPK(tomb.ID), blockPK(tomb.ID),
+	for _, pk := range []string{moltPK(tomb.ID), replyPointerPK(bye.ID), replyPointerPK(hi.ID), likePK(tomb.ID), followPK(tomb.ID), blockPK(tomb.ID),
 		blockPK(rival.ID), remoltMarkerPK(tomb.ID), trenchPK(tomb.ID), notificationPK(tomb.ID), notificationCounterPK(tomb.ID)} {
 		left, err := queryAll[map[string]any](ctx, s.db, &dynamodb.QueryInput{
 			TableName:                 s.tableName(),
@@ -573,7 +575,7 @@ func TestProfilesFollowListsAndLikeToggle(t *testing.T) {
 	}
 }
 
-func TestLikesAndComments(t *testing.T) {
+func TestLikes(t *testing.T) {
 	s := newTestStore(t)
 	ctx := context.Background()
 	author := mustCrab(t, s, "plankton")
@@ -594,19 +596,87 @@ func TestLikesAndComments(t *testing.T) {
 		t.Fatalf("likes: %+v, %v", likes, err)
 	}
 
-	// Two comments in the same second no longer collide.
+	got, err := s.MoltByID(ctx, m.ID)
+	if err != nil || got.LikeCount != 1 {
+		t.Fatalf("counters: %+v, %v", got, err)
+	}
+}
+
+func TestReplies(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+	author := mustCrab(t, s, "plankton")
+	karen := mustCrab(t, s, "karen")
+	m, err := s.CreateMolt(ctx, author, "the formula will be mine")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Two replies in the same second don't collide, and come back oldest first.
+	var replies []*Molt
 	for i := range 2 {
-		if _, err := s.AddComment(ctx, liker, m, fmt.Sprintf("comment %d", i)); err != nil {
+		r, err := s.Reply(ctx, karen, m, fmt.Sprintf("reply %d", i))
+		if err != nil {
 			t.Fatal(err)
 		}
+		replies = append(replies, r)
 	}
-	comments, err := s.CommentsOn(ctx, m.ID, 10)
-	if err != nil || len(comments) != 2 || comments[0].Content != "comment 0" {
-		t.Fatalf("comments: %+v, %v", comments, err)
+	thread, err := s.Replies(ctx, m.ID, 10)
+	if err != nil || len(thread) != 2 || thread[0].Content != "reply 0" || thread[0].ReplyToAuthor != "plankton" {
+		t.Fatalf("thread: %+v, %v", thread, err)
 	}
-	got, err := s.MoltByID(ctx, m.ID)
-	if err != nil || got.LikeCount != 1 || got.CommentCount != 2 {
-		t.Fatalf("counters: %+v, %v", got, err)
+	nested, err := s.Reply(ctx, author, replies[0], "quiet, computer wife")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Reply(ctx, karen, &Molt{ID: "x", Remolt: true}, "no"); !errors.Is(err, ErrNotAllowed) {
+		t.Fatalf("reply to a remolt: %v", err)
+	}
+	if got, _ := s.MoltByID(ctx, m.ID); got.ReplyCount != 2 {
+		t.Fatalf("reply count: %d", got.ReplyCount)
+	}
+	if got, _ := s.MoltByID(ctx, nested.ID); got == nil || got.ReplyTo != replies[0].ID {
+		t.Fatalf("nested reply by id: %+v", got)
+	}
+
+	// Replies stay off the timeline, the Sea and the trench queue, and have
+	// their own list on the profile.
+	if own, _ := s.MoltsByOwner(ctx, karen.ID, 10); len(own) != 0 {
+		t.Fatalf("replies on the molts timeline: %+v", own)
+	}
+	if own, _ := s.RepliesByOwner(ctx, karen.ID, 10); len(own) != 2 || own[0].ID != replies[1].ID {
+		t.Fatalf("replies by owner: %+v", own)
+	}
+	if sea, _ := s.Sea(ctx, 25); len(sea) != 1 {
+		t.Fatalf("sea has %d molts, want just the original", len(sea))
+	}
+	if pending, _ := s.PendingFanouts(ctx, time.Now().Add(time.Hour), 10); len(pending) != 1 {
+		t.Fatalf("fan-out queue has %d molts, want just the original", len(pending))
+	}
+	if karen = reload(t, s, karen); karen.MoltCount != 2 {
+		t.Fatalf("karen's molt count: %d", karen.MoltCount)
+	}
+
+	// Deleting a reply takes it off the thread and fixes the counts.
+	if err := s.DeleteMolt(ctx, karen, replies[1]); err != nil {
+		t.Fatal(err)
+	}
+	if thread, _ := s.Replies(ctx, m.ID, 10); len(thread) != 1 {
+		t.Fatalf("thread after delete: %+v", thread)
+	}
+	if got, _ := s.MoltByID(ctx, m.ID); got.ReplyCount != 1 {
+		t.Fatalf("reply count after delete: %d", got.ReplyCount)
+	}
+
+	// A reply whose parent was purged with its author's account can still be deleted.
+	if err := s.batchDelete(ctx, [][2]string{{m.PK, m.SK}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.DeleteMolt(ctx, reload(t, s, karen), replies[0]); err != nil {
+		t.Fatalf("delete reply to a purged molt: %v", err)
+	}
+	if karen = reload(t, s, karen); karen.MoltCount != 0 {
+		t.Fatalf("karen's molt count after deletes: %d", karen.MoltCount)
 	}
 }
 

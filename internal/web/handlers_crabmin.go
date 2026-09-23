@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 
 	"github.com/t0ul/krabber-net/internal/store"
@@ -74,9 +75,16 @@ func (app *App) crabminCrab(w http.ResponseWriter, r *http.Request) {
 		app.serverError(w, r, err)
 		return
 	}
+	replies, err := app.store.RepliesByOwner(r.Context(), c.ID, pageSize)
+	if err != nil {
+		app.serverError(w, r, err)
+		return
+	}
+	molts = append(molts, replies...)
+	slices.SortFunc(molts, func(a, b store.Molt) int { return strings.Compare(b.ID, a.ID) })
 	data := app.newTemplateData(r)
 	data.Profile = c
-	data.Molts = molts
+	data.Molts = molts[:min(len(molts), pageSize)]
 	data.CanModerate = app.canModerate(currentCrab(r), c) == nil
 	app.render(w, r, http.StatusOK, "crabmin-crab.html", data)
 }

@@ -242,7 +242,8 @@ As implemented in `internal/store/keys.go` (the single source for every key form
 | Username marker | `U#<username, lowercased>` | `U#` | — (written in the same transaction as the crab, so usernames are unique too) |
 | Molt (post) | `M#<ownerCrabID>` | `M#<moltID>` | GSI3 `M#<yyyy-mm-dd, UTC>` / `M#<moltID>` (the day's molts, newest first, feeds the sea); GSI5 `M#<moltID>` (by ID) |
 | Remolt marker | `RM#<crabID>` | `RM#<moltID>` | — (one remolt per crab per molt) |
-| Comment | `MC#<moltID>` | `MC#<commentID>` | — (comments on a molt are a base-table query) |
+| Reply (a molt) | `M#<authorCrabID>` | `MR#<moltID>` | GSI5 as for molts; no GSI3 or fan-out, so replies stay out of the sea and trenches |
+| Reply pointer | `RP#<parentMoltID>` | `RP#<replyMoltID>` | — (a thread is a base-table query plus one batch read; replaced the old `MC#` comments) |
 | Like | `L#<crabID>` | `L#<moltID>` | GSI7 `L#<moltID>` (who liked a molt) |
 | Follow | `F#<followerID>` | `F#<followeeID>` | GSI6 `F#<followeeID>` (followers of a crab) |
 | Trench (feed) entry | `T#<crabID>` | `T#<moltID>` | — (stores the molt's key, so a feed page is one `BatchGetItem`; `expires_at` 90 days) |
@@ -469,7 +470,7 @@ krabber-net/
 ├── internal/
 │   ├── store/                      # all DynamoDB access; no HTTP knowledge
 │   │   ├── store.go  keys.go       #   client + every key format in one place
-│   │   ├── crabs.go  molts.go  comments.go  likes.go  remolts.go
+│   │   ├── crabs.go  molts.go  replies.go  likes.go  remolts.go
 │   │   ├── follows.go  trench.go  seas.go  tokens.go  reports.go
 │   │   ├── sessions.go             #   scs.Store (section 5)
 │   │   ├── ratelimit.go            #   fixed-window counters, mail cap

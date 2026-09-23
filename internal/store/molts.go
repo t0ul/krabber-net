@@ -44,14 +44,18 @@ type Molt struct {
 	RemoltOfSK string `dynamodbav:"remolt_of_sk,omitempty"`
 	RemoltedBy string `dynamodbav:"remolted_by,omitempty"`
 
-	CommentCount int `dynamodbav:"comment_count"`
-	LikeCount    int `dynamodbav:"like_count"`
-	RemoltCount  int `dynamodbav:"remolt_count"`
+	ReplyTo       string `dynamodbav:"reply_to,omitempty"` // parent molt ID
+	ReplyToPK     string `dynamodbav:"reply_to_pk,omitempty"`
+	ReplyToSK     string `dynamodbav:"reply_to_sk,omitempty"`
+	ReplyToAuthor string `dynamodbav:"reply_to_author,omitempty"`
+
+	ReplyCount  int `dynamodbav:"reply_count"`
+	LikeCount   int `dynamodbav:"like_count"`
+	RemoltCount int `dynamodbav:"remolt_count"`
 
 	// Not stored; filled in for display.
-	Comments []Comment `dynamodbav:"-"`
-	EntryID  string    `dynamodbav:"-"` // ID of the list entry (the remolt) when showing an original
-	Liked    bool      `dynamodbav:"-"` // the viewer has liked it
+	EntryID string `dynamodbav:"-"` // ID of the list entry (the remolt) when showing an original
+	Liked   bool   `dynamodbav:"-"` // the viewer has liked it
 }
 
 // DOMID is unique per list entry, even when an original and its remolt are
@@ -141,13 +145,23 @@ func (s *Store) Remolt(ctx context.Context, by *Crab, original *Molt) (*Molt, er
 	return m, nil
 }
 
-// DeleteMolt soft-deletes a molt or remolt owned by crab c and erases its
-// text. It leaves the feeds that point at it: every read skips deleted items,
-// and trench entries expire on their own. Deleting a remolt frees the crab to
-// remolt it again.
+// DeleteMolt soft-deletes a molt, reply or remolt owned by crab c and erases
+// its text. It leaves the feeds that point at it: every read skips deleted
+// items, and trench entries expire on their own. Deleting a remolt frees the
+// crab to remolt it again; deleting a reply takes it off its parent's thread.
 func (s *Store) DeleteMolt(ctx context.Context, c *Crab, m *Molt) error {
 	if m.OwnerID != c.ID {
 		return ErrNotAllowed
+	}
+	var parentPK, parentSK, counter string
+	var unlink types.Delete
+	switch {
+	case m.Remolt && m.RemoltOfPK != "":
+		parentPK, parentSK, counter = m.RemoltOfPK, m.RemoltOfSK, "remolt_count"
+		unlink = types.Delete{TableName: s.tableName(), Key: keyOf(remoltMarkerPK(c.ID), remoltMarkerSK(m.RemoltOf))}
+	case m.ReplyTo != "":
+		parentPK, parentSK, counter = m.ReplyToPK, m.ReplyToSK, "reply_count"
+		unlink = types.Delete{TableName: s.tableName(), Key: keyOf(replyPointerPK(m.ReplyTo), replyPointerSK(m.ID))}
 	}
 	items := []types.TransactWriteItem{
 		{Update: &types.Update{
@@ -161,16 +175,17 @@ func (s *Store) DeleteMolt(ctx context.Context, c *Crab, m *Molt) error {
 		}},
 		s.addCounter(c.PK, c.SK, "molt_count", -1),
 	}
-	if m.Remolt && m.RemoltOfPK != "" {
+	if counter != "" {
 		items = append(items,
-			s.addCounter(m.RemoltOfPK, m.RemoltOfSK, "remolt_count", -1),
-			types.TransactWriteItem{Delete: &types.Delete{
-				TableName: s.tableName(),
-				Key:       keyOf(remoltMarkerPK(c.ID), remoltMarkerSK(m.RemoltOf)),
-			}},
+			types.TransactWriteItem{Delete: &unlink},
+			s.addCounter(parentPK, parentSK, counter, -1),
 		)
 	}
 	err := s.transact(ctx, items...)
+	if counter != "" && cancelledAt(err, len(items)-1) {
+		// The parent went with its author's account; there's no count to fix.
+		err = s.transact(ctx, items[:len(items)-1]...)
+	}
 	switch {
 	case cancelledAt(err, 0):
 		return ErrNotFound
@@ -181,7 +196,7 @@ func (s *Store) DeleteMolt(ctx context.Context, c *Crab, m *Molt) error {
 }
 
 // MoltByID returns a non-deleted molt. The ID index only finds the key; the
-// item is then read from the base table so like/comment/remolt counts are
+// item is then read from the base table so like, reply and remolt counts are
 // current (GSI projections of ADD updates lag, especially on DynamoDB Local).
 func (s *Store) MoltByID(ctx context.Context, id string) (*Molt, error) {
 	molts, err := queryAll[Molt](ctx, s.db, &dynamodb.QueryInput{
@@ -297,12 +312,22 @@ func (s *Store) ResolveRemolts(ctx context.Context, molts []Molt) ([]Molt, error
 	return out, nil
 }
 
-// MoltsByOwner returns a crab's own timeline, newest first.
+// MoltsByOwner returns a crab's own timeline (molts and remolts, no
+// replies), newest first.
 func (s *Store) MoltsByOwner(ctx context.Context, crabID string, limit int) ([]Molt, error) {
+	return s.ownerMolts(ctx, crabID, moltSK(""), limit)
+}
+
+// RepliesByOwner returns the replies a crab wrote, newest first.
+func (s *Store) RepliesByOwner(ctx context.Context, crabID string, limit int) ([]Molt, error) {
+	return s.ownerMolts(ctx, crabID, replySK(""), limit)
+}
+
+func (s *Store) ownerMolts(ctx context.Context, crabID, prefix string, limit int) ([]Molt, error) {
 	molts, err := queryAll[Molt](ctx, s.db, &dynamodb.QueryInput{
 		TableName:                 s.tableName(),
 		KeyConditionExpression:    aws.String("PK = :pk AND begins_with(SK, :m)"),
-		ExpressionAttributeValues: map[string]types.AttributeValue{":pk": str(moltPK(crabID)), ":m": str("M#")},
+		ExpressionAttributeValues: map[string]types.AttributeValue{":pk": str(moltPK(crabID)), ":m": str(prefix)},
 		ScanIndexForward:          aws.Bool(false),
 		Limit:                     pageLimit(limit),
 	}, limit)

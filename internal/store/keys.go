@@ -16,8 +16,10 @@ import (
 //	Molt              M#<authorCrabID>       M#<moltID>           GSI3 M#<yyyy-mm-dd> / M#<moltID>
 //	                                                              GSI5 M#<moltID> / M#<moltID>
 //	                                                              GSI8 Q#fanout / <moltID> (while pending)
+//	Reply             M#<authorCrabID>       MR#<moltID>          GSI5 as for molts (no day or fan-out keys:
+//	                                                              replies stay out of the Sea and trenches)
+//	Reply pointer     RP#<parentMoltID>      RP#<replyMoltID>
 //	Remolt marker     RM#<crabID>            RM#<moltID>
-//	Comment           MC#<moltID>            MC#<commentID>
 //	Like              L#<crabID>             L#<moltID>           GSI7 L#<moltID> / L#<crabID>
 //	Follow            F#<followerID>         F#<followeeID>       GSI6 F#<followeeID> / F#<followerID>
 //	Trench entry      T#<crabID>             T#<moltID>
@@ -32,7 +34,9 @@ import (
 //	Report queue      R#<moltID>             R#                   GSI8 Q#report / <ksuid> (while open)
 //	Report            R#<moltID>             R#by#<reporterID>
 //
-// Molt, comment and other generated IDs are KSUIDs, so sorting by SK sorts by time.
+// Molt and other generated IDs are KSUIDs, so sorting by SK sorts by time.
+// Replies use their own SK prefix so a crab's molts and replies are each one
+// begins_with query on the same partition.
 
 const (
 	gsiCrabByID     = "GSI2"
@@ -61,8 +65,9 @@ func remoltMarkerPK(crabID string) string {
 	return "RM#" + crabID
 }
 func remoltMarkerSK(moltID string) string      { return "RM#" + moltID }
-func commentPK(moltID string) string           { return "MC#" + moltID }
-func commentSK(commentID string) string        { return "MC#" + commentID }
+func replySK(moltID string) string             { return "MR#" + moltID }
+func replyPointerPK(parentID string) string    { return "RP#" + parentID }
+func replyPointerSK(replyID string) string     { return "RP#" + replyID }
 func likePK(crabID string) string              { return "L#" + crabID }
 func likeSK(moltID string) string              { return "L#" + moltID }
 func likesOnKey(moltID string) string          { return "L#" + moltID }

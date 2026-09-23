@@ -46,6 +46,7 @@
             </div>
             {{ template "molt-menu" . }}
         </div>
+        {{ if and $m.ReplyTo (not .InThread) }}{{ template "replying-to" $m }}{{ end }}
         <div class="mini-molt-content">
             <p class="mb-2">
                 <a class="zindex-front text-light molt-text" href="/molt/view/{{ $m.ID }}">{{ $m.Content }}</a>
@@ -54,6 +55,17 @@
         {{ template "molt-actions" . }}
     </div>
 </div>
+{{end}}
+
+{{define "replying-to"}}
+<div class="text-muted small kb-replying-to">Replying to <a class="zindex-front" href="/molt/view/{{ .ReplyTo }}">@{{ .ReplyToAuthor }}</a></div>
+{{end}}
+
+{{/* The response to a reply posted on the thread page: the reply for the list,
+     and the parent's action bar so its reply count updates. */}}
+{{define "reply-created"}}
+{{ template "molt" . }}
+<div id="thread-actions" hx-swap-oob="true">{{ template "molt-actions" (dict "M" .Parent "D" .D) }}</div>
 {{end}}
 
 {{/* The "…" menu. Pass "Thread" true on the thread page so deleting moves on. */}}
@@ -105,7 +117,7 @@
 <div class="mini-molt-actions d-flex flex-row justify-content-between mr-md-5">
     <a class="mini-molt-action reply rounded-circle zindex-front" href="/molt/view/{{ $m.ID }}" title="Reply">
         <svg class="mini-molt-action-icon" width="19" height="19"><use href="/static/img/sprites.svg?version=1704178675#message"></use></svg>
-        <span class="mini-molt-action-counter ml-1">{{ $m.CommentCount }}</span>
+        <span class="mini-molt-action-counter ml-1">{{ $m.ReplyCount }}</span>
     </a>
     {{ if $d.IsAuthenticated }}
     <form hx-post="/remolt/{{ $m.ID }}" hx-target="closest .mini-molt-actions" hx-swap="outerHTML">

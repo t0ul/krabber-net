@@ -36,6 +36,9 @@ type templateData struct {
 	Notifications []store.Notification
 
 	Molt         store.Molt
+	Parents      []store.Molt // on a reply's thread page, oldest first
+	ParentGone   bool         // the molt it replies to was deleted or is hidden
+	Replies      []store.Molt
 	Molts        []store.Molt
 	Likes        []store.Like
 	EmptyMessage string

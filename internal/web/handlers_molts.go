@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 
 	"github.com/t0ul/krabber-net/internal/store"
@@ -18,10 +19,8 @@ type moltForm struct {
 	validator.Validator `form:"-"`
 }
 
-type commentForm struct {
-	Comment             string `form:"comment"`
-	validator.Validator `form:"-"`
-}
+// maxAncestors is how many parents the thread page shows above a reply.
+const maxAncestors = 5
 
 // moltCreatePost stores a molt and queues its fan-out. htmx callers get the
 // rendered molt to put at the top of the list; others are redirected.
@@ -226,20 +225,37 @@ func (app *App) moltView(w http.ResponseWriter, r *http.Request) {
 		app.notFound(w, r)
 		return
 	}
-	shown := molts[0]
-	comments, err := app.store.CommentsOn(r.Context(), shown.ID, 100)
+	data := app.newTemplateData(r)
+	data.Molt = molts[0]
+
+	var parents []store.Molt
+	for p := data.Molt; p.ReplyTo != "" && len(parents) < maxAncestors; {
+		parent, err := app.store.MoltByKey(r.Context(), p.ReplyToPK, p.ReplyToSK)
+		if errors.Is(err, store.ErrNotFound) || (err == nil && app.hidden(r)(parent.AuthorID)) {
+			data.ParentGone = true
+			break
+		} else if err != nil {
+			app.serverError(w, r, err)
+			return
+		}
+		parents = append(parents, *parent)
+		p = *parent
+	}
+	slices.Reverse(parents)
+	if data.Parents, err = app.withLikes(r, parents); err != nil {
+		app.serverError(w, r, err)
+		return
+	}
+
+	replies, err := app.store.Replies(r.Context(), data.Molt.ID, 100)
 	if err != nil {
 		app.serverError(w, r, err)
 		return
 	}
-	hidden := app.hidden(r)
-	for _, c := range comments {
-		if !hidden(c.AuthorID) {
-			shown.Comments = append(shown.Comments, c)
-		}
+	if data.Replies, err = app.withLikes(r, replies); err != nil {
+		app.serverError(w, r, err)
+		return
 	}
-	data := app.newTemplateData(r)
-	data.Molt = shown
 	app.render(w, r, http.StatusOK, "view.html", data)
 }
 
@@ -259,35 +275,46 @@ func (app *App) moltLikesView(w http.ResponseWriter, r *http.Request) {
 	app.render(w, r, http.StatusOK, "likes.html", data)
 }
 
-// commentCreatePost stores a comment, then asks htmx to reload the thread so
-// the new comment shows.
-func (app *App) commentCreatePost(w http.ResponseWriter, r *http.Request) {
-	var f commentForm
+// replyCreatePost stores a reply to the molt in the URL. htmx callers get the
+// reply to append to the thread, plus the parent's refreshed action bar so
+// its reply count updates.
+func (app *App) replyCreatePost(w http.ResponseWriter, r *http.Request) {
+	var f moltForm
 	if err := app.decodePostForm(w, r, &f); err != nil {
 		app.clientError(w, http.StatusBadRequest)
 		return
 	}
-	if !validator.NotBlank(f.Comment) || !validator.MaxChars(f.Comment, store.MaxCommentLength) {
-		http.Error(w, "Comments must be 1–280 characters.", http.StatusUnprocessableEntity)
+	if !validator.NotBlank(f.Content) || !validator.MaxChars(f.Content, store.MaxMoltLength) {
+		http.Error(w, "Replies must be 1–280 characters.", http.StatusUnprocessableEntity)
 		return
 	}
-	m, ok := app.moltFromPath(w, r)
+	parent, ok := app.moltFromPath(w, r)
 	if !ok {
 		return
 	}
-	_, err := app.store.AddComment(r.Context(), currentCrab(r), m, f.Comment)
+	reply, err := app.store.Reply(r.Context(), currentCrab(r), parent, f.Content)
 	switch {
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, store.ErrNotFound), errors.Is(err, store.ErrNotAllowed):
+		app.notFound(w, r)
+		return
 	case err != nil:
 		app.serverError(w, r, err)
 		return
-	default:
-		app.notify(r, m.AuthorID, store.NotifyComment, m.ID, f.Comment)
 	}
-	if isHTMX(r) {
-		w.Header().Set("HX-Refresh", "true")
-		noContent(w)
+	app.notify(r, parent.AuthorID, store.NotifyReply, reply.ID, f.Content)
+
+	if !isHTMX(r) {
+		http.Redirect(w, r, "/molt/view/"+parent.ID, http.StatusSeeOther)
 		return
 	}
-	http.Redirect(w, r, "/molt/view/"+m.ID, http.StatusSeeOther)
+	fresh, err := app.store.MoltByKey(r.Context(), parent.PK, parent.SK)
+	if err != nil {
+		app.serverError(w, r, err)
+		return
+	}
+	if ids, err := app.store.LikedIDs(r.Context(), currentCrab(r).ID, []string{fresh.ID}); err == nil {
+		fresh.Liked = ids[fresh.ID]
+	}
+	app.renderTemplate(w, r, http.StatusOK, fragmentPage, "reply-created",
+		map[string]any{"M": reply, "Parent": fresh, "D": app.newTemplateData(r), "InThread": true})
 }

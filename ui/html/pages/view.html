@@ -9,43 +9,43 @@
     </div>
 
     {{ $d := . }}
+    {{ if .ParentGone }}
+    <div class="px-3 py-3 border-bottom border-dark text-muted small">The molt this replies to was deleted or isn't available.</div>
+    {{ end }}
+    <div id="thread-parents">
+        {{ range .Parents }}{{ template "molt" (dict "M" . "D" $d "InThread" true) }}{{ end }}
+    </div>
+
     {{ with .Molt }}
-    <div class="large-molt mini-molt border-bottom border-dark px-3 pt-3 pb-1">
+    <div class="large-molt mini-molt border-bottom border-dark px-3 pt-3 pb-1" id="{{ .DOMID }}" data-molt-id="{{ .ID }}">
         <div class="d-flex align-items-center mb-2">
             <a href="/crabs/{{ .Author }}" class="mr-2">{{ template "avatar" .Author }}</a>
             <a href="/crabs/{{ .Author }}" class="text-light font-weight-bold flex-grow-1">@{{ .Author }}</a>
             {{ template "molt-menu" (dict "M" . "D" $d "Thread" true) }}
         </div>
         {{ if .Remolt }}<div class="text-muted small mb-2">Remolted by <a class="text-muted" href="/crabs/{{ .RemoltedBy }}">@{{ .RemoltedBy }}</a></div>{{ end }}
+        {{ if .ReplyTo }}{{ template "replying-to" . }}{{ end }}
         <p class="large-molt-text mb-2">{{ .Content }}</p>
         <div class="text-muted small pb-2 border-bottom border-dark">{{ template "time" .CreatedAt }}</div>
-        {{ template "molt-actions" (dict "M" . "D" $d) }}
+        <div id="thread-actions">{{ template "molt-actions" (dict "M" . "D" $d) }}</div>
     </div>
 
-    <div id="loaded-molts">
-        {{ if $d.IsAuthenticated }}
-        <form class="px-3 py-2 border-bottom border-dark" hx-post="/comment/{{ .ID }}" hx-swap="none" data-reset-on-success>
-            <input type='hidden' name='csrf_token' value='{{ $d.CSRFToken }}'>
-            <textarea class="form-control mb-2" name="comment" rows="2" maxlength="280" placeholder="Add a comment..." required></textarea>
-            <button type="submit" class="btn btn-sm btn-primary rounded-pill">Comment</button>
-        </form>
-        {{ else }}
-        <p class="px-3 py-2 text-muted"><a href="/crab/login">Log in</a> to comment.</p>
-        {{ end }}
+    {{ if $d.IsAuthenticated }}
+    <form class="px-3 py-2 border-bottom border-dark" hx-post="/molt/reply/{{ .ID }}" hx-target="#reply-list" hx-swap="beforeend" hx-disabled-elt="find button" data-reset-on-success>
+        <input type='hidden' name='csrf_token' value='{{ $d.CSRFToken }}'>
+        <textarea class="form-control mb-2" name="content" rows="2" maxlength="280" placeholder="Molt your reply" aria-label="Reply to @{{ .Author }}" required></textarea>
+        <button type="submit" class="btn btn-sm btn-primary rounded-pill">Reply</button>
+    </form>
+    {{ else }}
+    <p class="px-3 py-2 text-muted"><a href="/crab/login">Log in</a> to reply.</p>
+    {{ end }}
+    {{ end }}
 
-        {{ range .Comments }}
-        <div class="mini-molt border-bottom border-dark px-3 py-2 d-flex flex-row">
-            <a class="mini-molt-profile-box" href="/crabs/{{ .Author }}">{{ template "avatar" .Author }}</a>
-            <div class="mini-molt-text-box w-100 px-2">
-                <a class="mini-molt-username text-light" href="/crabs/{{ .Author }}">@{{ .Author }}</a>
-                <span class="text-muted">· {{ template "time" .CreatedAt }}</span>
-                <p class="mb-1">{{ .Content }}</p>
-            </div>
-        </div>
-        {{ else }}
-        <div class="p-4 text-center text-muted">No comments yet.</div>
-        {{ end }}
+    <div id="reply-list">
+        {{ range .Replies }}{{ template "molt" (dict "M" . "D" $d "InThread" true) }}{{ end }}
     </div>
+    {{ if not .Replies }}
+    <div class="p-4 text-center text-muted" id="empty-list">No replies yet.</div>
     {{ end }}
 {{ template "shell-bottom" . }}
 {{end}}

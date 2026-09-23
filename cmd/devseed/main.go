@@ -93,7 +93,7 @@ func mustCrabs(ctx context.Context, s *store.Store, hash []byte, names ...string
 	return crabs
 }
 
-// seedMolts adds a few molts, likes, a remolt and a comment the first time the
+// seedMolts adds a few molts, likes, a remolt and a short reply thread the first time the
 // table is seeded, so feeds, counts and trending have something to show.
 func seedMolts(ctx context.Context, s *store.Store, crabs []*store.Crab) {
 	lines := map[string]string{
@@ -141,7 +141,15 @@ func seedMolts(ctx context.Context, s *store.Store, crabs []*store.Crab) {
 	if _, err := s.Remolt(ctx, crabs[0], ready); err != nil && !errors.Is(err, store.ErrAlreadyExists) {
 		log.Fatal(err)
 	}
-	if _, err := s.AddComment(ctx, crabs[2], ready, "Ugh. Barnacles."); err != nil {
+	ready, err := s.MoltByKey(ctx, ready.PK, ready.SK)
+	if err != nil {
+		log.Fatal(err)
+	}
+	barnacles, err := s.Reply(ctx, crabs[2], ready, "Ugh. Barnacles.")
+	if err != nil {
+		log.Fatal(err)
+	}
+	if _, err := s.Reply(ctx, crabs[1], barnacles, "Barnacles are just crabs who love their rocks!"); err != nil {
 		log.Fatal(err)
 	}
 }

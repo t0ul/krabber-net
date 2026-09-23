@@ -83,10 +83,6 @@ func (s *Store) PendingPurges(ctx context.Context, limit int) ([]string, error) 
 // counters of everyone they touched, then takes the tombstone off the queue.
 // Every step is idempotent, so an interrupted purge is simply run again, and
 // two instances purging the same crab at once don't double-count.
-//
-// Comments the crab left on other crabs' molts stay in the table (they aren't
-// indexed by author) and are hidden on read, like everything else by a
-// deleted crab.
 func (s *Store) PurgeCrab(ctx context.Context, crabID string) error {
 	tomb, err := s.CrabByKey(ctx, deletedCrabPK(crabID), crabSK())
 	if err != nil {
@@ -122,9 +118,10 @@ func (s *Store) PurgeCrab(ctx context.Context, crabID string) error {
 	return nil
 }
 
-// purgeMolts deletes the crab's molts and remolts. Originals take their
-// comments, likes and reports with them; remolts give back the original's
-// count.
+// purgeMolts deletes the crab's molts, replies and remolts. Molts and replies
+// take their likes, reports and thread listing with them (other crabs'
+// replies stay, pointing at a missing parent); replies and remolts give back
+// the parent's count.
 func (s *Store) purgeMolts(ctx context.Context, tomb *Crab) error {
 	molts, err := queryAll[Molt](ctx, s.db, &dynamodb.QueryInput{
 		TableName:                 s.tableName(),
@@ -136,7 +133,7 @@ func (s *Store) purgeMolts(ctx context.Context, tomb *Crab) error {
 	}
 	for _, m := range molts {
 		if !m.Remolt {
-			for _, pk := range []string{commentPK(m.ID), reportPK(m.ID)} {
+			for _, pk := range []string{replyPointerPK(m.ID), reportPK(m.ID)} {
 				if err := s.deletePartition(ctx, pk); err != nil {
 					return err
 				}
@@ -153,9 +150,17 @@ func (s *Store) purgeMolts(ctx context.Context, tomb *Crab) error {
 				return err
 			}
 		}
-		if m.Remolt && !m.Deleted && m.RemoltOfPK != "" {
+		switch {
+		case m.Deleted:
+			err = s.batchDelete(ctx, [][2]string{{m.PK, m.SK}})
+		case m.Remolt && m.RemoltOfPK != "":
 			err = s.deleteAndCount(ctx, m.PK, m.SK, m.RemoltOfPK, m.RemoltOfSK, "remolt_count")
-		} else {
+		case m.ReplyTo != "":
+			err = s.batchDelete(ctx, [][2]string{{replyPointerPK(m.ReplyTo), replyPointerSK(m.ID)}})
+			if err == nil {
+				err = s.deleteAndCount(ctx, m.PK, m.SK, m.ReplyToPK, m.ReplyToSK, "reply_count")
+			}
+		default:
 			err = s.batchDelete(ctx, [][2]string{{m.PK, m.SK}})
 		}
 		if err != nil {

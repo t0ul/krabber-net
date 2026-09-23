@@ -11,7 +11,7 @@ document.addEventListener("htmx:afterRequest", function (event) {
 
 // A molt inserted into an empty list replaces the "nothing here" message.
 document.addEventListener("htmx:afterSwap", function (event) {
-  if (event.target.id === "molt-list") {
+  if (event.target.id === "molt-list" || event.target.id === "reply-list") {
     var empty = document.getElementById("empty-list");
     if (empty) empty.remove();
   }

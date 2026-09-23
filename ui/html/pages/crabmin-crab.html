@@ -79,10 +79,10 @@
     </div>
     {{ end }}
 
-    <div class="px-3 pt-3 pb-1"><h2 class="h6 font-weight-bold">Recent molts</h2></div>
+    <div class="px-3 pt-3 pb-1"><h2 class="h6 font-weight-bold">Recent molts and replies</h2></div>
     {{ range .Molts }}
     <a class="d-block border-bottom border-dark px-3 py-2 small text-light" href="/crabmin/molts/{{ if .Remolt }}{{ .RemoltOf }}{{ else }}{{ .ID }}{{ end }}">
-        <span class="text-muted">{{ template "time" .CreatedAt }}{{ if .Remolt }} · remolted a molt by @{{ .Author }}{{ end }}</span>
+        <span class="text-muted">{{ template "time" .CreatedAt }}{{ if .Remolt }} · remolted a molt by @{{ .Author }}{{ else if .ReplyTo }} · reply to @{{ .ReplyToAuthor }}{{ end }}</span>
         {{ if not .Remolt }}<div class="kb-bio">{{ .Content }}</div>{{ end }}
     </a>
     {{ else }}

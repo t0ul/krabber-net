@@ -17,7 +17,7 @@ const (
 	NotifyLike    = "like"
 	NotifyRemolt  = "remolt"
 	NotifyFollow  = "follow"
-	NotifyComment = "comment"
+	NotifyReply   = "reply"
 	NotifyWarning = "warning" // from a moderator; Snippet holds the message
 )
 
@@ -73,7 +73,7 @@ func (s *Store) AddNotification(ctx context.Context, n Notification) error {
 	}
 
 	var items []types.TransactWriteItem
-	if n.Type != NotifyComment && n.Type != NotifyWarning {
+	if n.Type != NotifyReply && n.Type != NotifyWarning {
 		marker, err := marshal(map[string]any{
 			"PK":         notificationOncePK(n.RecipientID),
 			"SK":         notificationOnceSK(n.Type, n.ActorID, n.MoltID),
@@ -95,7 +95,7 @@ func (s *Store) AddNotification(ctx context.Context, n Notification) error {
 	)
 	err = s.transact(ctx, items...)
 	switch {
-	case n.Type != NotifyComment && cancelledAt(err, 0):
+	case n.Type != NotifyReply && cancelledAt(err, 0):
 		return nil // already notified
 	case err != nil:
 		return fmt.Errorf("add notification: %w", err)
