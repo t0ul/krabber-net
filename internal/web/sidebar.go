@@ -77,14 +77,25 @@ func (d *directory) removeMolt(id string) {
 	d.recent = recent
 }
 
-// setGone hides (or brings back) a crab this instance just banned or unbanned,
-// without waiting for the next reload.
+// setGone hides (or brings back) a crab this instance just banned, unbanned or
+// deleted, without waiting for the next reload.
 func (d *directory) setGone(id string, gone bool) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	next := make(map[string]bool, len(d.gone)+1)
 	for k := range d.gone {
 		next[k] = true
+	}
+	if gone && d.byID != nil {
+		crabs := make([]store.Crab, 0, len(d.crabs))
+		byID := make(map[string]store.Crab, len(d.byID))
+		for _, c := range d.crabs {
+			if c.ID != id {
+				crabs = append(crabs, c)
+				byID[c.ID] = c
+			}
+		}
+		d.crabs, d.byID = crabs, byID
 	}
 	if gone {
 		next[id] = true

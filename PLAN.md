@@ -356,7 +356,7 @@ Found while porting (all fixed, most with a test):
 |---|---|
 | Privacy policy (`/privacy`) | Reuse `privacy-policy-url-com-main-2`: what's collected (email, username, posts), SES for email, no ads or tracking |
 | Terms (`/terms`) | Acceptable use, termination for abuse |
-| Account deletion (`/crab/delete`) | Asks for the password again. Deletes the crab's email and profile immediately, deletes their molts, likes, follows and trench entries in the background worker, and invalidates sessions. |
+| Account deletion (`POST /settings/delete`) ✅ | Asks for the password again. Deletes the crab's email and profile immediately (a tombstone keeps the username reserved), deletes their molts, likes, follows and trench entries in the background worker, and invalidates sessions. Details in `docs/NOTES.md` section 3.11. |
 | Report a molt | Writes an `R#` item (GSI8 `Q#report`); the admin page lists open reports with remove-molt and ban-author actions |
 | Admin | A `role` attribute on the crab (`admin` or `moderator`) checked by `requireModerator`, replacing the hard-coded `Crabmin` ID. The first admin is set with `cmd/crabctl`; admins appoint moderators in Crabmin. See `docs/NOTES.md` section 3.9. |
 | Maintenance page | `ui/static/maintenance.html`, shown by CloudFront's custom error response for **403**, which is what WAF returns when the maintenance switch is on (section 7.2). So the app itself **never returns 403**: CSRF rejections use 400 (set with `CrossOriginProtection`'s deny handler), missing auth redirects to login, and admin-only pages return 404. |

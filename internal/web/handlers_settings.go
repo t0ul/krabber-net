@@ -33,9 +33,15 @@ type passwordForm struct {
 	validator.Validator `form:"-"`
 }
 
+type deleteForm struct {
+	Password            string `form:"password"`
+	validator.Validator `form:"-"`
+}
+
 type settingsForms struct {
 	Profile  profileForm
 	Password passwordForm
+	Delete   deleteForm
 }
 
 func (app *App) settings(w http.ResponseWriter, r *http.Request) {
@@ -49,7 +55,7 @@ func (app *App) settings(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *App) renderSettings(w http.ResponseWriter, r *http.Request, status int, f settingsForms) {
-	f.Password.Current, f.Password.New, f.Password.Confirm = "", "", ""
+	f.Password.Current, f.Password.New, f.Password.Confirm, f.Delete.Password = "", "", "", ""
 	data := app.newTemplateData(r)
 	data.Form = f
 	for id, name := range blocksOf(r).Blocking {
@@ -116,37 +122,22 @@ func (app *App) settingsPasswordPost(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	failures, err := app.store.Count(r.Context(), "password-change", c.ID, passwordChangeWindow)
-	if err != nil {
-		app.serverError(w, r, err)
-		return
-	}
-	if failures >= passwordChangeLimit {
-		f.AddFieldError("current_password", "Too many attempts. Please wait a few minutes and try again.")
-		app.renderSettings(w, r, http.StatusTooManyRequests, forms())
-		return
-	}
-
-	f.CheckField(validator.MaxBytes(f.Current, auth.MaxPasswordLength), "current_password", "That isn't your current password")
 	f.CheckField(validator.MinChars(f.New, auth.MinPasswordLength), "new_password", "Use at least 8 characters")
 	f.CheckField(validator.MaxBytes(f.New, auth.MaxPasswordLength), "new_password", "Use at most 72 bytes")
 	f.CheckField(f.New == f.Confirm, "confirm_password", "The passwords don't match")
-	if !f.Valid() {
-		app.renderSettings(w, r, http.StatusUnprocessableEntity, forms())
-		return
-	}
-	match, err := auth.CheckPassword(c.PasswordHash, f.Current)
+	ok, status, err := app.confirmPassword(r, c, f.Current)
 	if err != nil {
 		app.serverError(w, r, err)
 		return
 	}
-	if !match {
-		if _, err := app.store.Hit(r.Context(), "password-change", c.ID, passwordChangeWindow); err != nil {
-			app.serverError(w, r, err)
-			return
+	if !ok {
+		f.AddFieldError("current_password", passwordMessage(status))
+	}
+	if !f.Valid() {
+		if status == 0 {
+			status = http.StatusUnprocessableEntity
 		}
-		f.AddFieldError("current_password", "That isn't your current password")
-		app.renderSettings(w, r, http.StatusUnprocessableEntity, forms())
+		app.renderSettings(w, r, status, forms())
 		return
 	}
 
@@ -168,6 +159,70 @@ func (app *App) settingsPasswordPost(w http.ResponseWriter, r *http.Request) {
 	app.sessions.Put(r.Context(), sessionAuthAt, validAfter)
 	app.sessions.Put(r.Context(), sessionFlash, "Password changed. You've been signed out everywhere else.")
 	http.Redirect(w, r, "/settings", http.StatusSeeOther)
+}
+
+func (app *App) settingsDeletePost(w http.ResponseWriter, r *http.Request) {
+	var f deleteForm
+	if err := app.decodePostForm(w, r, &f); err != nil {
+		app.clientError(w, http.StatusBadRequest)
+		return
+	}
+	c := currentCrab(r)
+	ok, status, err := app.confirmPassword(r, c, f.Password)
+	if err != nil {
+		app.serverError(w, r, err)
+		return
+	}
+	if !ok {
+		f.AddFieldError("password", passwordMessage(status))
+		app.renderSettings(w, r, status, settingsForms{
+			Profile: profileForm{DisplayName: c.DisplayName, Bio: c.Bio, Location: c.Location, Website: c.Website},
+			Delete:  f,
+		})
+		return
+	}
+	if _, err := app.store.DeleteAccount(r.Context(), c); err != nil {
+		app.serverError(w, r, err)
+		return
+	}
+	app.dir.setGone(c.ID, true)
+	app.endSession(r)
+	app.log.Info("account deleted", "crab", c.ID)
+	app.sessions.Put(r.Context(), sessionFlash, "Your account is deleted. So long, and thanks for all the molts.")
+	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+// confirmPassword checks the signed-in crab's password before a sensitive
+// change. Wrong guesses are limited per crab: when ok is false, status is
+// 429 once the limit is reached and 422 for a wrong password.
+func (app *App) confirmPassword(r *http.Request, c *store.Crab, password string) (ok bool, status int, err error) {
+	failures, err := app.store.Count(r.Context(), "password-change", c.ID, passwordChangeWindow)
+	if err != nil {
+		return false, 0, err
+	}
+	if failures >= passwordChangeLimit {
+		return false, http.StatusTooManyRequests, nil
+	}
+	match := false
+	if len(password) <= auth.MaxPasswordLength {
+		if match, err = auth.CheckPassword(c.PasswordHash, password); err != nil {
+			return false, 0, err
+		}
+	}
+	if !match {
+		if _, err := app.store.Hit(r.Context(), "password-change", c.ID, passwordChangeWindow); err != nil {
+			return false, 0, err
+		}
+		return false, http.StatusUnprocessableEntity, nil
+	}
+	return true, 0, nil
+}
+
+func passwordMessage(status int) string {
+	if status == http.StatusTooManyRequests {
+		return "Too many attempts. Please wait a few minutes and try again."
+	}
+	return "That isn't your current password"
 }
 
 // singleLine trims a one-line field and drops control characters.

@@ -15,9 +15,11 @@
                     {{ with $c.Role }} · <span class="kb-role">{{ . }}</span>{{ end }}
                 </div>
             </div>
-            {{ if not $c.Banned }}<a class="ml-auto small" href="/crabs/{{ $c.UserName }}">Public profile</a>{{ end }}
+            {{ if not (or $c.Banned $c.Deleted) }}<a class="ml-auto small" href="/crabs/{{ $c.UserName }}">Public profile</a>{{ end }}
         </div>
-        {{ if $c.Banned }}
+        {{ if $c.Deleted }}
+        <div class="alert alert-secondary mt-3 mb-0 small">Deleted by its owner. The username stays reserved.</div>
+        {{ else if $c.Banned }}
         <div class="alert alert-danger mt-3 mb-0 small">Banned{{ with $c.BanReason }}: {{ . }}{{ end }}</div>
         {{ else if not $c.Activated }}
         <div class="alert alert-secondary mt-3 mb-0 small">Not activated yet.</div>
@@ -71,7 +73,7 @@
             {{ end }}
         </form>
     </div>
-    {{ else if ne $c.ID .CrabID }}
+    {{ else if and (ne $c.ID .CrabID) (not $c.Deleted) }}
     <div class="px-3 py-3 border-bottom border-dark small text-muted">
         {{ if $c.IsAdmin }}Admins can't be moderated from the web.{{ else }}Only an admin can moderate a moderator.{{ end }}
     </div>

@@ -10,6 +10,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/segmentio/ksuid"
 
 	"github.com/t0ul/krabber-net/internal/platform"
@@ -355,6 +356,97 @@ func TestBlocks(t *testing.T) {
 	}
 	if err := s.Follow(ctx, a, b); err != nil {
 		t.Fatalf("follow after unblock: %v", err)
+	}
+}
+
+func TestDeleteAccount(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+	gone := mustCrab(t, s, "flyingdutchman")
+	friend := mustCrab(t, s, "spongebob")
+	fan := mustCrab(t, s, "patrick")
+	rival := mustCrab(t, s, "plankton")
+
+	must := func(err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	must(s.Follow(ctx, gone, friend))
+	must(s.Follow(ctx, fan, gone))
+	must(s.Block(ctx, rival, gone))
+	bye, err := s.CreateMolt(ctx, gone, "Ahoy, I'm off")
+	must(err)
+	hi, err := s.CreateMolt(ctx, friend, "I'm ready!")
+	must(err)
+	must(s.LikeMolt(ctx, friend, bye))
+	_, err = s.AddComment(ctx, friend, bye, "Bye!")
+	must(err)
+	_, err = s.Remolt(ctx, fan, bye)
+	must(err)
+	must(s.LikeMolt(ctx, gone, hi))
+	_, err = s.Remolt(ctx, gone, hi)
+	must(err)
+	must(s.AddToTrenches(ctx, hi, []string{gone.ID}))
+	must(s.AddNotification(ctx, Notification{RecipientID: gone.ID, Type: NotifyFollow, ActorID: fan.ID, Actor: "patrick"}))
+
+	gone = reload(t, s, gone)
+	tomb, err := s.DeleteAccount(ctx, gone)
+	must(err)
+	if _, err := s.DeleteAccount(ctx, gone); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("second delete: %v", err)
+	}
+	if _, err := s.CrabByEmail(ctx, "flyingdutchman@krabber.test"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("email still stored: %v", err)
+	}
+	byName, err := s.CrabByUsername(ctx, "flyingdutchman")
+	if err != nil || !byName.Deleted || byName.CanSignIn() || byName.Email != "" || len(byName.PasswordHash) != 0 {
+		t.Fatalf("tombstone: %+v, %v", byName, err)
+	}
+	if _, err := s.CreateCrab(ctx, "flyingdutchman", "someone@krabber.test", []byte("h")); !errors.Is(err, ErrDuplicateUsername) {
+		t.Fatalf("username not reserved: %v", err)
+	}
+	if _, err := s.CreateCrab(ctx, "dutchman2", "flyingdutchman@krabber.test", []byte("h")); err != nil {
+		t.Fatalf("email not freed: %v", err)
+	}
+
+	queued, err := s.PendingPurges(ctx, 10)
+	if err != nil || len(queued) != 1 || queued[0] != tomb.ID {
+		t.Fatalf("purge queue: %v, %v", queued, err)
+	}
+	must(s.PurgeCrab(ctx, tomb.ID))
+	must(s.PurgeCrab(ctx, tomb.ID)) // idempotent
+
+	if queued, _ := s.PendingPurges(ctx, 10); len(queued) != 0 {
+		t.Fatalf("still queued: %v", queued)
+	}
+	friend, fan, rival = reload(t, s, friend), reload(t, s, fan), reload(t, s, rival)
+	if friend.FollowerCount != 0 || fan.FollowingCount != 0 || rival.BlockLinks != 0 {
+		t.Fatalf("counters: friend=%+v fan=%+v rival=%+v", friend, fan, rival)
+	}
+	if m, err := s.MoltByKey(ctx, hi.PK, hi.SK); err != nil || m.LikeCount != 0 || m.RemoltCount != 0 {
+		t.Fatalf("friend's molt: %+v, %v", m, err)
+	}
+	if liked, _ := s.LikedIDs(ctx, friend.ID, []string{bye.ID}); liked[bye.ID] {
+		t.Fatal("like on the deleted molt survived")
+	}
+	if _, err := s.MoltByID(ctx, bye.ID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("deleted crab's molt: %v", err)
+	}
+	for _, pk := range []string{moltPK(tomb.ID), commentPK(bye.ID), likePK(tomb.ID), followPK(tomb.ID), blockPK(tomb.ID),
+		blockPK(rival.ID), remoltMarkerPK(tomb.ID), trenchPK(tomb.ID), notificationPK(tomb.ID), notificationCounterPK(tomb.ID)} {
+		left, err := queryAll[map[string]any](ctx, s.db, &dynamodb.QueryInput{
+			TableName:                 s.tableName(),
+			KeyConditionExpression:    aws.String("PK = :pk"),
+			ExpressionAttributeValues: map[string]types.AttributeValue{":pk": str(pk)},
+		}, 0)
+		if err != nil || len(left) != 0 {
+			t.Fatalf("%s: %d items left, %v", pk, len(left), err)
+		}
+	}
+	if tomb = reload(t, s, tomb); tomb.FollowerCount+tomb.FollowingCount+tomb.MoltCount+tomb.BlockLinks != 0 || tomb.GSI8PK != "" {
+		t.Fatalf("tombstone after purge: %+v", tomb)
 	}
 }
 

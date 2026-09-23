@@ -40,6 +40,7 @@ func (app *App) Routes() http.Handler {
 	mux.HandleFunc("POST /unblock/{id}", app.requireAuthentication(app.unblockPost))
 	mux.HandleFunc("POST /settings/profile", app.requireAuthentication(app.settingsProfilePost))
 	mux.HandleFunc("POST /settings/password", app.requireAuthentication(app.settingsPasswordPost))
+	mux.HandleFunc("POST /settings/delete", app.requireAuthentication(app.settingsDeletePost))
 	mux.HandleFunc("GET /crabs", app.requireAuthentication(app.allCrabs))
 	mux.HandleFunc("GET /crabs/{name}", app.profile)
 	mux.HandleFunc("GET /crabs/{name}/followers", app.followersList)

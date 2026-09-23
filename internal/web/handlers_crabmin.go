@@ -108,6 +108,8 @@ func (app *App) canModerate(mod, target *store.Crab) error {
 	switch {
 	case mod.ID == target.ID:
 		return errors.New("you can't moderate yourself")
+	case target.Deleted:
+		return errors.New("the account is deleted")
 	case target.IsAdmin():
 		return errModForbidden
 	case target.IsModerator() && !mod.IsAdmin():

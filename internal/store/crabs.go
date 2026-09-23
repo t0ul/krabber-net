@@ -19,6 +19,8 @@ type Crab struct {
 	SK     string `dynamodbav:"SK"`
 	GSI2PK string `dynamodbav:"GSI2PK,omitempty"`
 	GSI2SK string `dynamodbav:"GSI2SK,omitempty"`
+	GSI8PK string `dynamodbav:"GSI8PK,omitempty"` // purge queue, while a deleted account is cleaned up
+	GSI8SK string `dynamodbav:"GSI8SK,omitempty"`
 
 	ID           string    `dynamodbav:"id"`
 	UserName     string    `dynamodbav:"user_name"`
@@ -30,7 +32,8 @@ type Crab struct {
 	Banned    bool   `dynamodbav:"banned"`
 	BanReason string `dynamodbav:"ban_reason,omitempty"`
 	Deleted   bool   `dynamodbav:"deleted"`
-	Role      string `dynamodbav:"role,omitempty"` // RoleAdmin, RoleModerator or empty
+	DeletedAt int64  `dynamodbav:"deleted_at,omitempty"` // Unix seconds
+	Role      string `dynamodbav:"role,omitempty"`       // RoleAdmin, RoleModerator or empty
 
 	Profile
 

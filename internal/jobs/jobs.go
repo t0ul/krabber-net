@@ -1,6 +1,7 @@
-// Package jobs runs the web server's background work: trench fan-out and
-// notifications. Fan-out interrupted by a deploy is picked up again, because
-// pending fan-out is recorded in DynamoDB, not only in memory. Notifications
+// Package jobs runs the web server's background work: trench fan-out,
+// notifications and cleanup after deleted accounts. Fan-out and cleanup
+// interrupted by a deploy are picked up again, because pending work is
+// recorded in DynamoDB, not only in memory. Notifications
 // are best effort: one lost in a restart isn't worth a durable queue.
 package jobs
 
@@ -20,6 +21,8 @@ const (
 	fanoutSweepMinAge = 30 * time.Second // leave fresh molts to the in-process worker
 	fanoutSweepBatch  = 25
 	notifyQueueSize   = 512
+	purgeSweepEvery   = time.Minute
+	purgeSweepBatch   = 5
 )
 
 // Runner owns the background goroutines.
@@ -62,10 +65,34 @@ func (r *Runner) Enqueue(m *store.Molt) {
 
 // Start launches the workers. They stop when ctx is cancelled.
 func (r *Runner) Start(ctx context.Context) {
-	r.wg.Add(3)
+	r.wg.Add(4)
 	go r.fanoutWorker(ctx)
 	go r.notifyWorker(ctx)
 	go r.every(ctx, fanoutSweepEvery, 5*time.Second, r.sweepFanouts)
+	go r.every(ctx, purgeSweepEvery, 15*time.Second, r.sweepPurges)
+}
+
+// sweepPurges cleans up after deleted accounts. A purge cut short by a
+// deploy stays queued and runs again from the start.
+func (r *Runner) sweepPurges(ctx context.Context) {
+	ids, err := r.store.PendingPurges(ctx, purgeSweepBatch)
+	if err != nil {
+		r.log.Error("purge sweep failed", "err", err)
+		return
+	}
+	for _, id := range ids {
+		if ctx.Err() != nil {
+			return
+		}
+		start := time.Now()
+		if err := r.store.PurgeCrab(ctx, id); err != nil {
+			if ctx.Err() == nil {
+				r.log.Error("purge failed; will retry", "crab", id, "err", err)
+			}
+			continue
+		}
+		r.log.Info("purge done", "crab", id, "ms", time.Since(start).Milliseconds())
+	}
 }
 
 func (r *Runner) notifyWorker(ctx context.Context) {

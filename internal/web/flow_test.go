@@ -2,6 +2,7 @@ package web
 
 import (
 	"context"
+	"errors"
 	"html"
 	"io"
 	"log/slog"
@@ -519,6 +520,69 @@ func TestSettings(t *testing.T) {
 	}
 	if status, _ := h.login("gary@krabber.test", "shell-polish-1"); status != http.StatusSeeOther {
 		t.Fatalf("new password: %d", status)
+	}
+}
+
+func TestDeleteAccountFlow(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	h.signupAndActivate("sandy", "sandy@krabber.test", "karate-chop!")
+	h.signupAndActivate("squidward", "squidward@krabber.test", "clarinet-solo")
+	sandyID, squidID := currentID(t, h, "sandy"), currentID(t, h, "squidward")
+
+	h.login("sandy@krabber.test", "karate-chop!")
+	tok := h.csrf("/trench")
+	h.post("/molt/create", url.Values{"csrf_token": {tok}, "content": {"Hi-yah! Texas pride"}}, "HX-Request", "true")
+	sandyMolts, _ := h.store.MoltsByOwner(ctx, sandyID, 1)
+	h.post("/crab/logout", url.Values{"csrf_token": {tok}})
+
+	h.login("squidward@krabber.test", "clarinet-solo")
+	tok = h.csrf("/trench")
+	h.post("/molt/create", url.Values{"csrf_token": {tok}, "content": {"Clarinet recital tonight"}}, "HX-Request", "true")
+	h.post("/comment/"+sandyMolts[0].ID, url.Values{"csrf_token": {tok}, "comment": {"Keep it down"}}, "HX-Request", "true")
+	squidMolts, _ := h.store.MoltsByOwner(ctx, squidID, 1)
+
+	status, body, _ := h.post("/settings/delete", url.Values{"csrf_token": {tok}, "password": {"wrong-note"}})
+	if status != http.StatusUnprocessableEntity || !strings.Contains(body, "isn&#39;t your current password") {
+		t.Fatalf("wrong password: %d", status)
+	}
+	if status, _, _ := h.get("/settings"); status != http.StatusOK {
+		t.Fatalf("still signed in after a wrong password: %d", status)
+	}
+	status, _, hdr := h.post("/settings/delete", url.Values{"csrf_token": {tok}, "password": {"clarinet-solo"}})
+	if status != http.StatusSeeOther || hdr.Get("Location") != "/" {
+		t.Fatalf("delete: %d %s", status, hdr.Get("Location"))
+	}
+	if status, _, _ := h.get("/settings"); status != http.StatusSeeOther {
+		t.Fatalf("still signed in after deleting: %d", status)
+	}
+	if status, _ := h.login("squidward@krabber.test", "clarinet-solo"); status == http.StatusSeeOther {
+		t.Fatal("deleted account can sign in")
+	}
+
+	// Before the purge runs, everything by the crab is already hidden.
+	h.login("sandy@krabber.test", "karate-chop!")
+	if _, body, _ := h.get("/sea"); strings.Contains(body, "Clarinet recital") {
+		t.Error("sea still shows the deleted crab's molt")
+	}
+	if _, body, _ := h.get("/molt/view/" + sandyMolts[0].ID); strings.Contains(body, "Keep it down") {
+		t.Error("the deleted crab's comment is still shown")
+	}
+	for _, path := range []string{"/crabs/squidward", "/molt/view/" + squidMolts[0].ID} {
+		if status, _, _ := h.get(path); status != http.StatusNotFound {
+			t.Errorf("%s: %d", path, status)
+		}
+	}
+
+	ids, err := h.store.PendingPurges(ctx, 10)
+	if err != nil || len(ids) != 1 || ids[0] != squidID {
+		t.Fatalf("purge queue: %v %v", ids, err)
+	}
+	if err := h.store.PurgeCrab(ctx, squidID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := h.store.MoltByKey(ctx, squidMolts[0].PK, squidMolts[0].SK); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("molt after purge: %v", err)
 	}
 }
 

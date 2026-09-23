@@ -81,5 +81,23 @@
         <div class="text-muted small">You haven't blocked anyone. You can block a crab from their profile or any of their molts.</div>
         {{ end }}
     </div>
+
+    {{ $del := .Form.Delete }}
+    <form class="px-3 py-3 border-bottom border-dark kb-settings" method="POST" action="/settings/delete" novalidate>
+        <input type='hidden' name='csrf_token' value='{{ .CSRFToken }}'>
+        <h2 class="h6 font-weight-bold mb-3 text-danger">Delete account</h2>
+        <input type="text" name="username" value="{{ .CrabName }}" autocomplete="username" hidden>
+        <p class="small mb-3">
+            This can't be undone. Your profile, molts, remolts, likes, follows and notifications are removed,
+            and you're signed out everywhere. Your email is forgotten, so you can sign up with it again later.
+            @{{ .CrabName }} stays reserved so nobody can pretend to be you.
+        </p>
+        <div class="form-group">
+            <label for="delete-password">Password</label>
+            {{ with $del.FieldErrors.password }}<div class="error small">{{ . }}</div>{{ end }}
+            <input type="password" name="password" id="delete-password" class="form-control" autocomplete="current-password" required>
+        </div>
+        <button type="submit" class="btn btn-outline-danger rounded-pill">Delete my account</button>
+    </form>
 {{ template "shell-bottom" . }}
 {{end}}

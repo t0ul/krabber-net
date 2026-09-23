@@ -66,9 +66,9 @@ func (app *App) notifications(w http.ResponseWriter, r *http.Request) {
 	}
 	data := app.newTemplateData(r)
 	data.Unread = 0
-	b := blocksOf(r)
+	hidden := app.hidden(r)
 	for _, n := range notes {
-		if !b.Hides(n.ActorID) {
+		if !hidden(n.ActorID) {
 			data.Notifications = append(data.Notifications, n)
 		}
 	}
@@ -155,7 +155,7 @@ func (app *App) followList(w http.ResponseWriter, r *http.Request, followers boo
 		}
 		data.CrabRows = append(data.CrabRows, crabRow{Crab: c, Following: followed[id]})
 	}
-	data.CrabRows = visibleCrabs(r, data.CrabRows)
+	data.CrabRows = app.visibleCrabs(r, data.CrabRows)
 	data.ListBack = "/crabs/" + p.UserName
 	if followers {
 		data.ListTitle = "Crabs following @" + p.UserName
@@ -178,7 +178,7 @@ func (app *App) allCrabs(w http.ResponseWriter, r *http.Request) {
 			data.CrabRows = append(data.CrabRows, crabRow{Crab: c, Following: followed[c.ID]})
 		}
 	}
-	data.CrabRows = visibleCrabs(r, data.CrabRows)
+	data.CrabRows = app.visibleCrabs(r, data.CrabRows)
 	sort.SliceStable(data.CrabRows, func(i, j int) bool {
 		return data.CrabRows[i].Crab.FollowerCount > data.CrabRows[j].Crab.FollowerCount
 	})
@@ -200,7 +200,7 @@ func (app *App) searchPage(w http.ResponseWriter, r *http.Request) {
 			app.serverError(w, r, err)
 			return
 		}
-		data.CrabRows = visibleCrabs(r, rows)
+		data.CrabRows = app.visibleCrabs(r, rows)
 		data.Molts = molts
 		data.EmptyMessage = "No molts match “" + q + "”."
 	}

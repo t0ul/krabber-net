@@ -168,7 +168,7 @@ func (app *App) moltFromPath(w http.ResponseWriter, r *http.Request) (*store.Mol
 	if err == nil && m.Remolt {
 		m, err = app.store.MoltByID(r.Context(), m.RemoltOf)
 	}
-	if err == nil && blocksOf(r).Hides(m.AuthorID) {
+	if err == nil && app.hidden(r)(m.AuthorID) {
 		err = store.ErrNotFound
 	}
 	switch {
@@ -227,9 +227,9 @@ func (app *App) moltView(w http.ResponseWriter, r *http.Request) {
 		app.serverError(w, r, err)
 		return
 	}
-	b := blocksOf(r)
+	hidden := app.hidden(r)
 	for _, c := range comments {
-		if !b.Hides(c.AuthorID) {
+		if !hidden(c.AuthorID) {
 			shown.Comments = append(shown.Comments, c)
 		}
 	}
@@ -245,9 +245,9 @@ func (app *App) moltLikesView(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	data := app.newTemplateData(r)
-	b := blocksOf(r)
+	hidden := app.hidden(r)
 	for _, l := range likes {
-		if !b.Hides(l.CrabID) {
+		if !hidden(l.CrabID) {
 			data.Likes = append(data.Likes, l)
 		}
 	}

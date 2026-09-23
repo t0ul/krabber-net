@@ -7,15 +7,17 @@ import (
 	"github.com/t0ul/krabber-net/internal/store"
 )
 
-// visibleMolts drops molts written or remolted by a banned or deleted crab, or
-// by a crab on either side of a block with the viewer.
-func (app *App) visibleMolts(r *http.Request, molts []store.Molt) []store.Molt {
+// hidden reports whether the viewer must not see a crab or anything by them:
+// the crab is banned or deleted, or on either side of a block with the viewer.
+func (app *App) hidden(r *http.Request) func(crabID string) bool {
 	b := blocksOf(r)
 	gone := app.goneCrabs(r)
-	if len(b.Blocking)+len(b.BlockedBy)+len(gone) == 0 {
-		return molts
-	}
-	hidden := func(id string) bool { return gone[id] || b.Hides(id) }
+	return func(id string) bool { return gone[id] || b.Hides(id) }
+}
+
+// visibleMolts drops molts written or remolted by a hidden crab.
+func (app *App) visibleMolts(r *http.Request, molts []store.Molt) []store.Molt {
+	hidden := app.hidden(r)
 	out := make([]store.Molt, 0, len(molts))
 	for _, m := range molts {
 		if !hidden(m.OwnerID) && !hidden(m.AuthorID) {
@@ -25,15 +27,12 @@ func (app *App) visibleMolts(r *http.Request, molts []store.Molt) []store.Molt {
 	return out
 }
 
-// visibleCrabs drops crab rows on either side of a block with the viewer.
-func visibleCrabs(r *http.Request, rows []crabRow) []crabRow {
-	b := blocksOf(r)
-	if len(b.Blocking)+len(b.BlockedBy) == 0 {
-		return rows
-	}
+// visibleCrabs drops rows for hidden crabs.
+func (app *App) visibleCrabs(r *http.Request, rows []crabRow) []crabRow {
+	hidden := app.hidden(r)
 	out := make([]crabRow, 0, len(rows))
 	for _, row := range rows {
-		if !b.Hides(row.Crab.ID) {
+		if !hidden(row.Crab.ID) {
 			out = append(out, row)
 		}
 	}

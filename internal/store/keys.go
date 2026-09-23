@@ -11,6 +11,7 @@ import (
 //
 //	Entity            PK                     SK                   Index keys
 //	Crab              C#<email>              C#                   GSI2 ID#<id> / ID#<id>
+//	Deleted crab      C#deleted#<id>         C#                   GSI2 as above; GSI8 Q#purge / <id> (until purged)
 //	Username marker   U#<username>           U#
 //	Molt              M#<authorCrabID>       M#<moltID>           GSI3 M#<yyyy-mm-dd> / M#<moltID>
 //	                                                              GSI5 M#<moltID> / M#<moltID>
@@ -39,11 +40,13 @@ const (
 	gsiLikesOnMolt  = "GSI7"
 	gsiWorkQueue    = "GSI8"
 	queueFanout     = "Q#fanout"
+	queuePurge      = "Q#purge"
 	trenchRetention = 90 * 24 * time.Hour
 )
 
 func crabPK(email string) string     { return "C#" + normalizeEmail(email) }
 func crabSK() string                 { return "C#" }
+func deletedCrabPK(id string) string { return "C#deleted#" + id } // no "@", so never an email key
 func crabIDKey(id string) string     { return "ID#" + id }
 func usernamePK(name string) string  { return "U#" + strings.ToLower(name) }
 func usernameSK() string             { return "U#" }
