@@ -29,6 +29,7 @@
 
         <h2>Emails</h2>
         <p>We only email you about your account: activating it, resetting your password, and telling you if a moderator bans it. No newsletters.</p>
+        {{ with .ContactEmail }}<p>Mail you send to {{ . }} is received by Amazon Web Services and forwarded to the operator's mailbox at HEY (hey.com). The copy at AWS is deleted after 30 days.</p>{{ end }}
 
         <h2>How long we keep it</h2>
         <ul>
