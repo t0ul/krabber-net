@@ -63,6 +63,7 @@
     </nav>
     {{ end }}
     {{ if and (eq $p.ID .CrabID) (eq .Tab "molts") }}{{ template "compose" . }}{{ end }}
+    {{ with .Pinned }}<div class="border-bottom border-dark border-thicc" id="pinned-molt">{{ template "molt" (dict "M" . "D" $ "Pinned" true) }}</div>{{ end }}
     {{ template "molt-list" . }}
 {{ template "shell-bottom" . }}
 {{end}}

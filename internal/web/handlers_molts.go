@@ -202,6 +202,11 @@ func (app *App) moltDeletePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	app.dir.removeMolt(m.ID)
+	if c := currentCrab(r); c.PinnedMoltID == m.ID {
+		if err := app.store.Unpin(r.Context(), c, m.ID); err != nil && !errors.Is(err, store.ErrNotFound) {
+			app.log.Warn("unpin deleted molt", "err", err, "molt", m.ID)
+		}
+	}
 	if !m.Remolt {
 		if err := app.store.ResolveReports(r.Context(), m.ID, m.Author, "deleted"); err != nil {
 			app.log.Warn("resolve reports on deleted molt", "err", err, "molt", m.ID)

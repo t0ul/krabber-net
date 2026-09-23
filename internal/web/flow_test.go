@@ -984,6 +984,64 @@ func TestBookmarks(t *testing.T) {
 	}
 }
 
+func TestPins(t *testing.T) {
+	h := newHarness(t)
+	h.signupAndActivate("karen", "karen@krabber.test", "computer-wife!")
+	h.signupAndActivate("plankton", "plankton@krabber.test", "formula-thief!")
+	h.login("karen@krabber.test", "computer-wife!")
+	tok := h.csrf("/trench")
+	for _, text := range []string{"Oldest thought", "Newest thought"} {
+		h.post("/molt/create", url.Values{"csrf_token": {tok}, "content": {text}}, "HX-Request", "true")
+	}
+	molts, _ := h.store.MoltsByOwner(context.Background(), currentID(t, h, "karen"), 2)
+	oldest := molts[1].ID
+
+	if _, body, _ := h.get("/sea"); strings.Contains(body, "/molt/pin/") {
+		t.Error("Pin shows outside your own profile")
+	}
+	if _, body, _ := h.get("/crabs/karen"); !strings.Contains(body, "/molt/pin/"+oldest) || strings.Contains(body, "Pinned Molt") {
+		t.Error("own profile should offer Pin and show no pin yet")
+	}
+	status, _, hdr := h.post("/molt/pin/"+oldest, url.Values{"csrf_token": {tok}}, "HX-Request", "true")
+	if status != http.StatusNoContent || hdr.Get("HX-Refresh") != "true" {
+		t.Fatalf("pin: %d %v", status, hdr)
+	}
+	_, body, _ := h.get("/crabs/karen")
+	pin, list := strings.Index(body, `id="pinned-molt"`), strings.Index(body, `id="molt-list"`)
+	if pin < 0 || pin > list || !strings.Contains(body[pin:list], "Pinned Molt") || !strings.Contains(body[pin:list], "Oldest thought") {
+		t.Error("the pinned molt isn't above the list")
+	}
+	if !strings.Contains(body, "/molt/unpin/"+oldest) {
+		t.Error("the pinned molt's menu should offer Unpin")
+	}
+	if _, body, _ := h.get("/crabs/karen/replies"); strings.Contains(body, "Pinned Molt") {
+		t.Error("the pin shows on the Replies tab")
+	}
+	h.post("/crab/logout", url.Values{"csrf_token": {tok}})
+
+	h.login("plankton@krabber.test", "formula-thief!")
+	tok = h.csrf("/trench")
+	if _, body, _ := h.get("/crabs/karen"); !strings.Contains(body, "Pinned Molt") || strings.Contains(body, "/molt/pin/") || strings.Contains(body, "/molt/unpin/") {
+		t.Error("visitors should see the pin but not Pin or Unpin")
+	}
+	if status, _, _ := h.post("/molt/pin/"+oldest, url.Values{"csrf_token": {tok}}, "HX-Request", "true"); status != http.StatusNotFound {
+		t.Errorf("pin someone else's molt: %d", status)
+	}
+	h.post("/crab/logout", url.Values{"csrf_token": {tok}})
+
+	h.login("karen@krabber.test", "computer-wife!")
+	tok = h.csrf("/trench")
+	h.post("/molt/unpin/"+oldest, url.Values{"csrf_token": {tok}}, "HX-Request", "true")
+	if _, body, _ := h.get("/crabs/karen"); strings.Contains(body, "Pinned Molt") {
+		t.Error("unpin left the pin")
+	}
+	h.post("/molt/pin/"+oldest, url.Values{"csrf_token": {tok}}, "HX-Request", "true")
+	h.post("/molt/delete/"+oldest, url.Values{"csrf_token": {tok}}, "HX-Request", "true")
+	if c, _ := h.store.CrabByUsername(context.Background(), "karen"); c.PinnedMoltID != "" {
+		t.Error("deleting the pinned molt should clear the pin")
+	}
+}
+
 // TestNavLayout keeps the nav in Crabber's order: main pages, the Molt button,
 // then the muted extras.
 func TestNavLayout(t *testing.T) {

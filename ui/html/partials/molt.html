@@ -28,17 +28,23 @@
 
 {{define "molt"}}{{ $m := .M }}
 <div class="regular-molt mini-molt border-dark py-2 d-flex flex-row absolute-container border-bottom px-3" id="{{ $m.DOMID }}" data-molt-id="{{ $m.ID }}">
-    <div class="mini-molt-profile-box">
+    <div class="mini-molt-profile-box{{ if .Pinned }} mt-4{{ end }}">
         <a class="zindex-front" href="/crabs/{{ $m.Author }}">{{ template "avatar" $m.Author }}</a>
     </div>
     <div class="mini-molt-text-box w-100 h-100 px-2">
+        {{ if .Pinned }}
+        <p class="text-muted zindex-front mb-2">
+            <svg class="mini-molt-action-icon remolt-icon" width="12" height="12"><use href="{{ asset "img/sprites.svg" }}#pin-f"></use></svg>
+            Pinned Molt
+        </p>
+        {{ end }}
         {{ if $m.Remolt }}
         <small class="mini-molt-remolt text-muted zindex-front">
             <svg class="mini-molt-action-icon remolt-icon" width="12" height="12"><use href="/static/img/sprites.svg?version=1704178675#repeat"></use></svg>
             <a href="/crabs/{{ $m.RemoltedBy }}">{{ or $m.RemoltedByName $m.RemoltedBy }}</a> Remolted</small>
         {{ end }}
         {{ if and $m.ReplyTo (not .InThread) }}{{ template "replying-to" . }}{{ end }}
-        <div class="mini-molt-credentials absolute-container{{ if or $m.Remolt (and $m.ReplyTo (not .InThread)) }} mt-1{{ end }}">
+        <div class="mini-molt-credentials absolute-container{{ if or .Pinned $m.Remolt (and $m.ReplyTo (not .InThread)) }} mt-1{{ end }}">
             <div class="mini-molt-credentials-text">
                 <a class="mini-molt-display-name zindex-front" href="/crabs/{{ $m.Author }}">{{ or $m.AuthorName $m.Author }}</a>
                 <span class="mini-molt-username zindex-front">@{{ $m.Author }}</span>
@@ -103,6 +109,19 @@
     </summary>
     <div class="kb-menu-items">
         {{ if $own }}
+        {{ with $d.Profile }}{{ if eq .ID $d.CrabID }}
+        {{ if eq .PinnedMoltID $m.ID }}
+        <form hx-post="/molt/unpin/{{ $m.ID }}" hx-swap="none" hx-confirm="Are you sure you want to unpin this Molt?">
+        {{ else }}
+        <form hx-post="/molt/pin/{{ $m.ID }}" hx-swap="none">
+        {{ end }}
+            <input type='hidden' name='csrf_token' value='{{ $d.CSRFToken }}'>
+            <button type="submit" class="kb-menu-item">
+                <svg width="19" height="19"><use href="{{ asset "img/sprites.svg" }}#pin"></use></svg>
+                {{ if eq .PinnedMoltID $m.ID }}Unpin{{ else }}Pin{{ end }}
+            </button>
+        </form>
+        {{ end }}{{ end }}
         <form hx-post="/molt/delete/{{ $m.ID }}{{ if .Thread }}?from=thread{{ end }}" hx-swap="none" hx-confirm="Delete this molt? This can't be undone.">
             <input type='hidden' name='csrf_token' value='{{ $d.CSRFToken }}'>
             <button type="submit" class="kb-menu-item kb-menu-danger">

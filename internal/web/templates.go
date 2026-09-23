@@ -46,6 +46,7 @@ type templateData struct {
 	EmptyMessage string
 
 	Profile     *store.Crab
+	Pinned      *store.Molt // shown above the profile's Molts tab
 	IsFollowing bool
 	FollowsYou  bool
 	IsBlocking  bool

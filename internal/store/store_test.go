@@ -878,6 +878,50 @@ func TestBookmarks(t *testing.T) {
 	}
 }
 
+func TestPins(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+	karen := mustCrab(t, s, "karen")
+	plankton := mustCrab(t, s, "plankton")
+	first, _ := s.CreateMolt(ctx, karen, "first")
+	second, _ := s.CreateMolt(ctx, karen, "second")
+	theirs, _ := s.CreateMolt(ctx, plankton, "theirs")
+	re, _ := s.Remolt(ctx, karen, theirs)
+
+	if err := s.Pin(ctx, karen, theirs); !errors.Is(err, ErrNotAllowed) {
+		t.Fatalf("pin someone else's molt: %v", err)
+	}
+	if err := s.Pin(ctx, karen, re); !errors.Is(err, ErrNotAllowed) {
+		t.Fatalf("pin a remolt: %v", err)
+	}
+	if err := s.Pin(ctx, karen, first); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Pin(ctx, karen, second); err != nil {
+		t.Fatal(err)
+	}
+	fresh := reload(t, s, karen)
+	if got, err := s.PinnedMolt(ctx, fresh); err != nil || got == nil || got.ID != second.ID {
+		t.Fatalf("pinned: %+v, %v", got, err)
+	}
+	// An unpin of the old pin doesn't clear the new one.
+	if err := s.Unpin(ctx, fresh, first.ID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("unpin a stale pin: %v", err)
+	}
+	if err := s.DeleteMolt(ctx, fresh, second); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := s.PinnedMolt(ctx, reload(t, s, karen)); err != nil || got != nil {
+		t.Fatalf("pinned after delete: %+v, %v", got, err)
+	}
+	if err := s.Unpin(ctx, reload(t, s, karen), second.ID); err != nil {
+		t.Fatalf("unpin: %v", err)
+	}
+	if fresh := reload(t, s, karen); fresh.PinnedMoltID != "" {
+		t.Fatalf("still pinned: %q", fresh.PinnedMoltID)
+	}
+}
+
 func TestMarksAndUndoRemolt(t *testing.T) {
 	s := newTestStore(t)
 	ctx := context.Background()

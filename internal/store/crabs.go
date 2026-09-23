@@ -37,6 +37,11 @@ type Crab struct {
 
 	Profile
 
+	// The molt shown at the top of the crab's profile, if any.
+	PinnedMoltID string `dynamodbav:"pinned_molt_id,omitempty"`
+	PinnedMoltPK string `dynamodbav:"pinned_molt_pk,omitempty"`
+	PinnedMoltSK string `dynamodbav:"pinned_molt_sk,omitempty"`
+
 	FollowerCount  int `dynamodbav:"follower_count"`
 	FollowingCount int `dynamodbav:"following_count"`
 	MoltCount      int `dynamodbav:"molt_count"`

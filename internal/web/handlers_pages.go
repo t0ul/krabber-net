@@ -126,12 +126,23 @@ func (app *App) profileTab(w http.ResponseWriter, r *http.Request, tab string) {
 		data.EmptyMessage = "@" + p.UserName + " hasn't molted yet."
 		molts, err = app.store.MoltsByOwner(r.Context(), p.ID, pageSize)
 	}
+	// The pin rides along in the same display pass, then comes off the front.
+	var pinned *store.Molt
+	if err == nil && tab == tabMolts {
+		if pinned, err = app.store.PinnedMolt(r.Context(), p); pinned != nil {
+			molts = append([]store.Molt{*pinned}, molts...)
+		}
+	}
 	if err == nil {
 		molts, err = app.withLikes(r, molts)
 	}
 	if err != nil {
 		app.serverError(w, r, err)
 		return
+	}
+	if pinned != nil && len(molts) > 0 && molts[0].ID == pinned.ID {
+		data.Pinned = &molts[0]
+		molts = molts[1:]
 	}
 	data.Molts = molts
 	if c := currentCrab(r); c != nil && c.ID != p.ID {
