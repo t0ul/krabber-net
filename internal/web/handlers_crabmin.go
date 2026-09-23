@@ -90,8 +90,14 @@ func (app *App) crabminMolt(w http.ResponseWriter, r *http.Request) {
 		app.serverError(w, r, err)
 		return
 	}
+	report, rows, err := app.store.ReportsOn(r.Context(), m.ID)
+	if err != nil {
+		app.serverError(w, r, err)
+		return
+	}
 	data := app.newTemplateData(r)
 	data.Molt = *m
+	data.Report, data.ReportRows = report, rows
 	if author, err := app.store.CrabByID(r.Context(), m.AuthorID); err == nil {
 		data.Profile = author
 		data.CanModerate = app.canModerate(currentCrab(r), author) == nil
@@ -218,6 +224,9 @@ func (app *App) crabminCrabPost(w http.ResponseWriter, r *http.Request) {
 		app.serverError(w, r, err)
 		return
 	}
+	if f.Action == "ban" {
+		app.sendBanEmail(r, target, f.Note)
+	}
 	app.logMod(r, entry)
 	done(msg)
 }
@@ -228,21 +237,35 @@ func (app *App) crabminMoltPost(w http.ResponseWriter, r *http.Request) {
 		app.clientError(w, http.StatusBadRequest)
 		return
 	}
-	m, err := app.store.MoltForModeration(r.Context(), r.PathValue("id"))
-	if errors.Is(err, store.ErrNotFound) {
-		app.notFound(w)
-		return
-	} else if err != nil {
-		app.serverError(w, r, err)
-		return
-	}
-	if f.Action != "remove" && f.Action != "restore" {
+	if f.Action != "remove" && f.Action != "restore" && f.Action != "dismiss" {
 		app.clientError(w, http.StatusBadRequest)
 		return
 	}
 	mod := currentCrab(r)
+	m, err := app.store.MoltForModeration(r.Context(), r.PathValue("id"))
+	switch {
+	case errors.Is(err, store.ErrNotFound) && f.Action == "dismiss":
+		// The author deleted it while it waited in the queue.
+		if err := app.store.ResolveReports(r.Context(), r.PathValue("id"), mod.UserName, "dismissed"); err != nil {
+			app.serverError(w, r, err)
+			return
+		}
+		app.sessions.Put(r.Context(), sessionFlash, "Reports dismissed.")
+		http.Redirect(w, r, "/crabmin/reports", http.StatusSeeOther)
+		return
+	case errors.Is(err, store.ErrNotFound):
+		app.notFound(w)
+		return
+	case err != nil:
+		app.serverError(w, r, err)
+		return
+	}
 	back := "/crabmin/molts/" + url.PathEscape(m.ID)
-	entry := store.ModAction{ModeratorID: mod.ID, Moderator: mod.UserName, Action: f.Action + "_molt", CrabID: m.AuthorID, Crab: m.Author, MoltID: m.ID, Note: store.Snippet(m.Content)}
+	action := f.Action + "_molt"
+	if f.Action == "dismiss" {
+		action, back = "dismiss_reports", "/crabmin/reports"
+	}
+	entry := store.ModAction{ModeratorID: mod.ID, Moderator: mod.UserName, Action: action, CrabID: m.AuthorID, Crab: m.Author, MoltID: m.ID, Note: store.Snippet(m.Content)}
 	author, err := app.store.CrabByID(r.Context(), m.AuthorID)
 	if err != nil && !errors.Is(err, store.ErrNotFound) {
 		app.serverError(w, r, err)
@@ -257,17 +280,29 @@ func (app *App) crabminMoltPost(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if err := app.store.SetMoltRemoved(r.Context(), m, f.Action == "remove"); err != nil {
+	var msg string
+	switch f.Action {
+	case "remove":
+		err = app.store.SetMoltRemoved(r.Context(), m, true)
+		if err == nil {
+			err = app.store.ResolveReports(r.Context(), m.ID, mod.UserName, "removed")
+		}
+		app.dir.removeMolt(m.ID)
+		msg = "Molt removed."
+	case "restore":
+		err = app.store.SetMoltRemoved(r.Context(), m, false)
+		app.dir.invalidate()
+		msg = "Molt restored."
+	case "dismiss":
+		err = app.store.ResolveReports(r.Context(), m.ID, mod.UserName, "dismissed")
+		msg = "Reports on @" + m.Author + "'s molt dismissed."
+	}
+	if err != nil {
 		app.serverError(w, r, err)
 		return
 	}
-	if f.Action == "remove" {
-		app.dir.removeMolt(m.ID)
-	} else {
-		app.dir.invalidate()
-	}
 	app.logMod(r, entry)
-	app.sessions.Put(r.Context(), sessionFlash, "Molt "+map[bool]string{true: "removed", false: "restored"}[f.Action == "remove"]+".")
+	app.sessions.Put(r.Context(), sessionFlash, msg)
 	http.Redirect(w, r, back, http.StatusSeeOther)
 }
 

@@ -23,7 +23,28 @@
         {{ else }}
         <button type="submit" name="action" value="remove" class="btn btn-sm btn-danger rounded-pill">Remove molt</button>
         {{ end }}
+        {{ with .Report }}{{ if .OpenReports }}
+        <button type="submit" name="action" value="dismiss" class="btn btn-sm btn-outline-light rounded-pill ml-2">Dismiss reports</button>
+        {{ end }}{{ end }}
     </form>
+    {{ end }}
+    {{ with .Report }}
+    <div class="px-3 pt-3 pb-1 d-flex">
+        <h2 class="h6 font-weight-bold">Reports</h2>
+        <span class="ml-auto small text-muted">
+            {{ if .OpenReports }}{{ .OpenReports }} open{{ else if .Resolution }}{{ .Resolution }} by @{{ .ResolvedBy }}{{ end }}
+        </span>
+    </div>
+    {{ end }}
+    {{ range .ReportRows }}
+    <div class="border-bottom border-dark px-3 py-2 small">
+        <div class="d-flex">
+            <a href="/crabmin/crabs/{{ .Reporter }}" class="mr-2">@{{ .Reporter }}</a>
+            <span class="text-muted">{{ reportLabel .Reason }}</span>
+            <span class="ml-auto text-muted">{{ template "time" .CreatedAt }}</span>
+        </div>
+        {{ with .Note }}<div class="kb-bio text-muted">{{ . }}</div>{{ end }}
+    </div>
     {{ end }}
 {{ template "shell-bottom" . }}
 {{end}}

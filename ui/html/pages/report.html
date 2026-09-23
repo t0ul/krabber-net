@@ -1,0 +1,34 @@
+{{define "title"}}Report a molt{{end}}
+
+{{define "page"}}
+{{ template "shell-top" . }}
+    {{ $m := .Molt }}
+    {{ $f := .Form }}
+    {{ template "heading" "Report a molt" }}
+    <div class="px-3 py-3 border-bottom border-dark">
+        <div class="small text-muted mb-1">@{{ $m.Author }} · {{ template "time" $m.CreatedAt }}</div>
+        <div class="kb-bio">{{ $m.Content }}</div>
+    </div>
+    <form class="px-3 py-3 border-bottom border-dark kb-settings" method="POST" action="/molt/report/{{ $m.ID }}" novalidate>
+        <input type='hidden' name='csrf_token' value='{{ .CSRFToken }}'>
+        <fieldset class="form-group">
+            <legend class="h6 font-weight-bold">What's wrong with it?</legend>
+            {{ with $f.FieldErrors.reason }}<div class="error small mb-2">{{ . }}</div>{{ end }}
+            {{ range reportReasons }}
+            <div class="custom-control custom-radio mb-2">
+                <input type="radio" name="reason" id="reason-{{ .Key }}" value="{{ .Key }}" class="custom-control-input"{{ if eq $f.Reason .Key }} checked{{ end }} required>
+                <label class="custom-control-label" for="reason-{{ .Key }}">{{ .Label }}</label>
+            </div>
+            {{ end }}
+        </fieldset>
+        <div class="form-group">
+            <label for="report-note">Anything a moderator should know? <span class="text-muted">(optional)</span></label>
+            {{ with $f.FieldErrors.note }}<div class="error small">{{ . }}</div>{{ end }}
+            <textarea name="note" id="report-note" class="form-control" rows="3" maxlength="280">{{ $f.Note }}</textarea>
+            <small class="form-text text-muted">Only moderators see your report. @{{ $m.Author }} isn't told who reported them.</small>
+        </div>
+        <button type="submit" class="btn btn-danger rounded-pill">Send report</button>
+        <a class="ml-3" href="/molt/view/{{ $m.ID }}">Cancel</a>
+    </form>
+{{ template "shell-bottom" . }}
+{{end}}

@@ -151,6 +151,11 @@ func (app *App) moltDeletePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	app.dir.removeMolt(m.ID)
+	if !m.Remolt {
+		if err := app.store.ResolveReports(r.Context(), m.ID, m.Author, "deleted"); err != nil {
+			app.log.Warn("resolve reports on deleted molt", "err", err, "molt", m.ID)
+		}
+	}
 	if isHTMX(r) && r.URL.Query().Get("from") != "thread" {
 		// app.js removes the entry (a remolt) or every entry of the molt.
 		trigger, _ := json.Marshal(map[string]any{"moltDeleted": map[string]any{"id": m.ID, "remolt": m.Remolt}})

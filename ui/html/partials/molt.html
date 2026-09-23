@@ -84,6 +84,10 @@
             </button>
         </form>
         {{ else }}
+        <a class="kb-menu-item kb-menu-danger" href="/molt/report/{{ $m.ID }}">
+            <svg width="19" height="19"><use href="{{ asset "img/sprites.svg" }}#flag"></use></svg>
+            Report molt
+        </a>
         {{ template "block-button" (dict "ID" $m.AuthorID "Name" $m.Author "D" $d) }}
         {{ end }}
         {{ if $d.IsModerator }}

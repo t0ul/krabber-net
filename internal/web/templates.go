@@ -46,6 +46,10 @@ type templateData struct {
 	Blocked     []store.Crab
 	ModLog      []store.ModAction
 	CanModerate bool
+	Reports     []store.Report
+	Report      *store.Report
+	ReportRows  []store.ReportRow
+	Gone        map[string]bool // banned and deleted crabs, for Crabmin
 	CrabRows    []crabRow
 	ListTitle   string
 	ListBack    string
@@ -101,6 +105,7 @@ var modActions = map[string][2]string{ // action: {done, tried to}
 	"remove_molt":        {"removed a molt by", "remove a molt by"},
 	"restore_molt":       {"restored a molt by", "restore a molt by"},
 	"set_role":           {"set the role of", "set the role of"},
+	"dismiss_reports":    {"dismissed reports on a molt by", "dismiss reports on a molt by"},
 }
 
 // modActionLabel turns a moderation log action into words.
@@ -170,6 +175,8 @@ var templateFuncs = template.FuncMap{
 	"websiteLabel":   websiteLabel,
 	"hasPrefix":      strings.HasPrefix,
 	"modActionLabel": modActionLabel,
+	"reportLabel":    store.ReportLabel,
+	"reportReasons":  func() []store.ReportReason { return store.ReportReasons },
 	"dict":           dict,
 	"asset":          asset,
 }

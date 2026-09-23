@@ -1,6 +1,7 @@
 {{define "crabmin-tabs"}}
 <div class="d-flex border-bottom border-dark px-3 py-2 small kb-crabmin-tabs">
     <a href="/crabmin" class="mr-3{{ if eq .CurrentPath "/crabmin" }} font-weight-bold{{ end }}">Look up</a>
+    <a href="/crabmin/reports" class="mr-3{{ if eq .CurrentPath "/crabmin/reports" }} font-weight-bold{{ end }}">Reports</a>
     <a href="/crabmin/log" class="mr-3{{ if eq .CurrentPath "/crabmin/log" }} font-weight-bold{{ end }}">Log</a>
     <span class="ml-auto text-muted">{{ if .IsAdmin }}Admin{{ else }}Moderator{{ end }}</span>
 </div>

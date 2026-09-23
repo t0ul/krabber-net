@@ -586,6 +586,93 @@ func TestDeleteAccountFlow(t *testing.T) {
 	}
 }
 
+func TestReporting(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	for _, name := range []string{"mrkrabs", "sandy", "plankton"} {
+		hash, _ := auth.HashPassword("secret-" + name)
+		c, err := h.store.CreateCrab(ctx, name, name+"@krabber.test", hash)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := h.store.ActivateCrab(ctx, c.ID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	boss, _ := h.store.CrabByUsername(ctx, "mrkrabs")
+	if err := h.store.SetRole(ctx, boss, store.RoleModerator); err != nil {
+		t.Fatal(err)
+	}
+	troll, _ := h.store.CrabByUsername(ctx, "plankton")
+	m, err := h.store.CreateMolt(ctx, troll, "The Krusty Krab is closed forever, come to the Chum Bucket")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	h.login("plankton@krabber.test", "secret-plankton")
+	if status, _, _ := h.get("/molt/report/" + m.ID); status != http.StatusNotFound {
+		t.Fatalf("reporting your own molt: %d", status)
+	}
+	h.client = h.newClient()
+
+	h.login("sandy@krabber.test", "secret-sandy")
+	if _, body, _ := h.get("/molt/view/" + m.ID); !strings.Contains(body, "/molt/report/"+m.ID) {
+		t.Fatal("no report link in the molt menu")
+	}
+	tok := h.csrf("/molt/report/" + m.ID)
+	if status, body, _ := h.post("/molt/report/"+m.ID, url.Values{"csrf_token": {tok}}); status != http.StatusUnprocessableEntity || !strings.Contains(body, "Choose a reason") {
+		t.Fatalf("no reason: %d", status)
+	}
+	status, _, hdr := h.post("/molt/report/"+m.ID, url.Values{"csrf_token": {tok}, "reason": {"spam"}, "note": {"Lies about the Krusty Krab"}})
+	if status != http.StatusSeeOther || hdr.Get("Location") != "/molt/view/"+m.ID {
+		t.Fatalf("report: %d", status)
+	}
+	if _, body, _ := h.get("/molt/view/" + m.ID); !strings.Contains(body, "Thanks for the report") {
+		t.Error("no thanks after reporting")
+	}
+	h.post("/molt/report/"+m.ID, url.Values{"csrf_token": {tok}, "reason": {"hate"}})
+	if _, body, _ := h.get("/molt/view/" + m.ID); !strings.Contains(body, "already reported") {
+		t.Error("a second report should say it's already reported")
+	}
+	if status, _, _ := h.get("/crabmin/reports"); status != http.StatusNotFound {
+		t.Fatalf("report queue for a regular crab: %d", status)
+	}
+	h.client = h.newClient()
+
+	h.login("mrkrabs@krabber.test", "secret-mrkrabs")
+	_, body, _ := h.get("/crabmin/reports")
+	for _, want := range []string{"Chum Bucket", "Spam or scam", "1 report "} {
+		if !strings.Contains(body, want) {
+			t.Errorf("queue missing %q", want)
+		}
+	}
+	_, body, _ = h.get("/crabmin/molts/" + m.ID)
+	if !strings.Contains(body, "@sandy") || !strings.Contains(body, "Lies about the Krusty Krab") {
+		t.Error("molt page doesn't show the report")
+	}
+	tok = h.csrf("/crabmin/reports")
+	status, _, hdr = h.post("/crabmin/molts/"+m.ID, url.Values{"csrf_token": {tok}, "action": {"dismiss"}})
+	if status != http.StatusSeeOther || hdr.Get("Location") != "/crabmin/reports" {
+		t.Fatalf("dismiss: %d", status)
+	}
+	if _, body, _ := h.get("/crabmin/reports"); strings.Contains(body, `action="/crabmin/molts/`+m.ID) || !strings.Contains(body, "No open reports") {
+		t.Error("dismissed report still queued")
+	}
+	if _, body, _ := h.get("/crabmin/log"); !strings.Contains(body, "dismissed reports on a molt by") {
+		t.Error("dismissal not logged")
+	}
+
+	// Banning emails the crab the reason.
+	sent := h.mail.count()
+	h.post("/crabmin/crabs/"+troll.ID, url.Values{"csrf_token": {tok}, "action": {"ban"}, "note": {"Spam about the Krusty Krab"}})
+	if h.mail.count() != sent+1 {
+		t.Fatal("no ban email")
+	}
+	if msg := h.mail.last(t); msg.To != "plankton@krabber.test" || !strings.Contains(msg.Text, "Spam about the Krusty Krab") || !strings.Contains(msg.Subject, "banned") {
+		t.Fatalf("ban email: %+v", msg)
+	}
+}
+
 func TestBlocking(t *testing.T) {
 	h := newHarness(t)
 	ctx := context.Background()

@@ -1,0 +1,33 @@
+{{define "subject"}}Your Krabber account has been banned{{end}}
+
+{{define "plainBody"}}
+Hi {{.UserName}},
+
+A Krabber moderator banned your account, so you can no longer sign in, and your molts are hidden.
+
+Reason: {{.Reason}}
+
+The rules are in the terms of use: {{.TermsURL}}
+{{ with .Contact }}
+If you think this was a mistake, write to {{ . }} and tell us why.
+{{ end }}
+The Krabber team
+{{end}}
+
+{{define "htmlBody"}}
+<!doctype html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width">
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+</head>
+<body>
+    <p>Hi {{.UserName}},</p>
+    <p>A Krabber moderator banned your account, so you can no longer sign in, and your molts are hidden.</p>
+    <p><strong>Reason:</strong> {{.Reason}}</p>
+    <p>The rules are in the <a href="{{.TermsURL}}">terms of use</a>.</p>
+    {{ with .Contact }}<p>If you think this was a mistake, write to <a href="mailto:{{ . }}">{{ . }}</a> and tell us why.</p>{{ end }}
+    <p>The Krabber team</p>
+</body>
+</html>
+{{end}}

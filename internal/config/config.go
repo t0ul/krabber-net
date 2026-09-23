@@ -34,6 +34,10 @@ type Config struct {
 	MailSender        string // "ses" or "console"
 	MailConfiguration string // SES configuration set (bounce and complaint events)
 
+	// ContactEmail is shown on the terms and privacy pages and in ban
+	// emails; those leave the address out when it's empty.
+	ContactEmail string
+
 	TurnstileSiteKey string
 	TurnstileSecret  string
 }
@@ -107,6 +111,7 @@ func parse(env map[string]string) (*Config, error) {
 		MailFrom:          valueOr(env["MAIL_FROM"], "Krabber <no-reply@krabber.net>"),
 		MailSender:        env["MAIL_SENDER"],
 		MailConfiguration: valueOr(env["MAIL_CONFIGURATION_SET"], "krabber-transactional"),
+		ContactEmail:      strings.TrimSpace(env["CONTACT_EMAIL"]),
 		TurnstileSiteKey:  env["TURNSTILE_SITE_KEY"],
 		TurnstileSecret:   env["TURNSTILE_SECRET"],
 		OriginVerifySecrets: nonEmpty(

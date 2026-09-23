@@ -61,6 +61,7 @@ Tests that need DynamoDB Local are skipped when `KRABBER_TEST_DYNAMO_ENDPOINT` i
 | `SSM_PREFIX` | If set (for example `/krabber/prod`), parameters under it override variables: `origin_verify_secret` becomes `ORIGIN_VERIFY_SECRET`, and so on |
 | `ORIGIN_VERIFY_SECRET`, `ORIGIN_VERIFY_SECRET_PREVIOUS` | Value(s) of CloudFront's `X-Origin-Verify` header; required in prod |
 | `MAIL_FROM`, `MAIL_DAILY_CAP`, `MAIL_CONFIGURATION_SET` | Email sender, daily limit (500), SES configuration set |
+| `CONTACT_EMAIL` | Address shown on the terms and privacy pages and in ban emails; left out when unset |
 | `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET` | Cloudflare Turnstile on signup and resend; off when unset |
 | `DYNAMO_ENDPOINT` | DynamoDB Local URL; dev only |
 | `PORT` | Listen port, 5000 by default (Beanstalk's) |

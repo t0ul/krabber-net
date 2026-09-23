@@ -123,7 +123,8 @@ func (s *Store) PurgeCrab(ctx context.Context, crabID string) error {
 }
 
 // purgeMolts deletes the crab's molts and remolts. Originals take their
-// comments and likes with them; remolts give back the original's count.
+// comments, likes and reports with them; remolts give back the original's
+// count.
 func (s *Store) purgeMolts(ctx context.Context, tomb *Crab) error {
 	molts, err := queryAll[Molt](ctx, s.db, &dynamodb.QueryInput{
 		TableName:                 s.tableName(),
@@ -135,8 +136,10 @@ func (s *Store) purgeMolts(ctx context.Context, tomb *Crab) error {
 	}
 	for _, m := range molts {
 		if !m.Remolt {
-			if err := s.deletePartition(ctx, commentPK(m.ID)); err != nil {
-				return err
+			for _, pk := range []string{commentPK(m.ID), reportPK(m.ID)} {
+				if err := s.deletePartition(ctx, pk); err != nil {
+					return err
+				}
 			}
 			likes, err := s.LikesOn(ctx, m.ID, 0)
 			if err != nil {

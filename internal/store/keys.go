@@ -29,6 +29,8 @@ import (
 //	Unread counter    NC#<crabID>            NC#
 //	Block             B#<crabID>             B#out#<otherID> (blocking) / B#in#<otherID> (blocked by)
 //	Moderation log    ML#<yyyy-mm>           ML#<ksuid>
+//	Report queue      R#<moltID>             R#                   GSI8 Q#report / <ksuid> (while open)
+//	Report            R#<moltID>             R#by#<reporterID>
 //
 // Molt, comment and other generated IDs are KSUIDs, so sorting by SK sorts by time.
 
@@ -41,6 +43,7 @@ const (
 	gsiWorkQueue    = "GSI8"
 	queueFanout     = "Q#fanout"
 	queuePurge      = "Q#purge"
+	queueReports    = "Q#report"
 	trenchRetention = 90 * 24 * time.Hour
 )
 
@@ -87,6 +90,9 @@ func blockOutSK(otherID string) string           { return "B#out#" + otherID }
 func blockInSK(otherID string) string            { return "B#in#" + otherID }
 func modLogPK(t time.Time) string                { return "ML#" + t.UTC().Format("2006-01") }
 func modLogSK(id string) string                  { return "ML#" + id }
+func reportPK(moltID string) string              { return "R#" + moltID }
+func reportSummarySK() string                    { return "R#" }
+func reportRowSK(reporterID string) string       { return "R#by#" + reporterID }
 
 // NormalizeEmail lowercases and trims an email address so that one mailbox
 // maps to exactly one account.

@@ -450,6 +450,60 @@ func TestDeleteAccount(t *testing.T) {
 	}
 }
 
+func TestReports(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+	troll := mustCrab(t, s, "plankton")
+	a, b, c := mustCrab(t, s, "sandy"), mustCrab(t, s, "gary"), mustCrab(t, s, "larry")
+	m, err := s.CreateMolt(ctx, troll, "Buy my chum, it's the best")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := s.ReportMolt(ctx, troll, m, "spam", ""); !errors.Is(err, ErrNotAllowed) {
+		t.Fatalf("reporting your own molt: %v", err)
+	}
+	if err := s.ReportMolt(ctx, a, m, "spam", "Chum again"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ReportMolt(ctx, a, m, "hate", ""); !errors.Is(err, ErrAlreadyExists) {
+		t.Fatalf("second report by the same crab: %v", err)
+	}
+	if err := s.ReportMolt(ctx, b, m, "other", ""); err != nil {
+		t.Fatal(err)
+	}
+	open, err := s.OpenReports(ctx, 10)
+	if err != nil || len(open) != 1 || open[0].MoltID != m.ID || open[0].OpenReports != 2 || len(open[0].Reasons) != 2 || open[0].Author != "plankton" {
+		t.Fatalf("queue: %+v, %v", open, err)
+	}
+	summary, rows, err := s.ReportsOn(ctx, m.ID)
+	if err != nil || summary == nil || len(rows) != 2 || rows[0].Note+rows[1].Note != "Chum again" {
+		t.Fatalf("reports on molt: %+v %+v %v", summary, rows, err)
+	}
+
+	if err := s.ResolveReports(ctx, m.ID, "mrkrabs", "dismissed"); err != nil {
+		t.Fatal(err)
+	}
+	if open, _ := s.OpenReports(ctx, 10); len(open) != 0 {
+		t.Fatalf("still open: %+v", open)
+	}
+	if summary, _, _ := s.ReportsOn(ctx, m.ID); summary.Resolution != "dismissed" || summary.ResolvedBy != "mrkrabs" || summary.OpenReports != 0 {
+		t.Fatalf("resolved: %+v", summary)
+	}
+
+	// A new report after a decision reopens the molt with a fresh count.
+	if err := s.ReportMolt(ctx, c, m, "sexual", ""); err != nil {
+		t.Fatal(err)
+	}
+	open, _ = s.OpenReports(ctx, 10)
+	if len(open) != 1 || open[0].OpenReports != 1 || len(open[0].Reasons) != 1 || open[0].Resolution != "" {
+		t.Fatalf("reopened: %+v", open)
+	}
+	if err := s.ResolveReports(ctx, "never-reported", "mrkrabs", "dismissed"); err != nil {
+		t.Fatalf("resolving an unreported molt: %v", err)
+	}
+}
+
 func TestEmptySea(t *testing.T) {
 	s := newTestStore(t)
 	molts, err := s.Sea(context.Background(), 25)

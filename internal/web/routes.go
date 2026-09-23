@@ -49,6 +49,8 @@ func (app *App) Routes() http.Handler {
 	mux.HandleFunc("POST /molt/create", app.requireAuthentication(app.moltCreatePost))
 	mux.HandleFunc("POST /molt/like/{id}", app.requireAuthentication(app.moltLikePost))
 	mux.HandleFunc("POST /molt/delete/{id}", app.requireAuthentication(app.moltDeletePost))
+	mux.HandleFunc("GET /molt/report/{id}", app.requireAuthentication(app.reportPage))
+	mux.HandleFunc("POST /molt/report/{id}", app.requireAuthentication(app.reportPost))
 	mux.HandleFunc("POST /remolt/{id}", app.requireAuthentication(app.remoltPost))
 	mux.HandleFunc("POST /comment/{id}", app.requireAuthentication(app.commentCreatePost))
 	mux.HandleFunc("POST /follow/{id}", app.requireAuthentication(app.followPost))
@@ -57,6 +59,7 @@ func (app *App) Routes() http.Handler {
 	// Admin.
 	mux.HandleFunc("GET /crabmin", app.requireModerator(app.crabmin))
 	mux.HandleFunc("GET /crabmin/log", app.requireModerator(app.crabminLog))
+	mux.HandleFunc("GET /crabmin/reports", app.requireModerator(app.crabminReports))
 	mux.HandleFunc("GET /crabmin/crabs/{name}", app.requireModerator(app.crabminCrab))
 	mux.HandleFunc("POST /crabmin/crabs/{id}", app.requireModerator(app.crabminCrabPost))
 	mux.HandleFunc("GET /crabmin/molts/{id}", app.requireModerator(app.crabminMolt))
