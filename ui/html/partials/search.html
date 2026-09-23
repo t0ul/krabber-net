@@ -19,9 +19,11 @@
     <div class="panel" id="trending">
         <div class="panel-title"><span>Trending</span></div>
         {{ range .Sidebar.Trending }}
-        <a class="d-block px-3 py-2 border-bottom border-dark text-light trending-item" href="/molt/view/{{ .ID }}">
-            <div class="text-muted small">@{{ .Author }} · {{ .LikeCount }} likes · {{ .RemoltCount }} remolts</div>
-            <div class="text-truncate">{{ .Content }}</div>
+        <a href="/crabtag/{{ .Name }}">
+            <div class="trending-tag">
+                <span class="text-primary">%{{ .Name }}</span>
+                <small class="text-muted">Used by {{ .Crabs }} crab{{ if ne .Crabs 1 }}s{{ end }} recently.</small>
+            </div>
         </a>
         {{ else }}
         <p class="text-muted nothing px-3">Nothing right now.</p>

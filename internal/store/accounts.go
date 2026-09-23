@@ -146,7 +146,7 @@ func (s *Store) purgeMolts(ctx context.Context, tomb *Crab) error {
 			for _, l := range likes {
 				keys = append(keys, [2]string{l.PK, l.SK})
 			}
-			if err := s.batchDelete(ctx, keys); err != nil {
+			if err := s.batchDelete(ctx, append(keys, tagKeys(&m)...)); err != nil {
 				return err
 			}
 		}

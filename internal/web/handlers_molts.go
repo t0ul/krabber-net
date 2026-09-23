@@ -39,7 +39,7 @@ func (app *App) moltCreatePost(w http.ResponseWriter, r *http.Request) {
 		app.serverError(w, r, err)
 		return
 	}
-	app.publish(r, m)
+	app.publish(r, m, "")
 
 	if !isHTMX(r) {
 		http.Redirect(w, r, moltReturnPath(r), http.StatusSeeOther)
@@ -49,16 +49,38 @@ func (app *App) moltCreatePost(w http.ResponseWriter, r *http.Request) {
 		map[string]any{"M": m, "D": app.newTemplateData(r)})
 }
 
-// publish sends a molt the signed-in crab just wrote to the feeds. The own
-// trench is written here so a refresh shows the molt immediately; follower
-// fan-out stays in the background (and writes the owner again).
-func (app *App) publish(r *http.Request, m *store.Molt) {
+// publish sends a molt the signed-in crab just wrote to the feeds and tells
+// the crabs it mentions (except skipMention). The own trench is written here
+// so a refresh shows the molt immediately; follower fan-out stays in the
+// background (and writes the owner again).
+func (app *App) publish(r *http.Request, m *store.Molt, skipMention string) {
 	if err := app.store.AddToTrenches(r.Context(), m, []string{m.OwnerID}); err != nil {
 		app.log.Warn("write own trench", "err", err, "molt", m.ID)
 	}
 	app.fanout.Enqueue(m)
 	app.dir.addMolt(*m)
-	m.AuthorName = currentCrab(r).Name()
+	app.notifyMentions(r, m, skipMention)
+	app.displayOne(r, m)
+	if m.AuthorName == "" {
+		m.AuthorName = currentCrab(r).Name()
+	}
+}
+
+// notifyMentions tells the crabs mentioned in m, except skipID (who already
+// gets a reply or quote notification for it).
+func (app *App) notifyMentions(r *http.Request, m *store.Molt, skipID string) {
+	for _, name := range m.Mentions {
+		c, err := app.store.CrabByUsername(r.Context(), name)
+		if err != nil {
+			if !errors.Is(err, store.ErrNotFound) {
+				app.log.Warn("mention lookup", "err", err, "name", name)
+			}
+			continue
+		}
+		if c.ID != skipID && c.CanSignIn() {
+			app.notify(r, c.ID, store.NotifyMention, m.ID, m.Content)
+		}
+	}
 }
 
 // moltReturnPath sends a non-htmx compose back to the feed it was posted from.
@@ -354,6 +376,7 @@ func (app *App) replyCreatePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	app.notify(r, parent.AuthorID, store.NotifyReply, reply.ID, f.Content)
+	app.notifyMentions(r, reply, parent.AuthorID)
 
 	if !isHTMX(r) {
 		http.Redirect(w, r, "/molt/view/"+parent.ID, http.StatusSeeOther)
@@ -364,7 +387,7 @@ func (app *App) replyCreatePost(w http.ResponseWriter, r *http.Request) {
 		app.serverError(w, r, err)
 		return
 	}
-	reply.AuthorName = currentCrab(r).Name()
+	app.displayOne(r, reply)
 	app.renderTemplate(w, r, http.StatusOK, fragmentPage, "reply-created",
 		map[string]any{"M": reply, "Parent": fresh, "D": app.newTemplateData(r), "InThread": true})
 }

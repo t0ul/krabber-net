@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/t0ul/krabber-net/internal/richtext"
 	"github.com/t0ul/krabber-net/internal/store"
 	"github.com/t0ul/krabber-net/ui"
 )
@@ -256,11 +257,23 @@ func (app *App) newTemplateData(r *http.Request) templateData {
 
 // withLikes resolves remolts to their originals and marks which molts the
 // viewer has liked.
-// withNames fills in the display names on molts from the directory, by crab
-// ID, so a crab's current name shows on everything they wrote. Crabs the
-// snapshot doesn't have yet keep the username stored on the molt.
-func (app *App) withNames(r *http.Request, molts []store.Molt) {
-	_, byID, _ := app.snapshot(r)
+// withDisplay fills in what molts need to render: display names from the
+// directory, by crab ID, so a crab's current name shows on everything they
+// wrote (crabs the snapshot doesn't have yet keep the username stored on the
+// molt), and the text with crabtags and known crabs' mentions linked.
+func (app *App) withDisplay(r *http.Request, molts []store.Molt) {
+	crabs, byID, _ := app.snapshot(r)
+	names := make(map[string]string, len(crabs))
+	for _, c := range crabs {
+		names[strings.ToLower(c.UserName)] = c.UserName
+	}
+	known := func(name string) (string, bool) {
+		n, ok := names[name]
+		return n, ok
+	}
+	for i := range molts {
+		molts[i].ContentHTML = richtext.HTML(molts[i].Content, known)
+	}
 	for i := range molts {
 		m := &molts[i]
 		if c, ok := byID[m.AuthorID]; ok {
@@ -275,12 +288,19 @@ func (app *App) withNames(r *http.Request, molts []store.Molt) {
 	}
 }
 
+// displayOne is withDisplay for a single molt the handler already holds.
+func (app *App) displayOne(r *http.Request, m *store.Molt) {
+	ms := []store.Molt{*m}
+	app.withDisplay(r, ms)
+	*m = ms[0]
+}
+
 func (app *App) withLikes(r *http.Request, molts []store.Molt) ([]store.Molt, error) {
 	molts, err := app.store.ResolveRemolts(r.Context(), app.visibleMolts(r, molts))
 	if err != nil {
 		return nil, err
 	}
-	app.withNames(r, molts)
+	app.withDisplay(r, molts)
 	if err := app.withQuoted(r, molts); err != nil {
 		return nil, err
 	}
@@ -324,7 +344,7 @@ func (app *App) withQuoted(r *http.Request, molts []store.Molt) error {
 		return err
 	}
 	quoted = app.visibleMolts(r, quoted)
-	app.withNames(r, quoted)
+	app.withDisplay(r, quoted)
 	byID := make(map[string]*store.Molt, len(quoted))
 	for i := range quoted {
 		byID[quoted[i].ID] = &quoted[i]

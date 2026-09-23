@@ -8,6 +8,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+
+	"github.com/t0ul/krabber-net/internal/richtext"
 )
 
 // moltPointer lists a reply on its parent's thread, or a quote on the quoted
@@ -38,6 +40,8 @@ func (s *Store) Reply(ctx context.Context, author *Crab, parent *Molt, content s
 		Author:          author.UserName,
 		Content:         content,
 		CreatedAt:       s.now(),
+		Tags:            richtext.Tags(content),
+		Mentions:        richtext.Mentions(content),
 		ReplyTo:         parent.ID,
 		ReplyToPK:       parent.PK,
 		ReplyToSK:       parent.SK,
@@ -54,12 +58,16 @@ func (s *Store) Reply(ctx context.Context, author *Crab, parent *Molt, content s
 	if err != nil {
 		return nil, err
 	}
-	err = s.transact(ctx,
+	tags, err := s.tagPointers(m)
+	if err != nil {
+		return nil, err
+	}
+	err = s.transact(ctx, append([]types.TransactWriteItem{
 		s.putNew(item),
 		s.putNew(pointer),
 		s.addCounter(parent.PK, parent.SK, "reply_count", 1),
 		s.addCounter(author.PK, author.SK, "molt_count", 1),
-	)
+	}, tags...)...)
 	switch {
 	case cancelledAt(err, 2):
 		return nil, ErrNotFound

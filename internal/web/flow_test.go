@@ -894,6 +894,54 @@ func TestQuotes(t *testing.T) {
 	}
 }
 
+func TestMentionsAndCrabtags(t *testing.T) {
+	h := newHarness(t)
+	h.signupAndActivate("karen", "karen@krabber.test", "computer-wife!")
+	h.signupAndActivate("plankton", "plankton@krabber.test", "formula-thief!")
+
+	h.login("karen@krabber.test", "computer-wife!")
+	tok := h.csrf("/trench")
+	_, body, _ := h.post("/molt/create", url.Values{"csrf_token": {tok}, "content": {"Try the %KrabbyPatty, @Plankton & @nobody <3"}}, "HX-Request", "true")
+	for _, want := range []string{
+		`<a href="/crabtag/krabbypatty" class="crabtag zindex-front">%KrabbyPatty</a>`,
+		`<a href="/crabs/plankton" class="mention zindex-front">@Plankton</a>`,
+		"&amp; @nobody &lt;3",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("new molt is missing %q: %s", want, body)
+		}
+	}
+	_, body, _ = h.get("/sea")
+	if !strings.Contains(body, `href="/crabtag/krabbypatty"`) || !strings.Contains(body, "%krabbypatty</span>") || !strings.Contains(body, "Used by 1 crab recently.") {
+		t.Error("the Sea or the trending panel is missing the crabtag")
+	}
+	status, body, _ := h.get("/crabtag/KrabbyPatty")
+	if status != http.StatusOK || !strings.Contains(body, "Try the") || !strings.Contains(body, "Exploring") {
+		t.Errorf("crabtag page: %d", status)
+	}
+	if status, body, _ := h.get("/crabtag/nothing"); status != http.StatusOK || !strings.Contains(body, "No molts use %nothing yet.") {
+		t.Errorf("empty crabtag page: %d", status)
+	}
+	if status, _, _ := h.get("/crabtag/not-a-tag"); status != http.StatusNotFound {
+		t.Errorf("bad crabtag: %d", status)
+	}
+	h.post("/crab/logout", url.Values{"csrf_token": {tok}})
+
+	h.login("plankton@krabber.test", "formula-thief!")
+	tok = h.csrf("/trench")
+	if _, body, _ := h.get("/notifications"); !strings.Contains(body, "mentioned you in a Molt") {
+		t.Error("plankton wasn't told about the mention")
+	}
+	molts, _ := h.store.MoltsByOwner(context.Background(), currentID(t, h, "karen"), 1)
+	h.post("/molt/reply/"+molts[0].ID, url.Values{"csrf_token": {tok}, "content": {"@karen never!"}}, "HX-Request", "true")
+	h.post("/crab/logout", url.Values{"csrf_token": {tok}})
+
+	h.login("karen@krabber.test", "computer-wife!")
+	if _, body, _ := h.get("/notifications"); !strings.Contains(body, "replied to your molt") || strings.Contains(body, "mentioned you") {
+		t.Error("a reply that mentions its parent's author should notify once, as a reply")
+	}
+}
+
 // TestNavLayout keeps the nav in Crabber's order: main pages, the Molt button,
 // then the muted extras.
 func TestNavLayout(t *testing.T) {

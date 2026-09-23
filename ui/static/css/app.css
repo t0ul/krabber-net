@@ -46,6 +46,7 @@
 .kb-notification-remolt { fill: var(--remolt); }
 .kb-notification-reply { fill: var(--reply); }
 .kb-notification-quote { fill: var(--remolt); }
+.kb-notification-mention { fill: var(--primary); }
 .kb-notification-follow { color: var(--primary); }
 
 .kb-notification-snippet:hover {
@@ -289,8 +290,7 @@
   box-shadow: none;
 }
 
-.crab-row:hover,
-.trending-item:hover {
+.crab-row:hover {
   background: rgba(255, 255, 255, 0.03);
   text-decoration: none;
 }

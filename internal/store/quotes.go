@@ -32,12 +32,16 @@ func (s *Store) Quote(ctx context.Context, author *Crab, quoted *Molt, content s
 	if err != nil {
 		return nil, err
 	}
-	err = s.transact(ctx,
+	tags, err := s.tagPointers(m)
+	if err != nil {
+		return nil, err
+	}
+	err = s.transact(ctx, append([]types.TransactWriteItem{
 		s.putNew(item),
 		s.putNew(pointer),
 		s.addCounter(quoted.PK, quoted.SK, "quote_count", 1),
 		s.addCounter(author.PK, author.SK, "molt_count", 1),
-	)
+	}, tags...)...)
 	switch {
 	case cancelledAt(err, 2):
 		return nil, ErrNotFound

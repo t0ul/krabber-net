@@ -24,6 +24,7 @@
             {{ else if eq .Type "remolt" }}<svg width="22" height="22"><use href="/static/img/sprites.svg?version=1704178675#repeat"></use></svg>
             {{ else if eq .Type "reply" }}<svg width="22" height="22"><use href="/static/img/sprites.svg?version=1704178675#message-f"></use></svg>
             {{ else if eq .Type "quote" }}<svg width="22" height="22"><use href="/static/img/sprites.svg?version=1704178675#pencil"></use></svg>
+            {{ else if eq .Type "mention" }}<svg width="22" height="22"><use href="/static/img/sprites.svg?version=1704178675#message-writing-f"></use></svg>
             {{ else }}<svg width="22" height="22"><use href="{{ asset "img/sprites.svg" }}#crab"></use></svg>{{ end }}
         </div>
         <div class="flex-grow-1 min-w-0">
@@ -37,6 +38,7 @@
                 {{ else if eq .Type "remolt" }}remolted your molt
                 {{ else if eq .Type "reply" }}replied to your molt
                 {{ else if eq .Type "quote" }}quoted your molt
+                {{ else if eq .Type "mention" }}mentioned you in a Molt
                 {{ else }}followed you{{ end }}
             </div>
             {{ if .MoltID }}
@@ -46,7 +48,7 @@
     </div>
     {{ end }}
     {{ else }}
-    <div class="p-4 text-center text-muted">Nothing yet. When crabs like, remolt, quote or reply to your molts, or follow you, it shows up here.</div>
+    <div class="p-4 text-center text-muted">Nothing yet. When crabs like, remolt, quote or reply to your molts, mention you or follow you, it shows up here.</div>
     {{ end }}
 {{ template "shell-bottom" . }}
 {{end}}

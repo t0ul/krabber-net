@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"testing"
 	"time"
 
@@ -762,6 +763,60 @@ func TestQuotes(t *testing.T) {
 	}
 	if list, _ := s.Quotes(ctx, m.ID, 10); len(list) != 0 {
 		t.Fatalf("quotes after purge: %+v", list)
+	}
+}
+
+func TestCrabtags(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+	author := mustCrab(t, s, "plankton")
+	karen := mustCrab(t, s, "karen")
+	m, err := s.CreateMolt(ctx, author, "Phase one of %TheFormula, with @Karen. %plan %theformula")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(m.Tags, []string{"theformula", "plan"}) || !slices.Equal(m.Mentions, []string{"karen"}) {
+		t.Fatalf("tags %q, mentions %q", m.Tags, m.Mentions)
+	}
+	reply, err := s.Reply(ctx, karen, m, "%theformula again?")
+	if err != nil {
+		t.Fatal(err)
+	}
+	quote, err := s.Quote(ctx, karen, m, "It never works. %TheFormula")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tagged, err := s.MoltsWithTag(ctx, "theformula", 10)
+	if err != nil || len(tagged) != 3 || tagged[0].ID != quote.ID {
+		t.Fatalf("tagged: %+v, %v", tagged, err)
+	}
+
+	// Deleting a molt takes it off its tags' pages and erases its tags.
+	if err := s.DeleteMolt(ctx, reload(t, s, karen), reply); err != nil {
+		t.Fatal(err)
+	}
+	var p moltPointer
+	if err := s.getItem(ctx, tagPK("theformula"), tagSK(reply.ID), &p); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("tag pointer after delete: %v", err)
+	}
+	var deleted Molt
+	if err := s.getItem(ctx, reply.PK, reply.SK, &deleted); err != nil || len(deleted.Tags) != 0 {
+		t.Fatalf("deleted reply kept its tags: %+v, %v", deleted.Tags, err)
+	}
+
+	// Purging the author removes their tag pointers.
+	tomb, err := s.DeleteAccount(ctx, reload(t, s, author))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.PurgeCrab(ctx, tomb.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.getItem(ctx, tagPK("plan"), tagSK(m.ID), &p); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("tag pointer after purge: %v", err)
+	}
+	if tagged, _ := s.MoltsWithTag(ctx, "theformula", 10); len(tagged) != 1 || tagged[0].ID != quote.ID {
+		t.Fatalf("tagged after purge: %+v", tagged)
 	}
 }
 

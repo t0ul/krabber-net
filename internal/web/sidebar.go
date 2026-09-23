@@ -16,13 +16,18 @@ const (
 	directoryCrabs    = 500
 	directoryMolts    = 200
 	whoToFollowCount  = 3
-	trendingCount     = 5
+	trendingCount     = 3
 	searchResultLimit = 25
 )
 
 type sidebar struct {
 	WhoToFollow []crabRow
-	Trending    []store.Molt
+	Trending    []trendingTag
+}
+
+type trendingTag struct {
+	Name  string
+	Crabs int // distinct crabs who used it recently
 }
 
 // directory is a short-lived in-memory copy of all crabs and the last week's
@@ -224,26 +229,34 @@ func (app *App) sidebarFor(r *http.Request) sidebar {
 		sb.WhoToFollow = append(sb.WhoToFollow, crabRow{Crab: c, Following: followed[c.ID]})
 	}
 
-	var scored, recentOriginals []store.Molt
-	for _, m := range app.visibleMolts(r, recent) {
-		if m.Remolt {
-			continue
-		}
-		recentOriginals = append(recentOriginals, m)
-		if score(m) > 0 {
-			scored = append(scored, m)
-		}
-	}
-	sort.SliceStable(scored, func(i, j int) bool { return score(scored[i]) > score(scored[j]) })
-	trending := scored
-	if len(trending) == 0 {
-		trending = recentOriginals
-	}
-	sb.Trending = trending[:min(trendingCount, len(trending))]
+	sb.Trending = trendingTags(app.visibleMolts(r, recent))
 	return sb
 }
 
-func score(m store.Molt) int { return 2*m.LikeCount + 3*m.RemoltCount + m.ReplyCount }
+// trendingTags ranks the crabtags in molts by how many different crabs used
+// them, as Crabber does over the last week.
+func trendingTags(molts []store.Molt) []trendingTag {
+	users := map[string]map[string]bool{}
+	for _, m := range molts {
+		for _, tag := range m.Tags {
+			if users[tag] == nil {
+				users[tag] = map[string]bool{}
+			}
+			users[tag][m.AuthorID] = true
+		}
+	}
+	tags := make([]trendingTag, 0, len(users))
+	for name, by := range users {
+		tags = append(tags, trendingTag{Name: name, Crabs: len(by)})
+	}
+	sort.Slice(tags, func(i, j int) bool {
+		if tags[i].Crabs != tags[j].Crabs {
+			return tags[i].Crabs > tags[j].Crabs
+		}
+		return tags[i].Name < tags[j].Name
+	})
+	return tags[:min(trendingCount, len(tags))]
+}
 
 // search matches crabs by name and the last week's molts by content.
 func (app *App) search(r *http.Request, q string) ([]crabRow, []store.Molt) {

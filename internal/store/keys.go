@@ -21,6 +21,7 @@ import (
 //	Reply pointer     RP#<parentMoltID>      RP#<replyMoltID>
 //	Quote             a molt (keys as above) with quote_of set
 //	Quote pointer     QP#<quotedMoltID>      QP#<quoteMoltID>
+//	Crabtag pointer   TG#<lowercase tag>     TG#<moltID>
 //	Remolt marker     RM#<crabID>            RM#<moltID>
 //	Like              L#<crabID>             L#<moltID>           GSI7 L#<moltID> / L#<crabID>
 //	Follow            F#<followerID>         F#<followeeID>       GSI6 F#<followeeID> / F#<followerID>
@@ -72,6 +73,8 @@ func replyPointerPK(parentID string) string    { return "RP#" + parentID }
 func replyPointerSK(replyID string) string     { return "RP#" + replyID }
 func quotePointerPK(quotedID string) string    { return "QP#" + quotedID }
 func quotePointerSK(quoteID string) string     { return "QP#" + quoteID }
+func tagPK(tag string) string                  { return "TG#" + tag }
+func tagSK(moltID string) string               { return "TG#" + moltID }
 func likePK(crabID string) string              { return "L#" + crabID }
 func likeSK(moltID string) string              { return "L#" + moltID }
 func likesOnKey(moltID string) string          { return "L#" + moltID }

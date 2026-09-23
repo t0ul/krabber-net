@@ -18,6 +18,15 @@ document.addEventListener("htmx:afterSwap", function (event) {
   localizeTimes(event.target);
 });
 
+// Molt text sits above the molt's own link so its mentions and crabtags are
+// clickable; a click elsewhere in the text (not a text selection) still opens
+// the molt, as in Crabber.
+document.addEventListener("click", function (event) {
+  var text = event.target.closest && event.target.closest(".molt-text[data-href]");
+  if (!text || event.target.closest("a") || String(window.getSelection())) return;
+  window.location.href = text.getAttribute("data-href");
+});
+
 // A deleted molt leaves the page: an undone remolt removes just that entry,
 // a deleted molt removes every entry showing it.
 document.addEventListener("moltDeleted", function (event) {

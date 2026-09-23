@@ -19,6 +19,7 @@ const (
 	NotifyFollow  = "follow"
 	NotifyReply   = "reply"
 	NotifyQuote   = "quote"
+	NotifyMention = "mention"
 	NotifyWarning = "warning" // from a moderator; Snippet holds the message
 )
 

@@ -19,7 +19,7 @@ func (app *App) renderQuote(w http.ResponseWriter, r *http.Request, status int, 
 		return
 	}
 	quoted := []store.Molt{*m}
-	app.withNames(r, quoted)
+	app.withDisplay(r, quoted)
 	data := app.newTemplateData(r)
 	data.Molt = quoted[0]
 	data.Form = f
@@ -52,7 +52,7 @@ func (app *App) quoteCreatePost(w http.ResponseWriter, r *http.Request) {
 		app.serverError(w, r, err)
 		return
 	}
-	app.publish(r, m)
+	app.publish(r, m, quoted.AuthorID)
 	app.notify(r, quoted.AuthorID, store.NotifyQuote, m.ID, f.Content)
 	redirect(w, r, "/molt/view/"+m.ID)
 }

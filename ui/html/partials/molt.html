@@ -47,13 +47,12 @@
             {{ template "molt-menu" . }}
         </div>
         <div class="mini-molt-content">
-            <p class="mb-2">
-                <a class="zindex-front text-light molt-text" href="/molt/view/{{ $m.ID }}">{{ $m.Content }}</a>
-            </p>
+            <p class="mb-2"><span class="zindex-front molt-text clickable" data-href="/molt/view/{{ $m.ID }}">{{ or $m.ContentHTML $m.Content }}</span></p>
         </div>
         {{ if $m.QuoteOf }}{{ template "quoted-molt" $m.Quoted }}{{ end }}
         {{ template "molt-actions" . }}
     </div>
+    <a class="absolute-fill" href="/molt/view/{{ $m.ID }}" tabindex="-1" aria-hidden="true"></a>
 </div>
 {{end}}
 
@@ -71,7 +70,7 @@
                 <span class="mini-molt-timestamp">· {{ template "time" .CreatedAt }}</span>
             </div>
         </div>
-        <div class="mini-molt-content"><p class="mb-0 molt-text">{{ .Content }}</p></div>
+        <div class="mini-molt-content"><p class="mb-0 molt-text">{{ or .ContentHTML .Content }}</p></div>
         <a class="absolute-fill" href="/molt/view/{{ .ID }}" aria-label="Open the quoted molt"></a>
     </div>
     {{ else }}

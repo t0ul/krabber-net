@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"html/template"
 	"sort"
 	"time"
 
@@ -11,6 +12,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+
+	"github.com/t0ul/krabber-net/internal/richtext"
 )
 
 // MaxMoltLength is the longest molt accepted, in characters.
@@ -50,6 +53,9 @@ type Molt struct {
 	ReplyToAuthor   string `dynamodbav:"reply_to_author,omitempty"`
 	ReplyToAuthorID string `dynamodbav:"reply_to_author_id,omitempty"`
 
+	Tags     []string `dynamodbav:"tags,omitempty"`     // lowercase crabtags, each with a TG# pointer
+	Mentions []string `dynamodbav:"mentions,omitempty"` // lowercase usernames
+
 	QuoteOf   string `dynamodbav:"quote_of,omitempty"` // quoted molt ID
 	QuoteOfPK string `dynamodbav:"quote_of_pk,omitempty"`
 	QuoteOfSK string `dynamodbav:"quote_of_sk,omitempty"`
@@ -60,14 +66,15 @@ type Molt struct {
 	QuoteCount  int `dynamodbav:"quote_count"`
 
 	// Not stored; filled in for display.
-	EntryID        string `dynamodbav:"-"` // ID of the list entry (the remolt) when showing an original
-	Liked          bool   `dynamodbav:"-"` // the viewer has liked it
-	RemoltedAs     string `dynamodbav:"-"` // ID of the viewer's remolt of it, if any
-	Quoted         *Molt  `dynamodbav:"-"` // the quoted molt, or nil when it's gone
-	RemoltedByID   string `dynamodbav:"-"`
-	AuthorName     string `dynamodbav:"-"` // display names, looked up by ID
-	RemoltedByName string `dynamodbav:"-"`
-	ReplyToName    string `dynamodbav:"-"`
+	EntryID        string        `dynamodbav:"-"` // ID of the list entry (the remolt) when showing an original
+	Liked          bool          `dynamodbav:"-"` // the viewer has liked it
+	RemoltedAs     string        `dynamodbav:"-"` // ID of the viewer's remolt of it, if any
+	Quoted         *Molt         `dynamodbav:"-"` // the quoted molt, or nil when it's gone
+	ContentHTML    template.HTML `dynamodbav:"-"` // Content with mentions and crabtags linked
+	RemoltedByID   string        `dynamodbav:"-"`
+	AuthorName     string        `dynamodbav:"-"` // display names, looked up by ID
+	RemoltedByName string        `dynamodbav:"-"`
+	ReplyToName    string        `dynamodbav:"-"`
 }
 
 // DOMID is unique per list entry, even when an original and its remolt are
@@ -97,6 +104,8 @@ func (s *Store) newMolt(owner *Crab, authorID, author, content string) *Molt {
 		Author:    author,
 		Content:   content,
 		CreatedAt: now,
+		Tags:      richtext.Tags(content),
+		Mentions:  richtext.Mentions(content),
 	}
 }
 
@@ -107,14 +116,49 @@ func (s *Store) CreateMolt(ctx context.Context, author *Crab, content string) (*
 	if err != nil {
 		return nil, err
 	}
-	err = s.transact(ctx,
+	tags, err := s.tagPointers(m)
+	if err != nil {
+		return nil, err
+	}
+	err = s.transact(ctx, append([]types.TransactWriteItem{
 		s.putNew(item),
 		s.addCounter(author.PK, author.SK, "molt_count", 1),
-	)
+	}, tags...)...)
 	if err != nil {
 		return nil, fmt.Errorf("create molt: %w", err)
 	}
 	return m, nil
+}
+
+// tagPointers lists m on each of its crabtags' pages.
+func (s *Store) tagPointers(m *Molt) ([]types.TransactWriteItem, error) {
+	items := make([]types.TransactWriteItem, 0, len(m.Tags))
+	for _, tag := range m.Tags {
+		item, err := marshal(moltPointer{PK: tagPK(tag), SK: tagSK(m.ID), MoltPK: m.PK, MoltSK: m.SK})
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, types.TransactWriteItem{Put: &types.Put{TableName: s.tableName(), Item: item}})
+	}
+	return items, nil
+}
+
+// tagKeys are the keys of m's crabtag pointers.
+func tagKeys(m *Molt) [][2]string {
+	keys := make([][2]string, 0, len(m.Tags))
+	for _, tag := range m.Tags {
+		keys = append(keys, [2]string{tagPK(tag), tagSK(m.ID)})
+	}
+	return keys
+}
+
+// MoltsWithTag returns the molts using a crabtag, newest first.
+func (s *Store) MoltsWithTag(ctx context.Context, tag string, limit int) ([]Molt, error) {
+	molts, err := s.pointedMolts(ctx, tagPK(tag), false, limit)
+	if err != nil {
+		return nil, fmt.Errorf("molts with tag: %w", err)
+	}
+	return molts, nil
 }
 
 // Remolt shares an existing molt on the remolter's timeline. Each crab can
@@ -183,13 +227,16 @@ func (s *Store) DeleteMolt(ctx context.Context, c *Crab, m *Molt) error {
 		{Update: &types.Update{
 			TableName:           s.tableName(),
 			Key:                 keyOf(m.PK, m.SK),
-			UpdateExpression:    aws.String("SET deleted = :t REMOVE content, GSI3PK, GSI3SK, GSI5PK, GSI5SK, GSI8PK, GSI8SK"),
+			UpdateExpression:    aws.String("SET deleted = :t REMOVE content, tags, mentions, GSI3PK, GSI3SK, GSI5PK, GSI5SK, GSI8PK, GSI8SK"),
 			ConditionExpression: aws.String("attribute_exists(PK) AND deleted = :f AND owner_id = :me"),
 			ExpressionAttributeValues: map[string]types.AttributeValue{
 				":t": boolean(true), ":f": boolean(false), ":me": str(c.ID),
 			},
 		}},
 		s.addCounter(c.PK, c.SK, "molt_count", -1),
+	}
+	for _, k := range tagKeys(m) {
+		items = append(items, types.TransactWriteItem{Delete: &types.Delete{TableName: s.tableName(), Key: keyOf(k[0], k[1])}})
 	}
 	if counter != "" {
 		items = append(items,
