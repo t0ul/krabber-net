@@ -34,8 +34,6 @@ type Config struct {
 	MailSender        string // "ses" or "console"
 	MailConfiguration string // SES configuration set (bounce and complaint events)
 
-	AdminCrabIDs []string
-
 	TurnstileSiteKey string
 	TurnstileSecret  string
 }
@@ -45,16 +43,6 @@ func (c *Config) IsDev() bool { return c.Env == "dev" }
 
 // TurnstileEnabled reports whether bot checks are configured.
 func (c *Config) TurnstileEnabled() bool { return c.TurnstileSiteKey != "" && c.TurnstileSecret != "" }
-
-// IsAdmin reports whether a crab ID is on the admin list.
-func (c *Config) IsAdmin(crabID string) bool {
-	for _, id := range c.AdminCrabIDs {
-		if id == crabID {
-			return true
-		}
-	}
-	return false
-}
 
 // SSMGetter is the subset of the SSM client used by Load.
 type SSMGetter interface {
@@ -121,7 +109,6 @@ func parse(env map[string]string) (*Config, error) {
 		MailConfiguration: valueOr(env["MAIL_CONFIGURATION_SET"], "krabber-transactional"),
 		TurnstileSiteKey:  env["TURNSTILE_SITE_KEY"],
 		TurnstileSecret:   env["TURNSTILE_SECRET"],
-		AdminCrabIDs:      splitList(env["ADMIN_CRAB_IDS"]),
 		OriginVerifySecrets: nonEmpty(
 			env["ORIGIN_VERIFY_SECRET"],
 			env["ORIGIN_VERIFY_SECRET_PREVIOUS"],
@@ -190,16 +177,6 @@ func valueOr(v, fallback string) string {
 		return fallback
 	}
 	return v
-}
-
-func splitList(s string) []string {
-	var out []string
-	for _, part := range strings.Split(s, ",") {
-		if part = strings.TrimSpace(part); part != "" {
-			out = append(out, part)
-		}
-	}
-	return out
 }
 
 func nonEmpty(values ...string) []string {

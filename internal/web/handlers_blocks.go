@@ -7,16 +7,18 @@ import (
 	"github.com/t0ul/krabber-net/internal/store"
 )
 
-// visibleMolts drops molts written or remolted by a crab on either side of a
-// block with the viewer.
-func visibleMolts(r *http.Request, molts []store.Molt) []store.Molt {
+// visibleMolts drops molts written or remolted by a banned or deleted crab, or
+// by a crab on either side of a block with the viewer.
+func (app *App) visibleMolts(r *http.Request, molts []store.Molt) []store.Molt {
 	b := blocksOf(r)
-	if len(b.Blocking)+len(b.BlockedBy) == 0 {
+	gone := app.goneCrabs(r)
+	if len(b.Blocking)+len(b.BlockedBy)+len(gone) == 0 {
 		return molts
 	}
+	hidden := func(id string) bool { return gone[id] || b.Hides(id) }
 	out := make([]store.Molt, 0, len(molts))
 	for _, m := range molts {
-		if !b.Hides(m.OwnerID) && !b.Hides(m.AuthorID) {
+		if !hidden(m.OwnerID) && !hidden(m.AuthorID) {
 			out = append(out, m)
 		}
 	}

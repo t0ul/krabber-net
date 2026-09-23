@@ -93,10 +93,11 @@ func (app *App) requireAuthentication(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-// requireAdmin hides admin pages (404) from everyone not on the admin list.
-func (app *App) requireAdmin(next http.HandlerFunc) http.HandlerFunc {
+// requireModerator hides Crabmin (404) from everyone who isn't a moderator or
+// admin.
+func (app *App) requireModerator(next http.HandlerFunc) http.HandlerFunc {
 	return app.requireAuthentication(func(w http.ResponseWriter, r *http.Request) {
-		if !app.cfg.IsAdmin(currentCrab(r).ID) {
+		if !currentCrab(r).IsModerator() {
 			app.notFound(w)
 			return
 		}

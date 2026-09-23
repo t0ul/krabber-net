@@ -22,7 +22,6 @@ func TestParseProd(t *testing.T) {
 		"TABLE_NAME":                    "krabber-prod",
 		"ORIGIN_VERIFY_SECRET":          "current",
 		"ORIGIN_VERIFY_SECRET_PREVIOUS": "old",
-		"ADMIN_CRAB_IDS":                "a, b",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -30,8 +29,8 @@ func TestParseProd(t *testing.T) {
 	if c.BaseURL.String() != "https://krabber.net" || c.MailSender != "ses" || c.MailDailyCap != 500 || c.Addr != ":5000" {
 		t.Fatalf("unexpected defaults: %+v", c)
 	}
-	if len(c.OriginVerifySecrets) != 2 || !c.IsAdmin("b") || c.IsAdmin("c") {
-		t.Fatalf("secrets/admins: %+v", c)
+	if len(c.OriginVerifySecrets) != 2 {
+		t.Fatalf("secrets: %+v", c)
 	}
 }
 

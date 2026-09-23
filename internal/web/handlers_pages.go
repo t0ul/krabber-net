@@ -278,10 +278,6 @@ func (app *App) checkCrab(w http.ResponseWriter, r *http.Request, c *store.Crab,
 	return c, true
 }
 
-func (app *App) crabmin(w http.ResponseWriter, r *http.Request) {
-	app.render(w, r, http.StatusOK, "crabmin.html", app.newTemplateData(r))
-}
-
 func (app *App) healthz(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	_, _ = w.Write([]byte("ok\n"))

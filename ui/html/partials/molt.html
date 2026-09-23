@@ -86,6 +86,12 @@
         {{ else }}
         {{ template "block-button" (dict "ID" $m.AuthorID "Name" $m.Author "D" $d) }}
         {{ end }}
+        {{ if $d.IsModerator }}
+        <a class="kb-menu-item" href="/crabmin/molts/{{ $m.ID }}">
+            <svg width="19" height="19"><use href="{{ asset "img/sprites.svg" }}#lifebuoy"></use></svg>
+            Open in Crabmin
+        </a>
+        {{ end }}
     </div>
 </details>
 {{ end }}

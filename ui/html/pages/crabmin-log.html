@@ -1,0 +1,9 @@
+{{define "title"}}Moderation log{{end}}
+
+{{define "page"}}
+{{ template "shell-top" . }}
+    {{ template "heading" "Moderation log" }}
+    {{ template "crabmin-tabs" . }}
+    {{ template "mod-log" .ModLog }}
+{{ template "shell-bottom" . }}
+{{end}}

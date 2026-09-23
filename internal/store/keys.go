@@ -27,6 +27,7 @@ import (
 //	Notified-once     NO#<recipientID>       <type>#<actorID>#<moltID>
 //	Unread counter    NC#<crabID>            NC#
 //	Block             B#<crabID>             B#out#<otherID> (blocking) / B#in#<otherID> (blocked by)
+//	Moderation log    ML#<yyyy-mm>           ML#<ksuid>
 //
 // Molt, comment and other generated IDs are KSUIDs, so sorting by SK sorts by time.
 
@@ -81,6 +82,8 @@ func notificationCounterSK() string              { return "NC#" }
 func blockPK(crabID string) string               { return "B#" + crabID }
 func blockOutSK(otherID string) string           { return "B#out#" + otherID }
 func blockInSK(otherID string) string            { return "B#in#" + otherID }
+func modLogPK(t time.Time) string                { return "ML#" + t.UTC().Format("2006-01") }
+func modLogSK(id string) string                  { return "ML#" + id }
 
 // NormalizeEmail lowercases and trims an email address so that one mailbox
 // maps to exactly one account.

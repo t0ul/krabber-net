@@ -35,6 +35,7 @@ type Molt struct {
 	Content   string    `dynamodbav:"content"`
 	CreatedAt time.Time `dynamodbav:"created_at"`
 	Deleted   bool      `dynamodbav:"deleted"`
+	Removed   bool      `dynamodbav:"removed,omitempty"` // by a moderator; keeps its index keys so it can be restored
 
 	Remolt     bool   `dynamodbav:"remolt"`
 	RemoltOf   string `dynamodbav:"remolt_of,omitempty"`
@@ -102,7 +103,7 @@ func (s *Store) CreateMolt(ctx context.Context, author *Crab, content string) (*
 // Remolt shares an existing molt on the remolter's timeline. Each crab can
 // remolt a given molt once.
 func (s *Store) Remolt(ctx context.Context, by *Crab, original *Molt) (*Molt, error) {
-	if original.Remolt || original.Deleted {
+	if original.Remolt || original.Deleted || original.Removed {
 		return nil, ErrNotAllowed
 	}
 	m := s.newMolt(by, original.AuthorID, original.Author, original.Content)
@@ -196,6 +197,49 @@ func (s *Store) MoltByID(ctx context.Context, id string) (*Molt, error) {
 	return s.MoltByKey(ctx, molts[0].PK, molts[0].SK)
 }
 
+// MoltForModeration is MoltByID for moderators: it also returns molts a
+// moderator removed.
+func (s *Store) MoltForModeration(ctx context.Context, id string) (*Molt, error) {
+	molts, err := queryAll[Molt](ctx, s.db, &dynamodb.QueryInput{
+		TableName:                 s.tableName(),
+		IndexName:                 aws.String(gsiMoltByID),
+		KeyConditionExpression:    aws.String("GSI5PK = :id"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{":id": str(moltIDKey(id))},
+	}, 1)
+	if err != nil {
+		return nil, fmt.Errorf("molt for moderation: %w", err)
+	}
+	if len(molts) == 0 {
+		return nil, ErrNotFound
+	}
+	var m Molt
+	if err := s.getItem(ctx, molts[0].PK, molts[0].SK, &m); err != nil {
+		return nil, err
+	}
+	if m.Deleted {
+		return nil, ErrNotFound
+	}
+	return &m, nil
+}
+
+// SetMoltRemoved removes a molt from view, or restores it.
+func (s *Store) SetMoltRemoved(ctx context.Context, m *Molt, removed bool) error {
+	_, err := s.db.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+		TableName:                 s.tableName(),
+		Key:                       keyOf(m.PK, m.SK),
+		UpdateExpression:          aws.String("SET removed = :r"),
+		ConditionExpression:       aws.String("attribute_exists(PK) AND deleted = :f"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{":r": boolean(removed), ":f": boolean(false)},
+	})
+	switch {
+	case conditionFailed(err):
+		return ErrNotFound
+	case err != nil:
+		return fmt.Errorf("set molt removed: %w", err)
+	}
+	return nil
+}
+
 // MoltByKey fetches a molt by table key with a strongly consistent read, so
 // counters include a write that just happened.
 func (s *Store) MoltByKey(ctx context.Context, pk, sk string) (*Molt, error) {
@@ -206,7 +250,7 @@ func (s *Store) MoltByKey(ctx context.Context, pk, sk string) (*Molt, error) {
 		}
 		return nil, fmt.Errorf("molt by key: %w", err)
 	}
-	if m.Deleted {
+	if m.Deleted || m.Removed {
 		return nil, ErrNotFound
 	}
 	return &m, nil
@@ -369,7 +413,7 @@ func (s *Store) ClearFanout(ctx context.Context, m *Molt) error {
 func withoutDeleted(molts []Molt) []Molt {
 	out := molts[:0]
 	for _, m := range molts {
-		if !m.Deleted {
+		if !m.Deleted && !m.Removed {
 			out = append(out, m)
 		}
 	}

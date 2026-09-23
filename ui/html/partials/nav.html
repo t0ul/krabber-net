@@ -8,7 +8,7 @@
     </a>
     {{ if .IsAuthenticated }}
     <a href="/trench" class="btn rounded-pill mx-auto mx-lg-0 mt-2 nav-link-btn"{{ if eq $p "/trench" }} id="nav-active" aria-current="page"{{ end }}>
-        <svg class="btn-icon" width="28" height="28"><use href="/static/img/sprites.svg?version=1704178675#{{ if eq $p "/trench" }}home-f{{ else }}home{{ end }}"></use></svg>
+        <svg class="btn-icon" width="28" height="28"><use href="{{ asset "img/sprites.svg" }}#trench"></use></svg>
         <strong class="d-none d-lg-inline-block ml-2">Trench</strong>
     </a>
     {{ end }}
@@ -39,6 +39,12 @@
         <svg class="btn-icon" width="28" height="28"><use href="/static/img/sprites.svg?version=1704178675#{{ if eq $p "/settings" }}cog-f{{ else }}cog{{ end }}"></use></svg>
         <strong class="d-none d-lg-inline-block ml-2">Settings</strong>
     </a>
+    {{ if .IsModerator }}
+    <a href="/crabmin" class="btn rounded-pill mx-auto mx-lg-0 mt-2 nav-link-btn"{{ if hasPrefix $p "/crabmin" }} id="nav-active" aria-current="page"{{ end }}>
+        <svg class="btn-icon" width="28" height="28"><use href="{{ asset "img/sprites.svg" }}#lifebuoy"></use></svg>
+        <strong class="d-none d-lg-inline-block ml-2">Crabmin</strong>
+    </a>
+    {{ end }}
     <a href="/moltinTime" id="molt-btn" class="btn btn-primary mx-auto mx-lg-0 subtle-shadow rounded-pill w-md-75 mt-4 d-block">
         <svg class="btn-icon d-lg-none" width="28" height="28"><use href="/static/img/sprites.svg?version=1704178675#write"></use></svg>
         <strong class="d-none d-lg-inline-block">Molt</strong>
@@ -50,7 +56,6 @@
             <strong class="d-none d-lg-inline-block ml-2">Log out</strong>
         </button>
     </form>
-    {{ if .IsAdmin }}<a href="/crabmin" class="d-block text-muted small mt-3">Crabmin</a>{{ end }}
     {{ else }}
     <a href="/search" class="btn rounded-pill mx-auto mx-lg-0 mt-2 nav-link-btn"{{ if eq $p "/search" }} id="nav-active" aria-current="page"{{ end }}>
         <svg class="btn-icon" width="28" height="28"><use href="/static/img/sprites.svg?version=1704178675#search"></use></svg>

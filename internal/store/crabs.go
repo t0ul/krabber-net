@@ -26,9 +26,11 @@ type Crab struct {
 	PasswordHash []byte    `dynamodbav:"password_hash"`
 	CreatedAt    time.Time `dynamodbav:"created_at"`
 
-	Activated bool `dynamodbav:"activated"`
-	Banned    bool `dynamodbav:"banned"`
-	Deleted   bool `dynamodbav:"deleted"`
+	Activated bool   `dynamodbav:"activated"`
+	Banned    bool   `dynamodbav:"banned"`
+	BanReason string `dynamodbav:"ban_reason,omitempty"`
+	Deleted   bool   `dynamodbav:"deleted"`
+	Role      string `dynamodbav:"role,omitempty"` // RoleAdmin, RoleModerator or empty
 
 	Profile
 
@@ -73,6 +75,19 @@ type usernameMarker struct {
 	SK     string `dynamodbav:"SK"`
 	CrabID string `dynamodbav:"crab_id"`
 }
+
+// Roles. Admins can do everything moderators can, plus act on moderators and
+// appoint them.
+const (
+	RoleAdmin     = "admin"
+	RoleModerator = "moderator"
+)
+
+// IsAdmin reports whether the crab is an admin.
+func (c Crab) IsAdmin() bool { return c.Role == RoleAdmin }
+
+// IsModerator reports whether the crab can moderate (admins included).
+func (c Crab) IsModerator() bool { return c.Role == RoleAdmin || c.Role == RoleModerator }
 
 // CanSignIn reports whether the account may hold a session.
 func (c *Crab) CanSignIn() bool { return c.Activated && !c.Banned && !c.Deleted }
@@ -159,10 +174,12 @@ func (s *Store) CrabByID(ctx context.Context, id string) (*Crab, error) {
 	return &crabs[0], nil
 }
 
-// ListCrabs returns up to limit accounts for the "who to follow" page, without
-// password hashes or emails.
-func (s *Store) ListCrabs(ctx context.Context, limit int) ([]Crab, error) {
+// ListCrabs returns up to limit accounts that can sign in, without password
+// hashes or emails, and the IDs of banned and deleted accounts (whose molts
+// stay hidden).
+func (s *Store) ListCrabs(ctx context.Context, limit int) ([]Crab, map[string]bool, error) {
 	var out []Crab
+	gone := map[string]bool{}
 	p := dynamodb.NewScanPaginator(s.db, &dynamodb.ScanInput{
 		TableName:            s.tableName(),
 		IndexName:            aws.String(gsiCrabByID),
@@ -184,14 +201,17 @@ func (s *Store) ListCrabs(ctx context.Context, limit int) ([]Crab, error) {
 	for p.HasMorePages() && len(out) < limit {
 		page, err := p.NextPage(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("list crabs: %w", err)
+			return nil, nil, fmt.Errorf("list crabs: %w", err)
 		}
 		var crabs []Crab
 		if err := attributevalue.UnmarshalListOfMaps(page.Items, &crabs); err != nil {
-			return nil, fmt.Errorf("list crabs: %w", err)
+			return nil, nil, fmt.Errorf("list crabs: %w", err)
 		}
 		for _, c := range crabs {
-			if c.CanSignIn() {
+			switch {
+			case c.Banned || c.Deleted:
+				gone[c.ID] = true
+			case c.CanSignIn():
 				out = append(out, c)
 			}
 		}
@@ -199,7 +219,7 @@ func (s *Store) ListCrabs(ctx context.Context, limit int) ([]Crab, error) {
 	if len(out) > limit {
 		out = out[:limit]
 	}
-	return out, nil
+	return out, gone, nil
 }
 
 // ActivateCrab marks an account as activated.
@@ -287,20 +307,51 @@ func (s *Store) SetPassword(ctx context.Context, c *Crab, hash []byte) (int64, e
 	return now, nil
 }
 
-// SetBanned bans or unbans an account and ends all of its sessions.
-func (s *Store) SetBanned(ctx context.Context, c *Crab, banned bool) error {
+// SetBanned bans (with a reason) or unbans an account and ends all of its
+// sessions.
+func (s *Store) SetBanned(ctx context.Context, c *Crab, banned bool, reason string) error {
+	expr := "SET banned = :b, sessions_valid_after = :now, ban_reason = :r"
+	values := map[string]types.AttributeValue{
+		":b":   boolean(banned),
+		":now": num(s.now().Unix() + 1),
+		":r":   str(reason),
+	}
+	if !banned || reason == "" {
+		expr = "SET banned = :b, sessions_valid_after = :now REMOVE ban_reason"
+		delete(values, ":r")
+	}
 	_, err := s.db.UpdateItem(ctx, &dynamodb.UpdateItemInput{
-		TableName:           s.tableName(),
-		Key:                 keyOf(c.PK, c.SK),
-		UpdateExpression:    aws.String("SET banned = :b, sessions_valid_after = :now"),
-		ConditionExpression: aws.String("attribute_exists(PK)"),
-		ExpressionAttributeValues: map[string]types.AttributeValue{
-			":b":   boolean(banned),
-			":now": num(s.now().Unix()),
-		},
+		TableName:                 s.tableName(),
+		Key:                       keyOf(c.PK, c.SK),
+		UpdateExpression:          aws.String(expr),
+		ConditionExpression:       aws.String("attribute_exists(PK)"),
+		ExpressionAttributeValues: values,
 	})
 	if err != nil {
 		return fmt.Errorf("set banned: %w", err)
+	}
+	return nil
+}
+
+// SetRole gives a crab a role, or removes it when role is empty.
+func (s *Store) SetRole(ctx context.Context, c *Crab, role string) error {
+	in := &dynamodb.UpdateItemInput{
+		TableName:                s.tableName(),
+		Key:                      keyOf(c.PK, c.SK),
+		UpdateExpression:         aws.String("REMOVE #role"),
+		ConditionExpression:      aws.String("attribute_exists(PK)"),
+		ExpressionAttributeNames: map[string]string{"#role": "role"},
+	}
+	switch role {
+	case "":
+	case RoleAdmin, RoleModerator:
+		in.UpdateExpression = aws.String("SET #role = :r")
+		in.ExpressionAttributeValues = map[string]types.AttributeValue{":r": str(role)}
+	default:
+		return fmt.Errorf("set role: unknown role %q", role)
+	}
+	if _, err := s.db.UpdateItem(ctx, in); err != nil {
+		return fmt.Errorf("set role: %w", err)
 	}
 	return nil
 }

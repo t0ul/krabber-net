@@ -35,6 +35,7 @@ type directory struct {
 	dirty   bool
 	crabs   []store.Crab
 	byID    map[string]store.Crab
+	gone    map[string]bool // banned and deleted crabs
 	recent  []store.Molt
 	loading bool
 }
@@ -76,6 +77,32 @@ func (d *directory) removeMolt(id string) {
 	d.recent = recent
 }
 
+// setGone hides (or brings back) a crab this instance just banned or unbanned,
+// without waiting for the next reload.
+func (d *directory) setGone(id string, gone bool) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	next := make(map[string]bool, len(d.gone)+1)
+	for k := range d.gone {
+		next[k] = true
+	}
+	if gone {
+		next[id] = true
+	} else {
+		delete(next, id)
+	}
+	d.gone = next
+	d.dirty = true
+}
+
+// goneCrabs returns the IDs of banned and deleted crabs.
+func (app *App) goneCrabs(r *http.Request) map[string]bool {
+	app.snapshot(r)
+	app.dir.mu.Lock()
+	defer app.dir.mu.Unlock()
+	return app.dir.gone
+}
+
 // addCrab adds a crab that just activated on this instance.
 func (d *directory) addCrab(c store.Crab) {
 	d.mu.Lock()
@@ -108,7 +135,7 @@ func (d *directory) snapshot(ctx context.Context, s *store.Store, log func(error
 	d.loading = true
 	d.mu.Unlock()
 
-	crabs, err := s.ListCrabs(ctx, directoryCrabs)
+	crabs, gone, err := s.ListCrabs(ctx, directoryCrabs)
 	var recent []store.Molt
 	if err == nil {
 		recent, err = s.LatestMolts(ctx, directoryMolts)
@@ -121,7 +148,7 @@ func (d *directory) snapshot(ctx context.Context, s *store.Store, log func(error
 		log(err)
 		return d.crabs, d.byID, d.recent
 	}
-	d.crabs, d.recent, d.loaded, d.dirty = crabs, recent, time.Now(), false
+	d.crabs, d.gone, d.recent, d.loaded, d.dirty = crabs, gone, recent, time.Now(), false
 	d.byID = make(map[string]store.Crab, len(crabs))
 	for _, c := range crabs {
 		d.byID[c.ID] = c
@@ -179,7 +206,7 @@ func (app *App) sidebarFor(r *http.Request) sidebar {
 	}
 
 	var scored, recentOriginals []store.Molt
-	for _, m := range visibleMolts(r, recent) {
+	for _, m := range app.visibleMolts(r, recent) {
 		if m.Remolt {
 			continue
 		}

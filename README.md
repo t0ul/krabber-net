@@ -14,8 +14,16 @@ make dev    # DynamoDB Local + table + sample crabs, then the site on http://loc
 
 Sign in as `mrkrabs@krabber.test`, `spongebob@krabber.test` or `plankton@krabber.test`
 with password `crabcakes123`. Emails (activation links) print to the server log.
-To use the admin page (`/crabmin`), pass your crab's ID:
-`ADMIN_CRAB_IDS=<id> make run`.
+`spongebob` is an admin and `mrkrabs` a moderator, so both see Crabmin (`/crabmin`).
+
+Roles live on the account and can only be granted with `crabctl`, never from the site.
+For example, this makes you the admin in prod:
+
+```bash
+AWS_PROFILE=krabber-admin TABLE_NAME=krabber-prod go run ./cmd/crabctl role <username> admin
+```
+
+Moderators can then be added or removed by an admin in Crabmin.
 
 ## Test
 
@@ -34,6 +42,7 @@ Tests that need DynamoDB Local are skipped when `KRABBER_TEST_DYNAMO_ENDPOINT` i
 |---|---|
 | `cmd/web` | The website (Beanstalk runs this) |
 | `cmd/devseed` | Dev only: create the table in DynamoDB Local and add sample crabs |
+| `cmd/crabctl` | Operator commands run from your machine (set a crab's role) |
 | `internal/store` | All DynamoDB access; every key format is in `keys.go` |
 | `internal/web` | Routes, handlers, templates, security middleware |
 | `internal/jobs` | Trench fan-out worker and sea refresh |
@@ -52,7 +61,6 @@ Tests that need DynamoDB Local are skipped when `KRABBER_TEST_DYNAMO_ENDPOINT` i
 | `SSM_PREFIX` | If set (for example `/krabber/prod`), parameters under it override variables: `origin_verify_secret` becomes `ORIGIN_VERIFY_SECRET`, and so on |
 | `ORIGIN_VERIFY_SECRET`, `ORIGIN_VERIFY_SECRET_PREVIOUS` | Value(s) of CloudFront's `X-Origin-Verify` header; required in prod |
 | `MAIL_FROM`, `MAIL_DAILY_CAP`, `MAIL_CONFIGURATION_SET` | Email sender, daily limit (500), SES configuration set |
-| `ADMIN_CRAB_IDS` | Comma-separated crab IDs allowed on `/crabmin` |
 | `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET` | Cloudflare Turnstile on signup and resend; off when unset |
 | `DYNAMO_ENDPOINT` | DynamoDB Local URL; dev only |
 | `PORT` | Listen port, 5000 by default (Beanstalk's) |

@@ -20,6 +20,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/segmentio/ksuid"
 
+	"github.com/t0ul/krabber-net/internal/auth"
 	"github.com/t0ul/krabber-net/internal/config"
 	"github.com/t0ul/krabber-net/internal/mail"
 	"github.com/t0ul/krabber-net/internal/platform"
@@ -636,6 +637,143 @@ func TestPasswordReset(t *testing.T) {
 	}
 }
 
+func TestCrabmin(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	for _, name := range []string{"boss", "mod", "peer", "troll"} {
+		hash, _ := auth.HashPassword("shell-game-" + name)
+		c, err := h.store.CreateCrab(ctx, name, name+"@krabber.test", hash)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := h.store.ActivateCrab(ctx, c.ID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	crab := func(name string) *store.Crab {
+		c, err := h.store.CrabByUsername(ctx, name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return c
+	}
+	for name, role := range map[string]string{"boss": store.RoleAdmin, "mod": store.RoleModerator, "peer": store.RoleModerator} {
+		if err := h.store.SetRole(ctx, crab(name), role); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := h.store.UpdateProfile(ctx, crab("troll"), store.Profile{Bio: "I am a menace"}); err != nil {
+		t.Fatal(err)
+	}
+
+	h.login("troll@krabber.test", "shell-game-troll")
+	trollClient := h.client
+	tok := h.csrf("/trench")
+	h.post("/molt/create", url.Values{"csrf_token": {tok}, "content": {"Barnacles to all of you"}}, "HX-Request", "true")
+	molts, _ := h.store.MoltsByOwner(ctx, crab("troll").ID, 1)
+	moltID := molts[0].ID
+	if status, _, _ := h.get("/crabmin"); status != http.StatusNotFound {
+		t.Fatalf("crabmin for a regular crab: %d", status)
+	}
+	if _, body, _ := h.get("/trench"); strings.Contains(body, `href="/crabmin"`) {
+		t.Error("regular crab sees the Crabmin nav button")
+	}
+
+	h.client = h.newClient()
+	h.login("mod@krabber.test", "shell-game-mod")
+	if _, body, _ := h.get("/sea"); !strings.Contains(body, `href="/crabmin"`) || !strings.Contains(body, "/crabmin/molts/"+moltID) {
+		t.Error("moderator should see the Crabmin nav button and the molt menu entry")
+	}
+	if status, _, hdr := h.get("/crabmin?q=%40Troll"); status != http.StatusSeeOther || hdr.Get("Location") != "/crabmin/crabs/troll" {
+		t.Fatalf("look up by username: %d %s", status, hdr.Get("Location"))
+	}
+	if _, _, hdr := h.get("/crabmin?q=" + moltID); hdr.Get("Location") != "/crabmin/molts/"+moltID {
+		t.Fatalf("look up by molt ID: %s", hdr.Get("Location"))
+	}
+	tok = h.csrf("/crabmin/crabs/troll")
+	act := func(target, action, note string) string {
+		t.Helper()
+		status, _, hdr := h.post("/crabmin/crabs/"+crab(target).ID, url.Values{"csrf_token": {tok}, "action": {action}, "note": {note}})
+		if status != http.StatusSeeOther {
+			t.Fatalf("%s %s: %d", action, target, status)
+		}
+		_, body, _ := h.get(hdr.Get("Location"))
+		return body
+	}
+
+	act("troll", "warn", "Please be kind to the other crabs")
+	if notes, _ := h.store.Notifications(ctx, crab("troll").ID, 10); len(notes) != 1 || notes[0].Type != store.NotifyWarning {
+		t.Fatalf("warning: %+v", notes)
+	}
+	act("troll", "clear_bio", "")
+	if c := crab("troll"); c.Bio != "" {
+		t.Fatalf("bio not cleared: %q", c.Bio)
+	}
+
+	tok = h.csrf("/crabmin/molts/" + moltID)
+	h.post("/crabmin/molts/"+moltID, url.Values{"csrf_token": {tok}, "action": {"remove"}})
+	if _, body, _ := h.get("/sea"); strings.Contains(body, "Barnacles to all of you") {
+		t.Error("removed molt still in the sea")
+	}
+	if status, _, _ := h.get("/molt/view/" + moltID); status != http.StatusNotFound {
+		t.Errorf("removed molt page: %d", status)
+	}
+	if _, body, _ := h.get("/crabmin/molts/" + moltID); !strings.Contains(body, "Removed by a moderator") {
+		t.Error("crabmin should still show the removed molt")
+	}
+	h.post("/crabmin/molts/"+moltID, url.Values{"csrf_token": {tok}, "action": {"restore"}})
+	if status, _, _ := h.get("/molt/view/" + moltID); status != http.StatusOK {
+		t.Errorf("restored molt page: %d", status)
+	}
+
+	// A moderator can't ban another moderator or appoint one.
+	if body := act("peer", "ban", "coup"); !strings.Contains(body, "Not allowed") || crab("peer").Banned {
+		t.Error("moderator banned a moderator")
+	}
+	if body := act("troll", "make_moderator", ""); !strings.Contains(body, "Only admins") || crab("troll").Role != "" {
+		t.Error("moderator appointed a moderator")
+	}
+
+	if body := act("troll", "ban", "Repeated harassment"); !strings.Contains(body, "Repeated harassment") {
+		t.Error("ban reason not shown")
+	}
+	if c := crab("troll"); !c.Banned || c.BanReason != "Repeated harassment" {
+		t.Fatalf("after ban: %+v", c)
+	}
+	if _, body, _ := h.get("/sea"); strings.Contains(body, "Barnacles to all of you") {
+		t.Error("banned crab's molt still in the sea")
+	}
+	_, logPage, _ := h.get("/crabmin/log")
+	for _, want := range []string{"banned", "warned", "cleared the bio of", "removed a molt by", "restored a molt by", "tried to ban", "tried to make a moderator:"} {
+		if !strings.Contains(logPage, want) {
+			t.Errorf("log missing %q", want)
+		}
+	}
+	mine := h.client
+	h.client = trollClient
+	if status, _, _ := h.get("/trench"); status != http.StatusSeeOther {
+		t.Errorf("banned crab still signed in: %d", status)
+	}
+
+	// The admin can moderate moderators, but nobody touches an admin from the web.
+	h.client = h.newClient()
+	h.login("boss@krabber.test", "shell-game-boss")
+	tok = h.csrf("/crabmin/crabs/peer")
+	act("peer", "remove_moderator", "")
+	if crab("peer").Role != "" {
+		t.Error("admin couldn't remove a moderator")
+	}
+	act("troll", "unban", "")
+	if crab("troll").Banned {
+		t.Error("admin couldn't unban")
+	}
+	h.client = mine
+	tok = h.csrf("/crabmin/crabs/boss")
+	if body := act("boss", "ban", "mutiny"); !strings.Contains(body, "Not allowed") || crab("boss").Banned {
+		t.Error("moderator banned the admin")
+	}
+}
+
 func currentID(t *testing.T, h *harness, name string) string {
 	t.Helper()
 	c, err := h.store.CrabByUsername(context.Background(), name)
@@ -686,7 +824,7 @@ func TestBanEndsSessions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := h.store.SetBanned(context.Background(), c, true); err != nil {
+	if err := h.store.SetBanned(context.Background(), c, true, "spam"); err != nil {
 		t.Fatal(err)
 	}
 	time.Sleep(10 * time.Millisecond)

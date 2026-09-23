@@ -20,7 +20,15 @@
                     <summary class="mini-molt-action reply rounded-circle" title="More" aria-label="More options">
                         <svg class="mini-molt-action-icon" width="19" height="19"><use href="/static/img/sprites.svg?version=1704178675#more-horizontal"></use></svg>
                     </summary>
-                    <div class="kb-menu-items">{{ template "block-button" (dict "ID" $p.ID "Name" $p.UserName "D" .) }}</div>
+                    <div class="kb-menu-items">
+                        {{ template "block-button" (dict "ID" $p.ID "Name" $p.UserName "D" .) }}
+                        {{ if .IsModerator }}
+                        <a class="kb-menu-item" href="/crabmin/crabs/{{ $p.UserName }}">
+                            <svg width="19" height="19"><use href="{{ asset "img/sprites.svg" }}#lifebuoy"></use></svg>
+                            Open in Crabmin
+                        </a>
+                        {{ end }}
+                    </div>
                 </details>
                 {{ end }}
             </div>

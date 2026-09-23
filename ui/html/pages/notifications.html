@@ -4,6 +4,20 @@
 {{ template "shell-top" . }}
     {{ template "heading" "Notifications" }}
     {{ range .Notifications }}
+    {{ if eq .Type "warning" }}
+    <div class="d-flex border-bottom border-dark px-3 py-2 kb-notification">
+        <div class="kb-notification-icon kb-notification-warning mr-3">
+            <svg width="22" height="22"><use href="{{ asset "img/sprites.svg" }}#lifebuoy"></use></svg>
+        </div>
+        <div class="flex-grow-1 min-w-0">
+            <div class="d-flex align-items-center mb-1">
+                <strong>A warning from the Krabber moderators</strong>
+                <span class="text-muted small ml-auto">{{ template "time" .CreatedAt }}</span>
+            </div>
+            <div class="kb-bio">{{ .Snippet }}</div>
+        </div>
+    </div>
+    {{ else }}
     <div class="d-flex border-bottom border-dark px-3 py-2 kb-notification">
         <div class="kb-notification-icon kb-notification-{{ .Type }} mr-3">
             {{ if eq .Type "like" }}<svg width="22" height="22"><use href="/static/img/sprites.svg?version=1704178675#heart-f"></use></svg>
@@ -28,6 +42,7 @@
             {{ end }}
         </div>
     </div>
+    {{ end }}
     {{ else }}
     <div class="p-4 text-center text-muted">Nothing yet. When crabs like, remolt, comment on your molts or follow you, it shows up here.</div>
     {{ end }}

@@ -104,6 +104,28 @@
 
 .kb-menu-item:hover {
   background: var(--primary-faded);
+  color: var(--light);
+  text-decoration: none;
+}
+
+/* Crabmin. */
+.kb-notification-warning { color: #f4a261; }
+
+.kb-role {
+  color: var(--primary);
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.kb-crabmin-fields {
+  display: grid;
+  grid-template-columns: 7rem 1fr;
+  row-gap: 4px;
+}
+
+.kb-crabmin-fields dd {
+  margin: 0;
+  overflow-wrap: anywhere;
 }
 
 .kb-menu-danger,

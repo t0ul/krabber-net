@@ -54,7 +54,12 @@ func (app *App) Routes() http.Handler {
 	mux.HandleFunc("POST /unfollow/{id}", app.requireAuthentication(app.unfollowPost))
 
 	// Admin.
-	mux.HandleFunc("GET /crabmin", app.requireAdmin(app.crabmin))
+	mux.HandleFunc("GET /crabmin", app.requireModerator(app.crabmin))
+	mux.HandleFunc("GET /crabmin/log", app.requireModerator(app.crabminLog))
+	mux.HandleFunc("GET /crabmin/crabs/{name}", app.requireModerator(app.crabminCrab))
+	mux.HandleFunc("POST /crabmin/crabs/{id}", app.requireModerator(app.crabminCrabPost))
+	mux.HandleFunc("GET /crabmin/molts/{id}", app.requireModerator(app.crabminMolt))
+	mux.HandleFunc("POST /crabmin/molts/{id}", app.requireModerator(app.crabminMoltPost))
 
 	dynamic := app.sessions.LoadAndSave(app.crossOriginProtection(app.csrf(app.authenticate(mux))))
 

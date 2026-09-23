@@ -60,6 +60,14 @@ func main() {
 	all := append(append([]*store.Crab{}, crew...), extras...)
 	seedMolts(ctx, s, all)
 	seedNotifications(ctx, s, all)
+	// SpongeBob runs Crabmin in dev; Mr. Krabs moderates, so the
+	// moderator-vs-admin rules have someone to try.
+	for c, role := range map[*store.Crab]string{crew[1]: store.RoleAdmin, crew[0]: store.RoleModerator} {
+		if err := s.SetRole(ctx, c, role); err != nil {
+			log.Fatal(err)
+		}
+		fmt.Printf("crab %-10s role=%s\n", c.UserName, role)
+	}
 	fmt.Printf("table %s ready; sign in as any crab with password crabcakes123\n", table)
 }
 

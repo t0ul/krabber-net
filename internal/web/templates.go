@@ -22,6 +22,7 @@ type templateData struct {
 	Flash            string
 	IsAuthenticated  bool
 	IsAdmin          bool
+	IsModerator      bool
 	CrabID           string
 	CrabName         string
 	CSRFToken        string
@@ -43,6 +44,8 @@ type templateData struct {
 	IsFollowing bool
 	IsBlocking  bool
 	Blocked     []store.Crab
+	ModLog      []store.ModAction
+	CanModerate bool
 	CrabRows    []crabRow
 	ListTitle   string
 	ListBack    string
@@ -84,6 +87,35 @@ func ago(t time.Time) string {
 }
 
 func monthYear(t time.Time) string { return t.UTC().Format("January 2006") }
+
+var modActions = map[string][2]string{ // action: {done, tried to}
+	"ban":                {"banned", "ban"},
+	"unban":              {"unbanned", "unban"},
+	"warn":               {"warned", "warn"},
+	"clear_display_name": {"cleared the display name of", "clear the display name of"},
+	"clear_bio":          {"cleared the bio of", "clear the bio of"},
+	"clear_location":     {"cleared the location of", "clear the location of"},
+	"clear_website":      {"cleared the website of", "clear the website of"},
+	"make_moderator":     {"made a moderator:", "make a moderator:"},
+	"remove_moderator":   {"removed the moderator role from", "remove the moderator role from"},
+	"remove_molt":        {"removed a molt by", "remove a molt by"},
+	"restore_molt":       {"restored a molt by", "restore a molt by"},
+	"set_role":           {"set the role of", "set the role of"},
+}
+
+// modActionLabel turns a moderation log action into words.
+func modActionLabel(action string) string {
+	if a, ok := strings.CutPrefix(action, "attempted_"); ok {
+		if l, ok := modActions[a]; ok {
+			return "tried to " + l[1]
+		}
+		return "tried " + a
+	}
+	if l, ok := modActions[action]; ok {
+		return l[0]
+	}
+	return action
+}
 
 // websiteLabel shows a profile website without the scheme or trailing slash.
 func websiteLabel(u string) string {
@@ -132,12 +164,14 @@ var assetVersion = func() string {
 func asset(path string) string { return "/static/" + path + "?v=" + assetVersion }
 
 var templateFuncs = template.FuncMap{
-	"humanDate":    humanDate,
-	"ago":          ago,
-	"monthYear":    monthYear,
-	"websiteLabel": websiteLabel,
-	"dict":         dict,
-	"asset":        asset,
+	"humanDate":      humanDate,
+	"ago":            ago,
+	"monthYear":      monthYear,
+	"websiteLabel":   websiteLabel,
+	"hasPrefix":      strings.HasPrefix,
+	"modActionLabel": modActionLabel,
+	"dict":           dict,
+	"asset":          asset,
 }
 
 func newTemplateCache() (map[string]*template.Template, error) {
@@ -193,7 +227,8 @@ func (app *App) newTemplateData(r *http.Request) templateData {
 		d.IsAuthenticated = true
 		d.CrabID = c.ID
 		d.CrabName = c.UserName
-		d.IsAdmin = app.cfg.IsAdmin(c.ID)
+		d.IsAdmin = c.IsAdmin()
+		d.IsModerator = c.IsModerator()
 		n, err := app.store.UnreadNotifications(r.Context(), c.ID)
 		if err != nil {
 			app.log.Warn("unread notifications", "err", err)
@@ -207,7 +242,7 @@ func (app *App) newTemplateData(r *http.Request) templateData {
 // withLikes resolves remolts to their originals and marks which molts the
 // viewer has liked.
 func (app *App) withLikes(r *http.Request, molts []store.Molt) ([]store.Molt, error) {
-	molts, err := app.store.ResolveRemolts(r.Context(), visibleMolts(r, molts))
+	molts, err := app.store.ResolveRemolts(r.Context(), app.visibleMolts(r, molts))
 	if err != nil {
 		return nil, err
 	}

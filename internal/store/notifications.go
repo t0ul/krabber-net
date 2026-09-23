@@ -18,6 +18,7 @@ const (
 	NotifyRemolt  = "remolt"
 	NotifyFollow  = "follow"
 	NotifyComment = "comment"
+	NotifyWarning = "warning" // from a moderator; Snippet holds the message
 )
 
 const (
@@ -72,7 +73,7 @@ func (s *Store) AddNotification(ctx context.Context, n Notification) error {
 	}
 
 	var items []types.TransactWriteItem
-	if n.Type != NotifyComment {
+	if n.Type != NotifyComment && n.Type != NotifyWarning {
 		marker, err := marshal(map[string]any{
 			"PK":         notificationOncePK(n.RecipientID),
 			"SK":         notificationOnceSK(n.Type, n.ActorID, n.MoltID),
