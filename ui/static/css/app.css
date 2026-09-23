@@ -14,6 +14,66 @@
   fill: var(--like);
 }
 
+/* The "…" menu on a molt. */
+.mini-molt-credentials {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.kb-menu {
+  position: relative;
+}
+
+.kb-menu > summary {
+  list-style: none;
+  cursor: pointer;
+  display: inline-flex;
+  padding: 2px 6px;
+  fill: var(--light-faded, #8899a6);
+}
+
+.kb-menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.kb-menu-items {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  z-index: 1050;
+  min-width: 190px;
+  padding: 4px 0;
+  background: var(--dark-less, #15181c);
+  border: 1px solid #2f3336;
+  border-radius: 10px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+}
+
+.kb-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 14px;
+  background: none;
+  border: none;
+  color: var(--light);
+  fill: var(--light);
+  text-align: left;
+  font-size: 0.9rem;
+}
+
+.kb-menu-item:hover {
+  background: var(--primary-faded);
+}
+
+.kb-menu-danger,
+.kb-menu-danger:hover {
+  color: var(--primary);
+  fill: var(--primary);
+}
+
 /* The nav items are links, not the buttons style.css was written for. */
 #nav-panel .nav-link-btn {
   display: block;

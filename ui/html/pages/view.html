@@ -13,7 +13,8 @@
     <div class="large-molt mini-molt border-bottom border-dark px-3 pt-3 pb-1">
         <div class="d-flex align-items-center mb-2">
             <a href="/crabs/{{ .Author }}" class="mr-2">{{ template "avatar" .Author }}</a>
-            <a href="/crabs/{{ .Author }}" class="text-light font-weight-bold">@{{ .Author }}</a>
+            <a href="/crabs/{{ .Author }}" class="text-light font-weight-bold flex-grow-1">@{{ .Author }}</a>
+            {{ template "molt-menu" (dict "M" . "D" $d "Thread" true) }}
         </div>
         {{ if .Remolt }}<div class="text-muted small mb-2">Remolted by <a class="text-muted" href="/crabs/{{ .RemoltedBy }}">@{{ .RemoltedBy }}</a></div>{{ end }}
         <p class="large-molt-text mb-2">{{ .Content }}</p>

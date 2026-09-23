@@ -18,6 +18,28 @@ document.addEventListener("htmx:afterSwap", function (event) {
   localizeTimes(event.target);
 });
 
+// A deleted molt leaves the page: an undone remolt removes just that entry,
+// a deleted molt removes every entry showing it.
+document.addEventListener("moltDeleted", function (event) {
+  var d = event.detail || {};
+  if (!d.id) return;
+  if (d.remolt) {
+    var entry = document.getElementById("molt-" + d.id);
+    if (entry) entry.remove();
+    return;
+  }
+  document.querySelectorAll('.mini-molt[data-molt-id="' + CSS.escape(d.id) + '"]').forEach(function (el) {
+    el.remove();
+  });
+});
+
+// Only one "…" menu is open at a time, and clicking elsewhere closes it.
+document.addEventListener("click", function (event) {
+  document.querySelectorAll("details.kb-menu[open]").forEach(function (menu) {
+    if (!menu.contains(event.target)) menu.removeAttribute("open");
+  });
+});
+
 // Relative times ("5m") show the exact moment in the reader's own timezone on hover.
 function localizeTimes(root) {
   (root || document).querySelectorAll("time[datetime]").forEach(function (el) {

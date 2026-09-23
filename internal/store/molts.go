@@ -139,6 +139,44 @@ func (s *Store) Remolt(ctx context.Context, by *Crab, original *Molt) (*Molt, er
 	return m, nil
 }
 
+// DeleteMolt soft-deletes a molt or remolt owned by crab c. It leaves the
+// feeds that point at it: every read skips deleted items, and trench entries
+// expire on their own. Deleting a remolt frees the crab to remolt it again.
+func (s *Store) DeleteMolt(ctx context.Context, c *Crab, m *Molt) error {
+	if m.OwnerID != c.ID {
+		return ErrNotAllowed
+	}
+	items := []types.TransactWriteItem{
+		{Update: &types.Update{
+			TableName:           s.tableName(),
+			Key:                 keyOf(m.PK, m.SK),
+			UpdateExpression:    aws.String("SET deleted = :t REMOVE GSI3PK, GSI3SK, GSI5PK, GSI5SK, GSI8PK, GSI8SK"),
+			ConditionExpression: aws.String("attribute_exists(PK) AND deleted = :f AND owner_id = :me"),
+			ExpressionAttributeValues: map[string]types.AttributeValue{
+				":t": boolean(true), ":f": boolean(false), ":me": str(c.ID),
+			},
+		}},
+		s.addCounter(c.PK, c.SK, "molt_count", -1),
+	}
+	if m.Remolt && m.RemoltOfPK != "" {
+		items = append(items,
+			s.addCounter(m.RemoltOfPK, m.RemoltOfSK, "remolt_count", -1),
+			types.TransactWriteItem{Delete: &types.Delete{
+				TableName: s.tableName(),
+				Key:       keyOf(remoltMarkerPK(c.ID), remoltMarkerSK(m.RemoltOf)),
+			}},
+		)
+	}
+	err := s.transact(ctx, items...)
+	switch {
+	case cancelledAt(err, 0):
+		return ErrNotFound
+	case err != nil:
+		return fmt.Errorf("delete molt: %w", err)
+	}
+	return nil
+}
+
 // MoltByID returns a non-deleted molt. The ID index only finds the key; the
 // item is then read from the base table so like/comment/remolt counts are
 // current (GSI projections of ADD updates lag, especially on DynamoDB Local).

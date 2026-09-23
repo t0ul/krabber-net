@@ -243,6 +243,63 @@ func TestMoltFanoutTrenchAndSea(t *testing.T) {
 	}
 }
 
+func TestDeleteMoltAndRemolt(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+	author := mustCrab(t, s, "pearl")
+	fan := mustCrab(t, s, "larry")
+
+	m, err := s.CreateMolt(ctx, author, "whale hello there")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.AddToTrenches(ctx, m, []string{fan.ID}); err != nil {
+		t.Fatal(err)
+	}
+	re, err := s.Remolt(ctx, reload(t, s, fan), m)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := s.DeleteMolt(ctx, fan, m); !errors.Is(err, ErrNotAllowed) {
+		t.Fatalf("deleting someone else's molt: got %v", err)
+	}
+
+	// Undoing the remolt fixes both counters and allows remolting again.
+	if err := s.DeleteMolt(ctx, reload(t, s, fan), re); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.DeleteMolt(ctx, reload(t, s, fan), re); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("second delete: got %v", err)
+	}
+	if got, _ := s.MoltByKey(ctx, m.PK, m.SK); got.RemoltCount != 0 {
+		t.Fatalf("remolt count after undo: %d", got.RemoltCount)
+	}
+	if fan = reload(t, s, fan); fan.MoltCount != 0 {
+		t.Fatalf("fan molt count after undo: %d", fan.MoltCount)
+	}
+	if _, err := s.Remolt(ctx, fan, m); err != nil {
+		t.Fatalf("remolt after undo: %v", err)
+	}
+
+	// Deleting the original hides it and its remolts everywhere.
+	if err := s.DeleteMolt(ctx, reload(t, s, author), m); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.MoltByID(ctx, m.ID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("deleted molt by id: got %v", err)
+	}
+	if sea, _ := s.Sea(ctx, 25); len(sea) != 0 {
+		t.Fatalf("sea after delete: %+v", sea)
+	}
+	if trench, _ := s.Trench(ctx, fan.ID, 25); len(trench) != 0 {
+		t.Fatalf("trench after delete: %+v", trench)
+	}
+	if author = reload(t, s, author); author.MoltCount != 0 {
+		t.Fatalf("author molt count: %d", author.MoltCount)
+	}
+}
+
 func TestEmptySea(t *testing.T) {
 	s := newTestStore(t)
 	molts, err := s.Sea(context.Background(), 25)

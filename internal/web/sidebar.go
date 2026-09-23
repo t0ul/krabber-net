@@ -63,6 +63,19 @@ func (d *directory) addMolt(m store.Molt) {
 	d.recent = append(recent, d.recent...)
 }
 
+// removeMolt drops a molt this instance just deleted from search and trending.
+func (d *directory) removeMolt(id string) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	recent := make([]store.Molt, 0, len(d.recent))
+	for _, m := range d.recent {
+		if m.ID != id {
+			recent = append(recent, m)
+		}
+	}
+	d.recent = recent
+}
+
 // addCrab adds a crab that just activated on this instance.
 func (d *directory) addCrab(c store.Crab) {
 	d.mu.Lock()

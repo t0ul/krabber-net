@@ -38,6 +38,7 @@ func (app *App) Routes() http.Handler {
 	mux.HandleFunc("GET /search", app.searchPage)
 	mux.HandleFunc("POST /molt/create", app.requireAuthentication(app.moltCreatePost))
 	mux.HandleFunc("POST /molt/like/{id}", app.requireAuthentication(app.moltLikePost))
+	mux.HandleFunc("POST /molt/delete/{id}", app.requireAuthentication(app.moltDeletePost))
 	mux.HandleFunc("POST /remolt/{id}", app.requireAuthentication(app.remoltPost))
 	mux.HandleFunc("POST /comment/{id}", app.requireAuthentication(app.commentCreatePost))
 	mux.HandleFunc("POST /follow/{id}", app.requireAuthentication(app.followPost))

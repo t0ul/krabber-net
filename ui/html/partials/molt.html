@@ -27,7 +27,7 @@
 {{end}}
 
 {{define "molt"}}{{ $m := .M }}
-<div class="regular-molt mini-molt border-dark py-2 d-flex flex-row absolute-container border-bottom px-3" id="{{ $m.DOMID }}">
+<div class="regular-molt mini-molt border-dark py-2 d-flex flex-row absolute-container border-bottom px-3" id="{{ $m.DOMID }}" data-molt-id="{{ $m.ID }}">
     <div class="mini-molt-profile-box">
         <a class="zindex-front" href="/crabs/{{ $m.Author }}">{{ template "avatar" $m.Author }}</a>
     </div>
@@ -44,6 +44,7 @@
                 <span class="text-muted">·</span>
                 <a class="mini-molt-timestamp zindex-front text-muted" href="/molt/view/{{ $m.ID }}">{{ template "time" $m.CreatedAt }}</a>
             </div>
+            {{ template "molt-menu" . }}
         </div>
         <div class="mini-molt-content">
             <p class="mb-2">
@@ -53,6 +54,41 @@
         {{ template "molt-actions" . }}
     </div>
 </div>
+{{end}}
+
+{{/* The "…" menu. Pass "Thread" true on the thread page so deleting moves on. */}}
+{{define "molt-menu"}}{{ $m := .M }}{{ $d := .D }}
+{{ if $d.IsAuthenticated }}
+{{ $own := eq $m.AuthorID $d.CrabID }}
+{{ $ownRemolt := and $m.Remolt $m.EntryID (eq $m.RemoltedBy $d.CrabName) }}
+{{ if or $own $ownRemolt }}
+<details class="kb-menu zindex-front">
+    <summary class="mini-molt-action reply rounded-circle" title="More" aria-label="More options">
+        <svg class="mini-molt-action-icon" width="19" height="19"><use href="/static/img/sprites.svg?version=1704178675#more-horizontal"></use></svg>
+    </summary>
+    <div class="kb-menu-items">
+        {{ if $ownRemolt }}
+        <form hx-post="/molt/delete/{{ $m.EntryID }}" hx-swap="none" hx-confirm="Undo this remolt?">
+            <input type='hidden' name='csrf_token' value='{{ $d.CSRFToken }}'>
+            <button type="submit" class="kb-menu-item">
+                <svg width="19" height="19"><use href="/static/img/sprites.svg?version=1704178675#repeat"></use></svg>
+                Undo remolt
+            </button>
+        </form>
+        {{ end }}
+        {{ if $own }}
+        <form hx-post="/molt/delete/{{ $m.ID }}{{ if .Thread }}?from=thread{{ end }}" hx-swap="none" hx-confirm="Delete this molt? This can't be undone.">
+            <input type='hidden' name='csrf_token' value='{{ $d.CSRFToken }}'>
+            <button type="submit" class="kb-menu-item kb-menu-danger">
+                <svg width="19" height="19"><use href="/static/img/sprites.svg?version=1704178675#trash"></use></svg>
+                Delete molt
+            </button>
+        </form>
+        {{ end }}
+    </div>
+</details>
+{{ end }}
+{{ end }}
 {{end}}
 
 {{define "molt-actions"}}{{ $m := .M }}{{ $d := .D }}

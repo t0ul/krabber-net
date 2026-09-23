@@ -358,6 +358,53 @@ func TestFeedsProfileSearchAndLiveCounts(t *testing.T) {
 	}
 }
 
+func TestDeleteMolt(t *testing.T) {
+	h := newHarness(t)
+	h.signupAndActivate("pearl", "pearl@krabber.test", "whale-of-a-time")
+	h.signupAndActivate("larry", "larry@krabber.test", "pump-it-up-now")
+	ctx := context.Background()
+
+	if status, _ := h.login("pearl@krabber.test", "whale-of-a-time"); status != http.StatusSeeOther {
+		t.Fatalf("login: %d", status)
+	}
+	tok := h.csrf("/trench")
+	h.post("/molt/create", url.Values{"csrf_token": {tok}, "content": {"going to the mall"}}, "HX-Request", "true")
+	molts, _ := h.store.MoltsByOwner(ctx, currentID(t, h, "pearl"), 1)
+	if len(molts) != 1 {
+		t.Fatal("molt not created")
+	}
+	id := molts[0].ID
+
+	// The author sees the menu; nobody else does.
+	if _, body, _ := h.get("/molt/view/" + id); !strings.Contains(body, "/molt/delete/"+id+"?from=thread") {
+		t.Fatal("author has no delete option on the thread")
+	}
+
+	h.post("/crab/logout", url.Values{"csrf_token": {tok}})
+	h.login("larry@krabber.test", "pump-it-up-now")
+	tok = h.csrf("/trench")
+	if _, body, _ := h.get("/sea"); strings.Contains(body, "/molt/delete/"+id) {
+		t.Fatal("another crab sees the delete option")
+	}
+	if status, _, _ := h.post("/molt/delete/"+id, url.Values{"csrf_token": {tok}}, "HX-Request", "true"); status != http.StatusNotFound {
+		t.Fatalf("deleting someone else's molt: %d", status)
+	}
+
+	h.post("/crab/logout", url.Values{"csrf_token": {tok}})
+	h.login("pearl@krabber.test", "whale-of-a-time")
+	tok = h.csrf("/trench")
+	status, _, hdr := h.post("/molt/delete/"+id, url.Values{"csrf_token": {tok}}, "HX-Request", "true")
+	if status != http.StatusOK || !strings.Contains(hdr.Get("HX-Trigger"), `"moltDeleted"`) {
+		t.Fatalf("delete: %d %q", status, hdr.Get("HX-Trigger"))
+	}
+	if status, _, _ := h.get("/molt/view/" + id); status != http.StatusNotFound {
+		t.Fatalf("deleted thread: %d", status)
+	}
+	if _, body, _ := h.get("/sea"); strings.Contains(body, "going to the mall") {
+		t.Fatal("deleted molt still on the sea")
+	}
+}
+
 func currentID(t *testing.T, h *harness, name string) string {
 	t.Helper()
 	c, err := h.store.CrabByUsername(context.Background(), name)

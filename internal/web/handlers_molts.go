@@ -1,6 +1,7 @@
 package web
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/url"
@@ -106,6 +107,38 @@ func (app *App) remoltPost(w http.ResponseWriter, r *http.Request) {
 		app.fanout.Enqueue(re)
 	}
 	app.renderActions(w, r, m, nil)
+}
+
+// moltDeletePost deletes the viewer's own molt, or undoes their remolt when
+// the ID is a remolt. htmx removes the molt from the list; the thread page
+// moves on to the trench.
+func (app *App) moltDeletePost(w http.ResponseWriter, r *http.Request) {
+	m, err := app.store.MoltByID(r.Context(), r.PathValue("id"))
+	if errors.Is(err, store.ErrNotFound) {
+		app.notFound(w)
+		return
+	} else if err != nil {
+		app.serverError(w, r, err)
+		return
+	}
+	err = app.store.DeleteMolt(r.Context(), currentCrab(r), m)
+	switch {
+	case errors.Is(err, store.ErrNotAllowed), errors.Is(err, store.ErrNotFound):
+		app.notFound(w)
+		return
+	case err != nil:
+		app.serverError(w, r, err)
+		return
+	}
+	app.dir.removeMolt(m.ID)
+	if isHTMX(r) && r.URL.Query().Get("from") != "thread" {
+		// app.js removes the entry (a remolt) or every entry of the molt.
+		trigger, _ := json.Marshal(map[string]any{"moltDeleted": map[string]any{"id": m.ID, "remolt": m.Remolt}})
+		w.Header().Set("HX-Trigger", string(trigger))
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	redirect(w, r, "/trench")
 }
 
 // moltFromPath loads the molt named in the URL, following a remolt to its
