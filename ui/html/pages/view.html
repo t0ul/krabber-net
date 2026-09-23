@@ -1,0 +1,50 @@
+{{define "title"}}Thread{{end}}
+
+{{define "page"}}
+{{ template "shell-top" . }}
+    <div id="content-heading" class="border-dark border-bottom p-2">
+        <h6 class="m-1"><a href="/sea" class="text-primary mr-2" aria-label="Back">
+            <svg width="20" height="20"><use href="/static/img/sprites.svg?version=1704178675#arrow-left"></use></svg>
+        </a><strong>Thread</strong></h6>
+    </div>
+
+    {{ $d := . }}
+    {{ with .Molt }}
+    <div class="large-molt mini-molt border-bottom border-dark px-3 pt-3 pb-1">
+        <div class="d-flex align-items-center mb-2">
+            <a href="/crabs/{{ .Author }}" class="mr-2">{{ template "avatar" .Author }}</a>
+            <a href="/crabs/{{ .Author }}" class="text-light font-weight-bold">@{{ .Author }}</a>
+        </div>
+        {{ if .Remolt }}<div class="text-muted small mb-2">Remolted by <a class="text-muted" href="/crabs/{{ .RemoltedBy }}">@{{ .RemoltedBy }}</a></div>{{ end }}
+        <p class="large-molt-text mb-2">{{ .Content }}</p>
+        <div class="text-muted small pb-2 border-bottom border-dark">{{ template "time" .CreatedAt }}</div>
+        {{ template "molt-actions" (dict "M" . "D" $d) }}
+    </div>
+
+    <div id="loaded-molts">
+        {{ if $d.IsAuthenticated }}
+        <form class="px-3 py-2 border-bottom border-dark" hx-post="/comment/{{ .ID }}" hx-swap="none" data-reset-on-success>
+            <input type='hidden' name='csrf_token' value='{{ $d.CSRFToken }}'>
+            <textarea class="form-control mb-2" name="comment" rows="2" maxlength="280" placeholder="Add a comment..." required></textarea>
+            <button type="submit" class="btn btn-sm btn-primary rounded-pill">Comment</button>
+        </form>
+        {{ else }}
+        <p class="px-3 py-2 text-muted"><a href="/crab/login">Log in</a> to comment.</p>
+        {{ end }}
+
+        {{ range .Comments }}
+        <div class="mini-molt border-bottom border-dark px-3 py-2 d-flex flex-row">
+            <a class="mini-molt-profile-box" href="/crabs/{{ .Author }}">{{ template "avatar" .Author }}</a>
+            <div class="mini-molt-text-box w-100 px-2">
+                <a class="mini-molt-username text-light" href="/crabs/{{ .Author }}">@{{ .Author }}</a>
+                <span class="text-muted">· {{ template "time" .CreatedAt }}</span>
+                <p class="mb-1">{{ .Content }}</p>
+            </div>
+        </div>
+        {{ else }}
+        <div class="p-4 text-center text-muted">No comments yet.</div>
+        {{ end }}
+    </div>
+    {{ end }}
+{{ template "shell-bottom" . }}
+{{end}}

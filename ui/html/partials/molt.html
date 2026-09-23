@@ -1,0 +1,125 @@
+{{/*
+  Shared building blocks. Molt partials take (dict "M" <molt> "D" <page data>)
+  so they can reach the CSRF token and sign-in state.
+*/}}
+
+{{define "time"}}<time datetime="{{ .UTC.Format "2006-01-02T15:04:05Z07:00" }}" title="{{ humanDate . }}">{{ ago . }}</time>{{end}}
+
+{{define "avatar"}}<img class="kb-avatar profile-picture" src="/static/img/crab_illustration.jpg" width="43" height="43" loading="lazy" alt="@{{ . }}">{{end}}
+
+{{define "compose"}}
+<div class="mini-compose-box border-bottom border-dark px-3 py-2 d-flex flex-row focused">
+    <div class="mini-molt-profile-box">
+        <a href="/crabs/{{ .CrabName }}">{{ template "avatar" .CrabName }}</a>
+    </div>
+    <div class="mini-molt-text-box w-100 h-100 px-2">
+        <form hx-post="/molt/create" hx-target="#molt-list" hx-swap="afterbegin" hx-disabled-elt="find button" data-reset-on-success>
+            <input type='hidden' name='csrf_token' value='{{ .CSRFToken }}'>
+            <div class="mini-compose-textarea">
+                <textarea name="content" rows="3" maxlength="280" class="my-2 w-100" placeholder="How are you feeling?" required></textarea>
+            </div>
+            <div class="mini-molt-actions d-flex flex-row justify-content-end w-100 compose-button-row">
+                <button type="submit" class="btn btn-primary rounded-pill"><strong>Molt</strong></button>
+            </div>
+        </form>
+    </div>
+</div>
+{{end}}
+
+{{define "molt"}}{{ $m := .M }}
+<div class="regular-molt mini-molt border-dark py-2 d-flex flex-row absolute-container border-bottom px-3" id="{{ $m.DOMID }}">
+    <div class="mini-molt-profile-box">
+        <a class="zindex-front" href="/crabs/{{ $m.Author }}">{{ template "avatar" $m.Author }}</a>
+    </div>
+    <div class="mini-molt-text-box w-100 h-100 px-2">
+        {{ if $m.Remolt }}
+        <div class="text-muted small mb-1">
+            <svg width="14" height="14"><use href="/static/img/sprites.svg?version=1704178675#repeat"></use></svg>
+            <a class="text-muted" href="/crabs/{{ $m.RemoltedBy }}">@{{ $m.RemoltedBy }}</a> remolted
+        </div>
+        {{ end }}
+        <div class="mini-molt-credentials absolute-container">
+            <div class="mini-molt-credentials-text">
+                <a class="mini-molt-username zindex-front" href="/crabs/{{ $m.Author }}">@{{ $m.Author }}</a>
+                <span class="text-muted">·</span>
+                <a class="mini-molt-timestamp zindex-front text-muted" href="/molt/view/{{ $m.ID }}">{{ template "time" $m.CreatedAt }}</a>
+            </div>
+        </div>
+        <div class="mini-molt-content">
+            <p class="mb-2">
+                <a class="zindex-front text-light molt-text" href="/molt/view/{{ $m.ID }}">{{ $m.Content }}</a>
+            </p>
+        </div>
+        {{ template "molt-actions" . }}
+    </div>
+</div>
+{{end}}
+
+{{define "molt-actions"}}{{ $m := .M }}{{ $d := .D }}
+<div class="mini-molt-actions d-flex flex-row justify-content-between mr-md-5">
+    <a class="mini-molt-action reply rounded-circle zindex-front" href="/molt/view/{{ $m.ID }}" title="Reply">
+        <svg class="mini-molt-action-icon" width="19" height="19"><use href="/static/img/sprites.svg?version=1704178675#message"></use></svg>
+        <span class="mini-molt-action-counter ml-1">{{ $m.CommentCount }}</span>
+    </a>
+    {{ if $d.IsAuthenticated }}
+    <form hx-post="/remolt/{{ $m.ID }}" hx-target="closest .mini-molt-actions" hx-swap="outerHTML">
+        <input type='hidden' name='csrf_token' value='{{ $d.CSRFToken }}'>
+        <button class="mini-molt-action remolt zindex-front action-button" type="submit" title="Remolt">
+            <svg class="mini-molt-action-icon" width="19" height="19"><use href="/static/img/sprites.svg?version=1704178675#repeat"></use></svg>
+            <span class="mini-molt-action-counter ml-1">{{ $m.RemoltCount }}</span>
+        </button>
+    </form>
+    <form hx-post="/molt/like/{{ $m.ID }}" hx-target="closest .mini-molt-actions" hx-swap="outerHTML">
+        <input type='hidden' name='csrf_token' value='{{ $d.CSRFToken }}'>
+        <button class="mini-molt-action like zindex-front action-button{{ if $m.Liked }} liked{{ end }}" type="submit" title="{{ if $m.Liked }}Unlike{{ else }}Like{{ end }}">
+            <svg class="mini-molt-action-icon" width="19" height="19"><use href="/static/img/sprites.svg?version=1704178675#{{ if $m.Liked }}heart-f{{ else }}heart{{ end }}"></use></svg>
+            <span class="mini-molt-action-counter ml-1">{{ $m.LikeCount }}</span>
+        </button>
+    </form>
+    {{ else }}
+    <span class="mini-molt-action remolt" title="Remolts">
+        <svg class="mini-molt-action-icon" width="19" height="19"><use href="/static/img/sprites.svg?version=1704178675#repeat"></use></svg>
+        <span class="mini-molt-action-counter ml-1">{{ $m.RemoltCount }}</span>
+    </span>
+    <span class="mini-molt-action like" title="Likes">
+        <svg class="mini-molt-action-icon" width="19" height="19"><use href="/static/img/sprites.svg?version=1704178675#heart"></use></svg>
+        <span class="mini-molt-action-counter ml-1">{{ $m.LikeCount }}</span>
+    </span>
+    {{ end }}
+    <a class="mini-molt-action zindex-front text-muted small align-self-center" href="/molt/likes/view/{{ $m.ID }}">Liked by</a>
+</div>
+{{end}}
+
+{{define "molt-list"}}
+<div id="molt-list">
+    {{ $d := . }}
+    {{ range .Molts }}{{ template "molt" (dict "M" . "D" $d) }}{{ end }}
+</div>
+{{ if not .Molts }}
+<div class="p-4 text-center text-muted" id="empty-list">{{ .EmptyMessage }}</div>
+{{ end }}
+{{end}}
+
+{{define "follow-button"}}{{ $c := .C }}{{ $d := .D }}
+{{ if and $d.IsAuthenticated (ne $c.ID $d.CrabID) }}
+<form hx-post="/{{ if .Following }}unfollow{{ else }}follow{{ end }}/{{ $c.ID }}" hx-swap="outerHTML" class="follow-form">
+    <input type='hidden' name='csrf_token' value='{{ $d.CSRFToken }}'>
+    {{ if .Following }}
+    <button type="submit" class="btn btn-sm btn-secondary rounded-pill follow-btn following" title="Unfollow @{{ $c.UserName }}">Following</button>
+    {{ else }}
+    <button type="submit" class="btn btn-sm btn-primary rounded-pill follow-btn">Follow</button>
+    {{ end }}
+</form>
+{{ end }}
+{{end}}
+
+{{define "crab-row"}}{{ $c := .C }}
+<div class="d-flex align-items-center border-bottom border-dark px-3 py-2 crab-row" data-name="{{ $c.UserName }}">
+    <a href="/crabs/{{ $c.UserName }}" class="mr-3 kb-avatar-link">{{ template "avatar" $c.UserName }}</a>
+    <div class="flex-grow-1 min-w-0">
+        <a href="/crabs/{{ $c.UserName }}" class="text-light font-weight-bold">@{{ $c.UserName }}</a>
+        <div class="text-muted small">{{ $c.FollowerCount }} followers · {{ $c.MoltCount }} molts</div>
+    </div>
+    {{ template "follow-button" . }}
+</div>
+{{end}}

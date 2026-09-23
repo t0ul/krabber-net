@@ -1,0 +1,17 @@
+{{define "title"}}{{ if .ListTitle }}{{ .ListTitle }}{{ else }}Crabs{{ end }}{{end}}
+
+{{ define "page" }}
+{{ template "shell-top" . }}
+    {{ template "heading" .ListTitle }}
+    {{ if .ListBack }}<div class="px-3 py-2 border-bottom border-dark"><a href="{{ .ListBack }}">← Back to profile</a></div>{{ end }}
+    {{ if .CrabRows }}
+    <div class="px-3 py-2 border-bottom border-dark kb-crab-toolbar">
+        <input class="form-control form-control-sm kb-filter" type="search" id="crab-filter" placeholder="Filter by name…" autocomplete="off">
+        <div class="text-muted small mt-2" id="crab-count">{{ len .CrabRows }} crabs</div>
+    </div>
+    {{ end }}
+    {{ $d := . }}
+    {{ range .CrabRows }}{{ template "crab-row" (dict "C" .Crab "D" $d "Following" .Following) }}{{ end }}
+    {{ if not .CrabRows }}<div class="p-4 text-center text-muted">{{ .EmptyMessage }}</div>{{ end }}
+{{ template "shell-bottom" . }}
+{{end}}

@@ -1,0 +1,9 @@
+{{define "title"}}Sea{{end}}
+
+{{define "page"}}
+{{ template "shell-top" . }}
+    {{ template "heading" "🌊 The latest molts from the seven seas 🌊" }}
+    {{ if .IsAuthenticated }}{{ template "compose" . }}{{ end }}
+    {{ template "molt-list" . }}
+{{ template "shell-bottom" . }}
+{{end}}

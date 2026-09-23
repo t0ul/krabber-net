@@ -1,0 +1,89 @@
+package web
+
+import (
+	"context"
+	"errors"
+	"net/http"
+
+	"github.com/t0ul/krabber-net/internal/store"
+)
+
+// Session keys.
+const (
+	sessionFlash  = "flash"
+	sessionCrabID = "crabID"
+	sessionCrabPK = "crabPK"
+	sessionCrabSK = "crabSK"
+	sessionAuthAt = "authAt" // Unix seconds of sign-in
+)
+
+type ctxKey int
+
+const (
+	ctxCrab ctxKey = iota
+	ctxClientIP
+)
+
+// currentCrab returns the signed-in crab, or nil.
+func currentCrab(r *http.Request) *store.Crab {
+	c, _ := r.Context().Value(ctxCrab).(*store.Crab)
+	return c
+}
+
+// authenticate loads the signed-in crab on every request (one consistent
+// GetItem) and ends the session if the account was banned, deleted, or had
+// its sessions revoked after this one began.
+func (app *App) authenticate(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		pk, sk := app.sessions.GetString(ctx, sessionCrabPK), app.sessions.GetString(ctx, sessionCrabSK)
+		if pk == "" || sk == "" {
+			next.ServeHTTP(w, r)
+			return
+		}
+		c, err := app.store.CrabByKey(ctx, pk, sk)
+		switch {
+		case errors.Is(err, store.ErrNotFound):
+			app.endSession(r)
+		case err != nil:
+			app.serverError(w, r, err)
+			return
+		case !c.CanSignIn() || app.sessions.GetInt64(ctx, sessionAuthAt) < c.SessionsValidAfter:
+			app.endSession(r)
+		default:
+			r = r.WithContext(context.WithValue(ctx, ctxCrab, c))
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (app *App) endSession(r *http.Request) {
+	ctx := r.Context()
+	_ = app.sessions.RenewToken(ctx)
+	for _, k := range []string{sessionCrabID, sessionCrabPK, sessionCrabSK, sessionAuthAt} {
+		app.sessions.Remove(ctx, k)
+	}
+}
+
+// requireAuthentication sends anonymous visitors to the login page and keeps
+// signed-in pages out of browser caches.
+func (app *App) requireAuthentication(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if currentCrab(r) == nil {
+			redirect(w, r, "/crab/login")
+			return
+		}
+		next(w, r)
+	}
+}
+
+// requireAdmin hides admin pages (404) from everyone not on the admin list.
+func (app *App) requireAdmin(next http.HandlerFunc) http.HandlerFunc {
+	return app.requireAuthentication(func(w http.ResponseWriter, r *http.Request) {
+		if !app.cfg.IsAdmin(currentCrab(r).ID) {
+			app.notFound(w)
+			return
+		}
+		next(w, r)
+	})
+}

@@ -1,0 +1,9 @@
+{{define "title"}}Trench{{end}}
+
+{{define "page"}}
+{{ template "shell-top" . }}
+    {{ template "heading" "What your crab friends are saying... 🫧" }}
+    {{ template "compose" . }}
+    {{ template "molt-list" . }}
+{{ template "shell-bottom" . }}
+{{end}}

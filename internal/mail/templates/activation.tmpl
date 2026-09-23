@@ -1,0 +1,35 @@
+{{define "subject"}}Activate your Krabber account{{end}}
+
+{{define "plainBody"}}
+Hi {{.UserName}},
+
+Welcome to the trench! Activate your account here:
+
+{{.ActivateURL}}
+
+Or go to {{.ActivatePage}} and paste this token:
+
+{{.Token}}
+
+The token works once and expires in 3 days. If you didn't sign up for Krabber, ignore this email.
+
+The Krabber team
+{{end}}
+
+{{define "htmlBody"}}
+<!doctype html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width">
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+</head>
+<body>
+    <p>Hi {{.UserName}},</p>
+    <p>Welcome to the trench! <a href="{{.ActivateURL}}">Activate your account</a>.</p>
+    <p>Or go to <a href="{{.ActivatePage}}">{{.ActivatePage}}</a> and paste this token:</p>
+    <pre><code>{{.Token}}</code></pre>
+    <p>The token works once and expires in 3 days. If you didn't sign up for Krabber, ignore this email.</p>
+    <p>The Krabber team</p>
+</body>
+</html>
+{{end}}

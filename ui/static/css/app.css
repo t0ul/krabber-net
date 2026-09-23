@@ -1,0 +1,147 @@
+/* Styles for the shared partials added in the port. */
+
+.action-button {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  cursor: pointer;
+}
+
+.mini-molt-action.like.liked,
+.mini-molt-action.like.liked .mini-molt-action-counter {
+  color: var(--like);
+  fill: var(--like);
+}
+
+/* The nav items are links, not the buttons style.css was written for. */
+#nav-panel .nav-link-btn {
+  display: block;
+  width: fit-content;
+  background: none;
+  border: none;
+  color: var(--light);
+}
+
+#nav-panel .nav-link-btn:hover {
+  background: var(--primary-faded);
+  text-decoration: none;
+}
+
+#nav-panel .nav-link-btn#nav-active,
+#nav-panel .nav-link-btn#nav-active strong {
+  color: var(--primary);
+}
+
+#nav-panel .nav-link-btn#nav-active .btn-icon {
+  fill: var(--primary);
+}
+
+#nav-panel button.extra-navs {
+  background: none;
+  border: none;
+}
+
+#nav-panel button.extra-navs:hover {
+  background: var(--primary-faded);
+}
+
+.molt-text,
+.molt-text:hover {
+  text-decoration: none;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+}
+
+.mini-molt-timestamp time,
+.mini-molt-timestamp:hover {
+  text-decoration: none;
+}
+
+.kb-avatar {
+  width: 43px;
+  height: 43px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #000;
+  flex-shrink: 0;
+}
+
+.kb-avatar-lg {
+  width: 96px;
+  height: 96px;
+  margin-top: -48px;
+  border: 4px solid #0e1014;
+}
+
+.kb-nav-avatar {
+  width: 28px;
+  height: 28px;
+  object-fit: cover;
+  background: #000;
+}
+
+.kb-avatar-link:hover {
+  text-decoration: none;
+}
+
+.kb-profile-banner {
+  height: 140px;
+  background: url("../img/banner.png") center / cover no-repeat;
+}
+
+.kb-profile-stats a:hover {
+  text-decoration: none;
+}
+
+.kb-crab-toolbar .kb-filter {
+  background: #16181c;
+  border-color: #2f3336;
+  color: #fff;
+}
+
+.kb-crab-toolbar .kb-filter:focus {
+  background: #16181c;
+  border-color: var(--primary);
+  color: #fff;
+  box-shadow: none;
+}
+
+.crab-row:hover,
+.trending-item:hover {
+  background: rgba(255, 255, 255, 0.03);
+  text-decoration: none;
+}
+
+.follow-btn {
+  min-width: 96px;
+}
+
+.follow-btn.following:hover {
+  background: var(--primary-dark);
+  border-color: var(--primary-darker);
+}
+
+.nav-link-btn {
+  text-align: left;
+  white-space: nowrap;
+}
+
+.flash {
+  margin-bottom: 0;
+}
+
+#add-panel .crab-row {
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+}
+
+#add-panel .panel {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+#add-panel .panel-title {
+  padding-left: 1rem;
+  padding-right: 1rem;
+}

@@ -1,0 +1,51 @@
+{{define "nav"}}{{ $p := .CurrentPath }}
+<div class="col-1 col-lg-3 p-1" id="nav-panel">
+    <a href="/" aria-label="Krabber home">
+        <img class="mt-2 d-block mx-auto d-lg-inline logo" src="/static/img/krabber_logo.svg" alt="Krabber" width="32" height="32">
+    </a>
+    {{ if .IsAuthenticated }}
+    <a href="/trench" class="btn rounded-pill mx-auto mx-lg-0 mt-2 nav-link-btn"{{ if eq $p "/trench" }} id="nav-active" aria-current="page"{{ end }}>
+        <svg class="btn-icon" width="28" height="28"><use href="/static/img/sprites.svg?version=1704178675#{{ if eq $p "/trench" }}home-f{{ else }}home{{ end }}"></use></svg>
+        <strong class="d-none d-lg-inline-block ml-2">Trench</strong>
+    </a>
+    {{ end }}
+    <a href="/sea" class="btn rounded-pill mx-auto mx-lg-0 mt-2 nav-link-btn"{{ if eq $p "/sea" }} id="nav-active" aria-current="page"{{ end }}>
+        <svg class="btn-icon" width="28" height="28"><use href="{{ asset "img/sprites.svg" }}#waves"></use></svg>
+        <strong class="d-none d-lg-inline-block ml-2">Sea</strong>
+    </a>
+    {{ if .IsAuthenticated }}
+    {{ $me := printf "/crabs/%s" .CrabName }}
+    <a href="{{ $me }}" class="btn rounded-pill mx-auto mx-lg-0 mt-2 nav-link-btn"{{ if eq $p $me }} id="nav-active" aria-current="page"{{ end }}>
+        <img class="rounded-circle profile-picture kb-nav-avatar" src="/static/img/crab_illustration.jpg" width="28" height="28" alt="">
+        <strong class="d-none d-lg-inline-block ml-2">Profile</strong>
+    </a>
+    <a href="/crabs" class="btn rounded-pill mx-auto mx-lg-0 mt-2 nav-link-btn"{{ if eq $p "/crabs" }} id="nav-active" aria-current="page"{{ end }}>
+        <svg class="btn-icon" width="28" height="28"><use href="{{ asset "img/sprites.svg" }}#crab"></use></svg>
+        <strong class="d-none d-lg-inline-block ml-2">Crabs</strong>
+    </a>
+    <a href="/search" class="btn rounded-pill mx-auto mx-lg-0 mt-2 nav-link-btn"{{ if eq $p "/search" }} id="nav-active" aria-current="page"{{ end }}>
+        <svg class="btn-icon" width="28" height="28"><use href="/static/img/sprites.svg?version=1704178675#search"></use></svg>
+        <strong class="d-none d-lg-inline-block ml-2">Search</strong>
+    </a>
+    <a href="/moltinTime" id="molt-btn" class="btn btn-primary mx-auto mx-lg-0 subtle-shadow rounded-pill w-md-75 mt-4 d-block">
+        <svg class="btn-icon d-lg-none" width="28" height="28"><use href="/static/img/sprites.svg?version=1704178675#write"></use></svg>
+        <strong class="d-none d-lg-inline-block">Molt</strong>
+    </a>
+    <form action="/crab/logout" method="POST">
+        <input type='hidden' name='csrf_token' value='{{ .CSRFToken }}'>
+        <button type="submit" class="btn rounded-pill mx-auto mx-lg-0 mt-2 extra-navs">
+            <svg class="btn-icon text-muted" width="28" height="28"><use href="/static/img/sprites.svg?version=1704178675#log-out"></use></svg>
+            <strong class="d-none d-lg-inline-block ml-2">Log out</strong>
+        </button>
+    </form>
+    {{ if .IsAdmin }}<a href="/crabmin" class="d-block text-muted small mt-3">Crabmin</a>{{ end }}
+    {{ else }}
+    <a href="/search" class="btn rounded-pill mx-auto mx-lg-0 mt-2 nav-link-btn"{{ if eq $p "/search" }} id="nav-active" aria-current="page"{{ end }}>
+        <svg class="btn-icon" width="28" height="28"><use href="/static/img/sprites.svg?version=1704178675#search"></use></svg>
+        <strong class="d-none d-lg-inline-block ml-2">Search</strong>
+    </a>
+    <a href="/crab/login" class="btn btn-primary rounded-pill mx-auto mx-lg-0 mt-4 d-block"><strong>Log in</strong></a>
+    <a href="/crab/signup" class="btn btn-secondary rounded-pill mx-auto mx-lg-0 mt-2 d-block"><strong>Sign up</strong></a>
+    {{ end }}
+</div>
+{{end}}

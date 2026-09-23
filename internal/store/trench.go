@@ -1,0 +1,76 @@
+package store
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+)
+
+// trenchEntry points a follower's feed at a molt. It stores the molt's table
+// key so a page of the feed is one BatchGetItem.
+type trenchEntry struct {
+	PK        string `dynamodbav:"PK"`
+	SK        string `dynamodbav:"SK"`
+	MoltPK    string `dynamodbav:"molt_pk"`
+	MoltSK    string `dynamodbav:"molt_sk"`
+	ExpiresAt int64  `dynamodbav:"expires_at"`
+}
+
+// AddToTrenches writes molt m into each follower's trench, 25 items per
+// request. Writes are idempotent, so retrying a partly done fan-out is safe.
+func (s *Store) AddToTrenches(ctx context.Context, m *Molt, followerIDs []string) error {
+	expires := s.now().Add(trenchRetention).Unix()
+	for start := 0; start < len(followerIDs); start += 25 {
+		end := min(start+25, len(followerIDs))
+		var writes []types.WriteRequest
+		for _, id := range followerIDs[start:end] {
+			item, err := marshal(trenchEntry{
+				PK:        trenchPK(id),
+				SK:        trenchSK(m.ID),
+				MoltPK:    m.PK,
+				MoltSK:    m.SK,
+				ExpiresAt: expires,
+			})
+			if err != nil {
+				return err
+			}
+			writes = append(writes, types.WriteRequest{PutRequest: &types.PutRequest{Item: item}})
+		}
+
+		req := map[string][]types.WriteRequest{s.table: writes}
+		err := retryUnprocessed(ctx, 8, func() (int, error) {
+			res, err := s.db.BatchWriteItem(ctx, &dynamodb.BatchWriteItemInput{RequestItems: req})
+			if err != nil {
+				return 0, err
+			}
+			req = res.UnprocessedItems
+			return len(req[s.table]), nil
+		})
+		if err != nil {
+			return fmt.Errorf("add to trenches: %w", err)
+		}
+	}
+	return nil
+}
+
+// Trench returns the newest molts from the crabs that crabID follows.
+func (s *Store) Trench(ctx context.Context, crabID string, limit int) ([]Molt, error) {
+	entries, err := queryAll[trenchEntry](ctx, s.db, &dynamodb.QueryInput{
+		TableName:                 s.tableName(),
+		KeyConditionExpression:    aws.String("PK = :pk"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{":pk": str(trenchPK(crabID))},
+		ScanIndexForward:          aws.Bool(false),
+		Limit:                     pageLimit(limit),
+	}, limit)
+	if err != nil {
+		return nil, fmt.Errorf("trench: %w", err)
+	}
+	keys := make([][2]string, 0, len(entries))
+	for _, e := range entries {
+		keys = append(keys, [2]string{e.MoltPK, e.MoltSK})
+	}
+	return s.MoltsByKeys(ctx, keys)
+}

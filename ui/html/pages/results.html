@@ -1,0 +1,26 @@
+{{define "title"}}{{ if .Query }}{{ .Query }}{{ else }}Search{{ end }}{{end}}
+
+{{define "page"}}
+{{ template "shell-top" . }}
+    <div class="border-dark border-bottom p-2" id="content-heading">
+        <h6 class="m-1"><strong>{{ if .Query }}Results for “{{ .Query }}”{{ else }}Search Krabber{{ end }}</strong></h6>
+    </div>
+    <form action="/search" method="GET" role="search" class="px-3 py-3 border-bottom border-dark d-lg-none">
+        <input class="form-control" type="search" name="q" value="{{ .Query }}" placeholder="Search crabs and molts" minlength="2" maxlength="50" required>
+    </form>
+    {{ $d := . }}
+    {{ if .Query }}
+        {{ if .CrabRows }}
+            <div class="px-3 pt-3 pb-1 text-muted small text-uppercase">Crabs</div>
+            {{ range .CrabRows }}{{ template "crab-row" (dict "C" .Crab "D" $d "Following" .Following) }}{{ end }}
+        {{ end }}
+        <div class="px-3 pt-3 pb-1 text-muted small text-uppercase">Molts</div>
+        {{ template "molt-list" . }}
+    {{ else }}
+        <div class="p-4 text-muted">
+            <p class="mb-2">Type at least two letters to find crabs by name or molts from the last week.</p>
+            <p class="mb-0 small">Try <a href="/search?q=ready">ready</a>, <a href="/search?q=formula">formula</a> or a username.</p>
+        </div>
+    {{ end }}
+{{ template "shell-bottom" . }}
+{{end}}

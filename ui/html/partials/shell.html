@@ -1,0 +1,27 @@
+{{define "shell-top"}}
+<!DOCTYPE html>
+<html lang="en">
+{{ template "header" . }}
+<body class="bg-dark text-light">
+<div class="container-fluid vh-100 master-container">
+<div class="row h-100 justify-content-center">
+    {{ template "nav" . }}
+    <div class="col col-lg-6 content border-dark border-left border-right p-0" id="main-panel">
+        {{ with .Flash }}<div class="alert alert-info m-2 flash" role="status">{{ . }}</div>{{ end }}
+{{end}}
+
+{{define "shell-bottom"}}
+        <div class="d-inline-block w-100 p-5 my-5"></div>
+    </div>
+    {{ template "search" . }}
+</div>
+</div>
+</body>
+</html>
+{{end}}
+
+{{define "heading"}}
+<div class="border-dark border-bottom p-2" id="content-heading">
+    <h6 class="m-1"><strong>{{ . }}</strong></h6>
+</div>
+{{end}}
