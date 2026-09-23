@@ -69,6 +69,21 @@ func (d *directory) addMolt(m store.Molt) {
 	d.recent = append(recent, d.recent...)
 }
 
+// replaceMolt swaps in a molt this instance just edited, so search and
+// trending see the new text and crabtags.
+func (d *directory) replaceMolt(m store.Molt) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	recent := make([]store.Molt, len(d.recent))
+	for i, old := range d.recent {
+		if old.ID == m.ID {
+			old = m
+		}
+		recent[i] = old
+	}
+	d.recent = recent
+}
+
 // removeMolt drops a molt this instance just deleted from search and trending.
 func (d *directory) removeMolt(id string) {
 	d.mu.Lock()

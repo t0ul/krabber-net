@@ -1,0 +1,28 @@
+{{define "title"}}Edit Molt{{end}}
+
+{{define "page"}}
+{{ template "shell-top" . }}
+    <div id="content-heading" class="border-dark border-bottom p-2">
+        <h6 class="m-1"><a href="/molt/view/{{ .Molt.ID }}" class="text-primary mr-2" aria-label="Back">
+            <svg width="20" height="20"><use href="/static/img/sprites.svg?version=1704178675#arrow-left"></use></svg>
+        </a><strong>Editing your own Molt</strong></h6>
+    </div>
+    <div class="mini-compose-box border-bottom border-dark px-3 py-2 d-flex flex-row focused">
+        <div class="mini-molt-profile-box">
+            <a href="/crabs/{{ .CrabName }}">{{ template "avatar" .CrabName }}</a>
+        </div>
+        <div class="mini-molt-text-box w-100 h-100 px-2">
+            <form method="POST" action="/molt/edit/{{ .Molt.ID }}">
+                <input type='hidden' name='csrf_token' value='{{ .CSRFToken }}'>
+                <div class="mini-compose-reply-textarea">
+                    <textarea name="content" rows="5" maxlength="280" class="my-2 w-100" placeholder="Remember to be kind" aria-label="Molt text" required autofocus>{{ with .Form }}{{ .Content }}{{ end }}</textarea>
+                    {{ with .Form }}{{ with .FieldErrors.content }}<div class="text-primary small mb-2">{{ . }}</div>{{ end }}{{ end }}
+                </div>
+                <div class="mini-molt-actions d-flex flex-row justify-content-end w-100 compose-button-row">
+                    <button type="submit" class="btn btn-primary rounded-pill"><strong>Save</strong></button>
+                </div>
+            </form>
+        </div>
+    </div>
+{{ template "shell-bottom" . }}
+{{end}}

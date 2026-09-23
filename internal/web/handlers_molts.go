@@ -67,9 +67,13 @@ func (app *App) publish(r *http.Request, m *store.Molt, skipMention string) {
 }
 
 // notifyMentions tells the crabs mentioned in m, except skipID (who already
-// gets a reply or quote notification for it).
-func (app *App) notifyMentions(r *http.Request, m *store.Molt, skipID string) {
+// gets a reply or quote notification for it) and the names in told (already
+// mentioned before an edit).
+func (app *App) notifyMentions(r *http.Request, m *store.Molt, skipID string, told ...string) {
 	for _, name := range m.Mentions {
+		if slices.Contains(told, name) {
+			continue
+		}
 		c, err := app.store.CrabByUsername(r.Context(), name)
 		if err != nil {
 			if !errors.Is(err, store.ErrNotFound) {

@@ -189,6 +189,19 @@ var templateFuncs = template.FuncMap{
 	"reportReasons":  func() []store.ReportReason { return store.ReportReasons },
 	"dict":           dict,
 	"asset":          asset,
+	"editable":       editable,
+}
+
+// editable reports whether a molt is still inside its edit window. Templates
+// hold molts both by value and by pointer.
+func editable(m any) bool {
+	switch m := m.(type) {
+	case store.Molt:
+		return m.Editable(time.Now())
+	case *store.Molt:
+		return m != nil && m.Editable(time.Now())
+	}
+	return false
 }
 
 func newTemplateCache() (map[string]*template.Template, error) {

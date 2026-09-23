@@ -162,6 +162,11 @@
 
 {{define "molt-actions"}}{{ $m := .M }}{{ $d := .D }}
 <div class="mini-molt-actions d-flex flex-row justify-content-between mr-md-5">
+    {{ if and $d.IsAuthenticated (eq $m.AuthorID $d.CrabID) (editable $m) }}
+    <a class="mini-molt-action edit rounded-circle zindex-front" href="/molt/edit/{{ $m.ID }}" title="Edit">
+        <svg class="mini-molt-action-icon" width="19" height="19"><use href="/static/img/sprites.svg?version=1704178675#pencil"></use></svg>
+    </a>
+    {{ end }}
     <a class="mini-molt-action reply rounded-circle zindex-front" href="/molt/view/{{ $m.ID }}" title="Reply">
         <svg class="mini-molt-action-icon" width="19" height="19"><use href="/static/img/sprites.svg?version=1704178675#message"></use></svg>
         <span class="mini-molt-action-counter ml-1">{{ $m.ReplyCount }}</span>

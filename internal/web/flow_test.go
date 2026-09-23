@@ -1421,3 +1421,71 @@ func TestRequestsWithoutOriginSecretAre404(t *testing.T) {
 		t.Fatalf("healthz via CloudFront: %d %q", status, body)
 	}
 }
+
+func TestEditMolt(t *testing.T) {
+	h := newHarness(t)
+	h.signupAndActivate("karen", "karen@krabber.test", "computer-wife!")
+	h.signupAndActivate("plankton", "plankton@krabber.test", "formula-thief!")
+	h.signupAndActivate("sandy", "sandy@krabber.test", "karate-chop!!")
+	h.login("plankton@krabber.test", "formula-thief!")
+	tok := h.csrf("/trench")
+	h.post("/molt/create", url.Values{"csrf_token": {tok}, "content": {"Hey @karen, %plan one"}}, "HX-Request", "true")
+	molts, _ := h.store.MoltsByOwner(context.Background(), currentID(t, h, "plankton"), 1)
+	id := molts[0].ID
+
+	if _, body, _ := h.get("/sea"); !strings.Contains(body, `href="/molt/edit/`+id+`"`) {
+		t.Error("your fresh molt has no edit button")
+	}
+	status, body, _ := h.get("/molt/edit/" + id)
+	if status != http.StatusOK || !strings.Contains(body, "Editing your own Molt") || !strings.Contains(body, "Hey @karen, %plan one</textarea>") {
+		t.Fatalf("edit page: %d", status)
+	}
+	for text, want := range map[string]string{
+		"   ":                    "Molt text cannot be blank",
+		"Hey @karen, %plan one":  "No changes were made",
+		strings.Repeat("x", 281): "Molts can be up to 280 characters.",
+	} {
+		if status, body, _ := h.post("/molt/edit/"+id, url.Values{"csrf_token": {tok}, "content": {text}}); status != http.StatusUnprocessableEntity || !strings.Contains(body, want) {
+			t.Errorf("edit to %q: %d, want %q", text[:min(len(text), 20)], status, want)
+		}
+	}
+	status, _, hdr := h.post("/molt/edit/"+id, url.Values{"csrf_token": {tok}, "content": {"Hey @karen and @sandy, %plan two"}})
+	if status != http.StatusSeeOther || hdr.Get("Location") != "/molt/view/"+id {
+		t.Fatalf("save: %d %s", status, hdr.Get("Location"))
+	}
+	if _, body, _ := h.get("/molt/view/" + id); !strings.Contains(body, "%plan</a> two") || !strings.Contains(body, "This molt has been edited") {
+		t.Error("the thread doesn't show the edit")
+	}
+	if _, body, _ := h.get("/crabtag/plan"); !strings.Contains(body, "two") {
+		t.Error("the crabtag page doesn't show the new text")
+	}
+	h.post("/crab/logout", url.Values{"csrf_token": {tok}})
+
+	for name, want := range map[string]int{"karen": 1, "sandy": 1} {
+		n, err := h.store.Notifications(context.Background(), currentID(t, h, name), 10)
+		if err != nil || len(n) != want {
+			t.Errorf("%s has %d notifications, want %d (%v)", name, len(n), want, err)
+		}
+	}
+
+	h.login("karen@krabber.test", "computer-wife!")
+	tok = h.csrf("/trench")
+	if _, body, _ := h.get("/sea"); strings.Contains(body, "/molt/edit/") {
+		t.Error("the edit button shows on someone else's molt")
+	}
+	if status, _, _ := h.get("/molt/edit/" + id); status != http.StatusNotFound {
+		t.Errorf("edit page for someone else's molt: %d", status)
+	}
+	if status, _, _ := h.post("/molt/edit/"+id, url.Values{"csrf_token": {tok}, "content": {"Mine now"}}); status != http.StatusNotFound {
+		t.Errorf("edit someone else's molt: %d", status)
+	}
+}
+
+func TestEditable(t *testing.T) {
+	fresh := store.Molt{CreatedAt: time.Now().Add(-time.Minute)}
+	old := store.Molt{CreatedAt: time.Now().Add(-store.EditWindow)}
+	gone := store.Molt{CreatedAt: time.Now(), Deleted: true}
+	if !editable(fresh) || !editable(&fresh) || editable(old) || editable(gone) || editable((*store.Molt)(nil)) {
+		t.Error("editable is wrong about the edit window")
+	}
+}

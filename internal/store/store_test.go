@@ -980,3 +980,56 @@ func TestRateLimitWindows(t *testing.T) {
 		t.Fatalf("next window count = %d, want 0", n)
 	}
 }
+
+func TestEditMolt(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+	karen := mustCrab(t, s, "karen")
+	plankton := mustCrab(t, s, "plankton")
+	m, err := s.CreateMolt(ctx, plankton, "Step one %plan %formula")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.EditMolt(ctx, karen, m, "mine now"); !errors.Is(err, ErrNotAllowed) {
+		t.Fatalf("edit someone else's molt: %v", err)
+	}
+
+	edited, err := s.EditMolt(ctx, plankton, m, "Step two %formula %chumbucket with @karen")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.MoltByID(ctx, m.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.Edited || got.Content != edited.Content || !slices.Equal(got.Tags, []string{"formula", "chumbucket"}) ||
+		!slices.Equal(got.Mentions, []string{"karen"}) {
+		t.Fatalf("after edit: %+v", got)
+	}
+	for tag, want := range map[string]int{"plan": 0, "formula": 1, "chumbucket": 1} {
+		if tagged, err := s.MoltsWithTag(ctx, tag, 10); err != nil || len(tagged) != want {
+			t.Fatalf("%%%s: %d molts, %v", tag, len(tagged), err)
+		}
+	}
+
+	// An edit based on text that has since changed loses.
+	if _, err := s.EditMolt(ctx, plankton, m, "stale"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("stale edit: %v", err)
+	}
+	// Dropping every tag and mention clears them.
+	if _, err := s.EditMolt(ctx, plankton, got, "Nothing to see"); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := s.MoltByID(ctx, m.ID); len(got.Tags) != 0 || len(got.Mentions) != 0 {
+		t.Fatalf("tags %q, mentions %q", got.Tags, got.Mentions)
+	}
+	if tagged, _ := s.MoltsWithTag(ctx, "formula", 10); len(tagged) != 0 {
+		t.Fatalf("%%formula still lists %d molts", len(tagged))
+	}
+
+	s.now = func() time.Time { return time.Now().UTC().Add(EditWindow) }
+	latest, _ := s.MoltByID(ctx, m.ID)
+	if _, err := s.EditMolt(ctx, plankton, latest, "too late"); !errors.Is(err, ErrNotAllowed) {
+		t.Fatalf("edit after the window: %v", err)
+	}
+}

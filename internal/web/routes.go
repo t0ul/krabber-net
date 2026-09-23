@@ -42,6 +42,8 @@ func (app *App) Routes() http.Handler {
 	mux.HandleFunc("GET /notifications/badge", app.requireAuthentication(app.notificationBadge))
 	mux.HandleFunc("GET /bookmarks", app.requireAuthentication(app.bookmarksPage))
 	mux.HandleFunc("POST /molt/bookmark/{id}", app.requireAuthentication(app.bookmarkPost))
+	mux.HandleFunc("GET /molt/edit/{id}", app.requireAuthentication(app.editPage))
+	mux.HandleFunc("POST /molt/edit/{id}", app.requireAuthentication(app.editPost))
 	mux.HandleFunc("POST /molt/pin/{id}", app.requireAuthentication(app.pinPost))
 	mux.HandleFunc("POST /molt/unpin/{id}", app.requireAuthentication(app.unpinPost))
 	mux.HandleFunc("GET /settings", app.requireAuthentication(app.settings))

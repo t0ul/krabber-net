@@ -40,6 +40,7 @@ type Molt struct {
 	CreatedAt time.Time `dynamodbav:"created_at"`
 	Deleted   bool      `dynamodbav:"deleted"`
 	Removed   bool      `dynamodbav:"removed,omitempty"` // by a moderator; keeps its index keys so it can be restored
+	Edited    bool      `dynamodbav:"edited,omitempty"`
 
 	Remolt     bool   `dynamodbav:"remolt"`
 	RemoltOf   string `dynamodbav:"remolt_of,omitempty"`

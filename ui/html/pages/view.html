@@ -34,7 +34,7 @@
         </div>
         <p class="large-molt-text mb-2 molt-text">{{ or .ContentHTML .Content }}</p>
         {{ if .QuoteOf }}{{ template "quoted-molt" .Quoted }}{{ end }}
-        <div class="text-muted small pb-2 border-bottom border-dark">{{ template "time" .CreatedAt }}</div>
+        <div class="text-muted small pb-2 border-bottom border-dark">{{ template "time" .CreatedAt }}{{ if .Edited }} &mdash; This molt has been edited{{ end }}</div>
         {{ if or .RemoltCount .QuoteCount .LikeCount }}
         <div class="d-flex flex-row border-dark border-bottom w-100 py-2 kb-molt-stats">
             {{ if .RemoltCount }}<span class="text-muted mr-3"><span class="text-light font-weight-bold">{{ .RemoltCount }}</span> Remolt{{ if ne .RemoltCount 1 }}s{{ end }}</span>{{ end }}
