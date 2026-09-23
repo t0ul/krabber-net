@@ -30,6 +30,7 @@ func (app *App) Routes() http.Handler {
 	mux.HandleFunc("GET /trench", app.requireAuthentication(app.trench))
 	mux.HandleFunc("GET /moltinTime", app.requireAuthentication(app.moltinTime))
 	mux.HandleFunc("GET /notifications", app.requireAuthentication(app.notifications))
+	mux.HandleFunc("GET /notifications/badge", app.requireAuthentication(app.notificationBadge))
 	mux.HandleFunc("GET /settings", app.requireAuthentication(app.settings))
 	mux.HandleFunc("GET /crabs", app.requireAuthentication(app.allCrabs))
 	mux.HandleFunc("GET /crabs/{name}", app.profile)

@@ -99,11 +99,12 @@ func newHarness(t *testing.T) *harness {
 	log := slog.New(slog.NewTextHandler(testLog{t}, nil))
 	captured := &capturedMail{}
 	app, err := New(Deps{
-		Config: &config.Config{Env: "prod", BaseURL: base, TableName: table, OriginVerifySecrets: []string{originSecret}},
-		Log:    log,
-		Store:  st,
-		Mailer: mail.New(captured, st, 100, log),
-		Fanout: realQueue{t: t, s: st},
+		Config:   &config.Config{Env: "prod", BaseURL: base, TableName: table, OriginVerifySecrets: []string{originSecret}},
+		Log:      log,
+		Store:    st,
+		Mailer:   mail.New(captured, st, 100, log),
+		Fanout:   realQueue{t: t, s: st},
+		Notifier: realQueue{t: t, s: st},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -294,6 +295,12 @@ func (q realQueue) Enqueue(m *store.Molt) {
 	}
 }
 
+func (q realQueue) Notify(n store.Notification) {
+	if err := q.s.AddNotification(context.Background(), n); err != nil {
+		q.t.Error(err)
+	}
+}
+
 var likeCountRX = regexp.MustCompile(`(?s)class="mini-molt-action like[^"]*"[^>]*>.*?mini-molt-action-counter ml-1">(\d+)<`)
 
 func TestFeedsProfileSearchAndLiveCounts(t *testing.T) {
@@ -402,6 +409,51 @@ func TestDeleteMolt(t *testing.T) {
 	}
 	if _, body, _ := h.get("/sea"); strings.Contains(body, "going to the mall") {
 		t.Fatal("deleted molt still on the sea")
+	}
+}
+
+var badgeRX = regexp.MustCompile(`class="kb-badge" aria-label="(\d+) unread"`)
+
+func TestNotifications(t *testing.T) {
+	h := newHarness(t)
+	h.signupAndActivate("karen", "karen@krabber.test", "computer-wife!")
+	h.signupAndActivate("plankton", "plankton@krabber.test", "formula-thief!")
+	karen, _ := h.store.CrabByUsername(context.Background(), "karen")
+
+	h.login("karen@krabber.test", "computer-wife!")
+	tok := h.csrf("/trench")
+	h.post("/molt/create", url.Values{"csrf_token": {tok}, "content": {"Plankton, dinner is ready"}}, "HX-Request", "true")
+	molts, _ := h.store.MoltsByOwner(context.Background(), karen.ID, 1)
+	id := molts[0].ID
+	// Liking your own molt doesn't notify you.
+	h.post("/molt/like/"+id, url.Values{"csrf_token": {tok}}, "HX-Request", "true")
+	h.post("/crab/logout", url.Values{"csrf_token": {tok}})
+
+	h.login("plankton@krabber.test", "formula-thief!")
+	tok = h.csrf("/trench")
+	h.post("/follow/"+karen.ID, url.Values{"csrf_token": {tok}}, "HX-Request", "true")
+	for range 3 { // like, unlike, like: one notification
+		h.post("/molt/like/"+id, url.Values{"csrf_token": {tok}}, "HX-Request", "true")
+	}
+	h.post("/comment/"+id, url.Values{"csrf_token": {tok}, "comment": {"Coming, my love"}}, "HX-Request", "true")
+	h.post("/crab/logout", url.Values{"csrf_token": {tok}})
+
+	h.login("karen@krabber.test", "computer-wife!")
+	_, body, _ := h.get("/trench")
+	if got := badgeRX.FindStringSubmatch(body); got == nil || got[1] != "3" {
+		t.Fatalf("badge before reading: %v", got)
+	}
+	_, body, _ = h.get("/notifications")
+	for _, want := range []string{"followed you", "liked your molt", "commented on your molt", "Coming, my love", "/molt/view/" + id} {
+		if !strings.Contains(body, want) {
+			t.Errorf("notifications page missing %q", want)
+		}
+	}
+	if strings.Count(body, "liked your molt") != 1 {
+		t.Errorf("like notified %d times", strings.Count(body, "liked your molt"))
+	}
+	if _, body, _ := h.get("/notifications/badge"); badgeRX.MatchString(body) || !strings.Contains(body, `hx-trigger="every 60s"`) {
+		t.Fatalf("badge after reading: %s", body)
 	}
 }
 

@@ -3,6 +3,33 @@
 {{define "page"}}
 {{ template "shell-top" . }}
     {{ template "heading" "Notifications" }}
-    <div class="p-4 text-center text-muted">Nothing here yet.</div>
+    {{ range .Notifications }}
+    <div class="d-flex border-bottom border-dark px-3 py-2 kb-notification">
+        <div class="kb-notification-icon kb-notification-{{ .Type }} mr-3">
+            {{ if eq .Type "like" }}<svg width="22" height="22"><use href="/static/img/sprites.svg?version=1704178675#heart-f"></use></svg>
+            {{ else if eq .Type "remolt" }}<svg width="22" height="22"><use href="/static/img/sprites.svg?version=1704178675#repeat"></use></svg>
+            {{ else if eq .Type "comment" }}<svg width="22" height="22"><use href="/static/img/sprites.svg?version=1704178675#message-f"></use></svg>
+            {{ else }}<svg width="22" height="22"><use href="{{ asset "img/sprites.svg" }}#crab"></use></svg>{{ end }}
+        </div>
+        <div class="flex-grow-1 min-w-0">
+            <div class="d-flex align-items-center mb-1">
+                <a href="/crabs/{{ .Actor }}" class="mr-2">{{ template "avatar" .Actor }}</a>
+                <span class="text-muted small ml-auto">{{ template "time" .CreatedAt }}</span>
+            </div>
+            <div>
+                <a href="/crabs/{{ .Actor }}" class="text-light font-weight-bold">@{{ .Actor }}</a>
+                {{ if eq .Type "like" }}liked your molt
+                {{ else if eq .Type "remolt" }}remolted your molt
+                {{ else if eq .Type "comment" }}commented on your molt
+                {{ else }}followed you{{ end }}
+            </div>
+            {{ if .MoltID }}
+            <a class="d-block text-muted mt-1 kb-notification-snippet" href="/molt/view/{{ .MoltID }}">{{ .Snippet }}</a>
+            {{ end }}
+        </div>
+    </div>
+    {{ else }}
+    <div class="p-4 text-center text-muted">Nothing yet. When crabs like, remolt, comment on your molts or follow you, it shows up here.</div>
+    {{ end }}
 {{ template "shell-bottom" . }}
 {{end}}

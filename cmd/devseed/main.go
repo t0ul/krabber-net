@@ -57,7 +57,9 @@ func main() {
 			}
 		}
 	}
-	seedMolts(ctx, s, append(append([]*store.Crab{}, crew...), extras...))
+	all := append(append([]*store.Crab{}, crew...), extras...)
+	seedMolts(ctx, s, all)
+	seedNotifications(ctx, s, all)
 	fmt.Printf("table %s ready; sign in as any crab with password crabcakes123\n", table)
 }
 
@@ -134,6 +136,39 @@ func seedMolts(ctx context.Context, s *store.Store, crabs []*store.Crab) {
 	if _, err := s.AddComment(ctx, crabs[2], ready, "Ugh. Barnacles."); err != nil {
 		log.Fatal(err)
 	}
+}
+
+// seedNotifications gives spongebob the notifications the seeded likes,
+// follows and remolt would have sent. Likes, follows and remolts are recorded
+// once per actor, so running the seed again adds nothing.
+func seedNotifications(ctx context.Context, s *store.Store, crabs []*store.Crab) {
+	sponge := crabs[1]
+	molts, err := s.MoltsByOwner(ctx, sponge.ID, 100)
+	if err != nil {
+		log.Fatal(err)
+	}
+	var ready *store.Molt
+	for i := range molts {
+		if !molts[i].Remolt && molts[i].Content == "I'm ready! I'm ready! I'm ready!" {
+			ready = &molts[i]
+		}
+	}
+	add := func(n store.Notification) {
+		n.RecipientID = sponge.ID
+		if err := s.AddNotification(ctx, n); err != nil {
+			log.Fatal(err)
+		}
+	}
+	for _, c := range []*store.Crab{crabs[0], crabs[2]} {
+		add(store.Notification{Type: store.NotifyFollow, ActorID: c.ID, Actor: c.UserName})
+	}
+	if ready == nil {
+		return
+	}
+	for _, c := range crabs[2:4] {
+		add(store.Notification{Type: store.NotifyLike, ActorID: c.ID, Actor: c.UserName, MoltID: ready.ID, Snippet: store.Snippet(ready.Content)})
+	}
+	add(store.Notification{Type: store.NotifyRemolt, ActorID: crabs[0].ID, Actor: crabs[0].UserName, MoltID: ready.ID, Snippet: store.Snippet(ready.Content)})
 }
 
 func followerIDs(ctx context.Context, s *store.Store, c *store.Crab) []string {

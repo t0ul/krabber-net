@@ -23,6 +23,9 @@ import (
 //	Token             CT#<sha256 hex>        CT#<scope>
 //	Session           S#<sha256 hex>         S#
 //	Rate-limit window RL#<action>#<key>      RL#<window unix>
+//	Notification      N#<recipientID>        N#<notificationID>
+//	Notified-once     NO#<recipientID>       <type>#<actorID>#<moltID>
+//	Unread counter    NC#<crabID>            NC#
 //
 // Molt, comment and other generated IDs are KSUIDs, so sorting by SK sorts by time.
 
@@ -66,6 +69,14 @@ func sessionPK(hash string) string             { return "S#" + hash }
 func sessionSK() string                        { return "S#" }
 func rateLimitPK(action, key string) string    { return "RL#" + action + "#" + key }
 func rateLimitSK(windowStart time.Time) string { return fmt.Sprintf("RL#%d", windowStart.Unix()) }
+func notificationPK(crabID string) string      { return "N#" + crabID }
+func notificationSK(id string) string          { return "N#" + id }
+func notificationOncePK(crabID string) string  { return "NO#" + crabID }
+func notificationOnceSK(kind, actorID, moltID string) string {
+	return kind + "#" + actorID + "#" + moltID
+}
+func notificationCounterPK(crabID string) string { return "NC#" + crabID }
+func notificationCounterSK() string              { return "NC#" }
 
 // NormalizeEmail lowercases and trims an email address so that one mailbox
 // maps to exactly one account.

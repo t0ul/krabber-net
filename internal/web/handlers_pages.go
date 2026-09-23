@@ -53,8 +53,30 @@ func (app *App) moltinTime(w http.ResponseWriter, r *http.Request) {
 	app.renderFeed(w, r, "moltinTime.html", molts, err, "You haven't molted anything yet.")
 }
 
+// notifications lists the crab's notifications and clears the unread badge.
 func (app *App) notifications(w http.ResponseWriter, r *http.Request) {
-	app.render(w, r, http.StatusOK, "notifications.html", app.newTemplateData(r))
+	c := currentCrab(r)
+	notes, err := app.store.Notifications(r.Context(), c.ID, 50)
+	if err != nil {
+		app.serverError(w, r, err)
+		return
+	}
+	if err := app.store.MarkNotificationsRead(r.Context(), c.ID); err != nil {
+		app.log.Warn("mark notifications read", "err", err)
+	}
+	data := app.newTemplateData(r)
+	data.Unread = 0
+	data.Notifications = notes
+	app.render(w, r, http.StatusOK, "notifications.html", data)
+}
+
+// notificationBadge is polled by the nav so the unread count stays current.
+func (app *App) notificationBadge(w http.ResponseWriter, r *http.Request) {
+	n, err := app.store.UnreadNotifications(r.Context(), currentCrab(r).ID)
+	if err != nil {
+		app.log.Warn("unread notifications", "err", err)
+	}
+	app.renderTemplate(w, r, http.StatusOK, fragmentPage, "notification-badge", n)
 }
 
 func (app *App) settings(w http.ResponseWriter, r *http.Request) {
@@ -193,6 +215,9 @@ func (app *App) setFollow(w http.ResponseWriter, r *http.Request, follow bool) {
 	var err error
 	if follow {
 		err = app.store.Follow(r.Context(), currentCrab(r), followee)
+		if err == nil {
+			app.notify(r, followee.ID, store.NotifyFollow, "", "")
+		}
 	} else {
 		err = app.store.Unfollow(r.Context(), currentCrab(r), followee)
 	}

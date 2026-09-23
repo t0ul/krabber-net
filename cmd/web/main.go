@@ -68,11 +68,12 @@ func run(log *slog.Logger) error {
 
 	runner := jobs.New(st, log)
 	app, err := web.New(web.Deps{
-		Config: cfg,
-		Log:    log,
-		Store:  st,
-		Mailer: mailer,
-		Fanout: runner,
+		Config:   cfg,
+		Log:      log,
+		Store:    st,
+		Mailer:   mailer,
+		Fanout:   runner,
+		Notifier: runner,
 	})
 	if err != nil {
 		return err

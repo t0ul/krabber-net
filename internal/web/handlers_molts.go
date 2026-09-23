@@ -87,6 +87,9 @@ func (app *App) moltLikePost(w http.ResponseWriter, r *http.Request) {
 		app.serverError(w, r, err)
 		return
 	}
+	if liked {
+		app.notify(r, m.AuthorID, store.NotifyLike, m.ID, m.Content)
+	}
 	app.renderActions(w, r, m, &liked)
 }
 
@@ -105,8 +108,25 @@ func (app *App) remoltPost(w http.ResponseWriter, r *http.Request) {
 		return
 	default:
 		app.fanout.Enqueue(re)
+		app.notify(r, m.AuthorID, store.NotifyRemolt, m.ID, m.Content)
 	}
 	app.renderActions(w, r, m, nil)
+}
+
+// notify queues a notification from the signed-in crab to recipientID.
+func (app *App) notify(r *http.Request, recipientID, kind, moltID, text string) {
+	c := currentCrab(r)
+	if app.notifier == nil || c == nil {
+		return
+	}
+	app.notifier.Notify(store.Notification{
+		RecipientID: recipientID,
+		Type:        kind,
+		ActorID:     c.ID,
+		Actor:       c.UserName,
+		MoltID:      moltID,
+		Snippet:     store.Snippet(text),
+	})
 }
 
 // moltDeletePost deletes the viewer's own molt, or undoes their remolt when
@@ -236,9 +256,14 @@ func (app *App) commentCreatePost(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if _, err := app.store.AddComment(r.Context(), currentCrab(r), m, f.Comment); err != nil && !errors.Is(err, store.ErrNotFound) {
+	_, err := app.store.AddComment(r.Context(), currentCrab(r), m, f.Comment)
+	switch {
+	case errors.Is(err, store.ErrNotFound):
+	case err != nil:
 		app.serverError(w, r, err)
 		return
+	default:
+		app.notify(r, m.AuthorID, store.NotifyComment, m.ID, f.Comment)
 	}
 	if isHTMX(r) {
 		w.Header().Set("HX-Refresh", "true")

@@ -21,6 +21,11 @@ type FanoutQueue interface {
 	Enqueue(m *store.Molt)
 }
 
+// Notifier hands notifications to the background writer.
+type Notifier interface {
+	Notify(n store.Notification)
+}
+
 // App holds the website's dependencies.
 type App struct {
 	cfg       *config.Config
@@ -31,17 +36,19 @@ type App struct {
 	templates map[string]*template.Template
 	forms     *form.Decoder
 	fanout    FanoutQueue
+	notifier  Notifier
 	turnstile *turnstile
 	dir       *directory
 }
 
 // Deps are the collaborators App needs.
 type Deps struct {
-	Config *config.Config
-	Log    *slog.Logger
-	Store  *store.Store
-	Mailer *mail.Mailer
-	Fanout FanoutQueue
+	Config   *config.Config
+	Log      *slog.Logger
+	Store    *store.Store
+	Mailer   *mail.Mailer
+	Fanout   FanoutQueue
+	Notifier Notifier
 }
 
 // New builds the App, parsing templates and configuring sessions.
@@ -79,6 +86,7 @@ func New(d Deps) (*App, error) {
 		templates: templates,
 		forms:     form.NewDecoder(),
 		fanout:    d.Fanout,
+		notifier:  d.Notifier,
 		turnstile: newTurnstile(d.Config.TurnstileSecret),
 		dir:       &directory{},
 	}, nil

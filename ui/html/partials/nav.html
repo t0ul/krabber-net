@@ -1,3 +1,6 @@
+{{/* Unread count on the bell; it re-polls itself every minute. */}}
+{{define "notification-badge"}}<span class="kb-badge-slot" hx-get="/notifications/badge" hx-trigger="every 60s" hx-swap="outerHTML">{{ if gt . 0 }}<span class="kb-badge" aria-label="{{ . }} unread">{{ if gt . 99 }}99+{{ else }}{{ . }}{{ end }}</span>{{ end }}</span>{{end}}
+
 {{define "nav"}}{{ $p := .CurrentPath }}
 <div class="col-1 col-lg-3 p-1" id="nav-panel">
     <a href="/" aria-label="Krabber home">
@@ -14,6 +17,11 @@
         <strong class="d-none d-lg-inline-block ml-2">Sea</strong>
     </a>
     {{ if .IsAuthenticated }}
+    <a href="/notifications" class="btn rounded-pill mx-auto mx-lg-0 mt-2 nav-link-btn kb-nav-notifications"{{ if eq $p "/notifications" }} id="nav-active" aria-current="page"{{ end }}>
+        <svg class="btn-icon" width="28" height="28"><use href="/static/img/sprites.svg?version=1704178675#{{ if eq $p "/notifications" }}bell-f{{ else }}bell{{ end }}"></use></svg>
+        {{ template "notification-badge" .Unread }}
+        <strong class="d-none d-lg-inline-block ml-2">Notifications</strong>
+    </a>
     {{ $me := printf "/crabs/%s" .CrabName }}
     <a href="{{ $me }}" class="btn rounded-pill mx-auto mx-lg-0 mt-2 nav-link-btn"{{ if eq $p $me }} id="nav-active" aria-current="page"{{ end }}>
         <img class="rounded-circle profile-picture kb-nav-avatar" src="/static/img/crab_illustration.jpg" width="28" height="28" alt="">

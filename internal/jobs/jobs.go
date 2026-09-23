@@ -1,6 +1,7 @@
-// Package jobs runs the web server's background work: trench fan-out. Work
-// interrupted by a deploy is picked up again, because pending fan-out is
-// recorded in DynamoDB, not only in memory.
+// Package jobs runs the web server's background work: trench fan-out and
+// notifications. Fan-out interrupted by a deploy is picked up again, because
+// pending fan-out is recorded in DynamoDB, not only in memory. Notifications
+// are best effort: one lost in a restart isn't worth a durable queue.
 package jobs
 
 import (
@@ -18,6 +19,7 @@ const (
 	fanoutSweepEvery  = time.Minute
 	fanoutSweepMinAge = 30 * time.Second // leave fresh molts to the in-process worker
 	fanoutSweepBatch  = 25
+	notifyQueueSize   = 512
 )
 
 // Runner owns the background goroutines.
@@ -25,12 +27,27 @@ type Runner struct {
 	store *store.Store
 	log   *slog.Logger
 	queue chan *store.Molt
+	notes chan store.Notification
 	wg    sync.WaitGroup
 }
 
 // New returns a Runner; call Start to begin work.
 func New(s *store.Store, log *slog.Logger) *Runner {
-	return &Runner{store: s, log: log, queue: make(chan *store.Molt, fanoutQueueSize)}
+	return &Runner{
+		store: s,
+		log:   log,
+		queue: make(chan *store.Molt, fanoutQueueSize),
+		notes: make(chan store.Notification, notifyQueueSize),
+	}
+}
+
+// Notify hands a notification to the writer without blocking the request.
+func (r *Runner) Notify(n store.Notification) {
+	select {
+	case r.notes <- n:
+	default:
+		r.log.Warn("notification queue full; dropping", "type", n.Type, "recipient", n.RecipientID)
+	}
 }
 
 // Enqueue hands a new molt to the fan-out worker without blocking the
@@ -45,9 +62,26 @@ func (r *Runner) Enqueue(m *store.Molt) {
 
 // Start launches the workers. They stop when ctx is cancelled.
 func (r *Runner) Start(ctx context.Context) {
-	r.wg.Add(2)
+	r.wg.Add(3)
 	go r.fanoutWorker(ctx)
+	go r.notifyWorker(ctx)
 	go r.every(ctx, fanoutSweepEvery, 5*time.Second, r.sweepFanouts)
+}
+
+func (r *Runner) notifyWorker(ctx context.Context) {
+	defer r.wg.Done()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case n := <-r.notes:
+			nctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+			if err := r.store.AddNotification(nctx, n); err != nil {
+				r.log.Error("notification failed", "type", n.Type, "recipient", n.RecipientID, "err", err)
+			}
+			cancel()
+		}
+	}
 }
 
 // Wait blocks until the workers exit or timeout passes. Unfinished fan-out

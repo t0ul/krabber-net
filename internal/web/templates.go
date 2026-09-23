@@ -28,7 +28,10 @@ type templateData struct {
 	Form             any
 	Query            string
 	CurrentPath      string
+	Unread           int
 	Sidebar          sidebar
+
+	Notifications []store.Notification
 
 	Molt         store.Molt
 	Molts        []store.Molt
@@ -181,6 +184,11 @@ func (app *App) newTemplateData(r *http.Request) templateData {
 		d.CrabID = c.ID
 		d.CrabName = c.UserName
 		d.IsAdmin = app.cfg.IsAdmin(c.ID)
+		n, err := app.store.UnreadNotifications(r.Context(), c.ID)
+		if err != nil {
+			app.log.Warn("unread notifications", "err", err)
+		}
+		d.Unread = n
 	}
 	d.Sidebar = app.sidebarFor(r)
 	return d
