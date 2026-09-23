@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -29,6 +30,8 @@ type Crab struct {
 	Banned    bool `dynamodbav:"banned"`
 	Deleted   bool `dynamodbav:"deleted"`
 
+	Profile
+
 	FollowerCount  int `dynamodbav:"follower_count"`
 	FollowingCount int `dynamodbav:"following_count"`
 	MoltCount      int `dynamodbav:"molt_count"`
@@ -36,6 +39,30 @@ type Crab struct {
 	// SessionsValidAfter (Unix seconds) invalidates every session created
 	// before it: set on password change, reset and ban.
 	SessionsValidAfter int64 `dynamodbav:"sessions_valid_after"`
+}
+
+// Profile is what a crab tells others about themselves.
+type Profile struct {
+	DisplayName string `dynamodbav:"display_name,omitempty"`
+	Bio         string `dynamodbav:"bio,omitempty"`
+	Location    string `dynamodbav:"location,omitempty"`
+	Website     string `dynamodbav:"website,omitempty"`
+}
+
+// Profile field limits, in characters (the same as Crabber's).
+const (
+	MaxDisplayName = 64
+	MaxBio         = 512
+	MaxLocation    = 128
+	MaxWebsite     = 512
+)
+
+// Name is the display name, or the username when none is set.
+func (c Crab) Name() string {
+	if c.DisplayName != "" {
+		return c.DisplayName
+	}
+	return c.UserName
 }
 
 type usernameMarker struct {
@@ -136,8 +163,10 @@ func (s *Store) ListCrabs(ctx context.Context, limit int) ([]Crab, error) {
 	p := dynamodb.NewScanPaginator(s.db, &dynamodb.ScanInput{
 		TableName:            s.tableName(),
 		IndexName:            aws.String(gsiCrabByID),
-		ProjectionExpression: aws.String("#id, #un, #frc, #fgc, #mc, #act, #ban, #del, #ca"),
+		ProjectionExpression: aws.String("#id, #un, #frc, #fgc, #mc, #act, #ban, #del, #ca, #dn, #bio"),
 		ExpressionAttributeNames: map[string]string{
+			"#dn":  "display_name",
+			"#bio": "bio",
 			"#ca":  "created_at",
 			"#id":  "id",
 			"#un":  "user_name",
@@ -187,6 +216,72 @@ func (s *Store) ActivateCrab(ctx context.Context, crabID string) error {
 		return fmt.Errorf("activate crab: %w", err)
 	}
 	return nil
+}
+
+// UpdateProfile replaces the crab's profile fields; empty fields are removed.
+func (s *Store) UpdateProfile(ctx context.Context, c *Crab, p Profile) error {
+	fields := []struct{ attr, value string }{
+		{"display_name", p.DisplayName},
+		{"bio", p.Bio},
+		{"location", p.Location},
+		{"website", p.Website},
+	}
+	var set, remove []string
+	names := map[string]string{}
+	values := map[string]types.AttributeValue{}
+	for i, f := range fields {
+		name := fmt.Sprintf("#f%d", i)
+		names[name] = f.attr
+		if f.value == "" {
+			remove = append(remove, name)
+			continue
+		}
+		value := fmt.Sprintf(":v%d", i)
+		values[value] = str(f.value)
+		set = append(set, name+" = "+value)
+	}
+	expr := ""
+	if len(set) > 0 {
+		expr = "SET " + strings.Join(set, ", ")
+	}
+	if len(remove) > 0 {
+		expr += " REMOVE " + strings.Join(remove, ", ")
+	}
+	in := &dynamodb.UpdateItemInput{
+		TableName:                s.tableName(),
+		Key:                      keyOf(c.PK, c.SK),
+		UpdateExpression:         aws.String(strings.TrimSpace(expr)),
+		ConditionExpression:      aws.String("attribute_exists(PK)"),
+		ExpressionAttributeNames: names,
+	}
+	if len(values) > 0 {
+		in.ExpressionAttributeValues = values
+	}
+	if _, err := s.db.UpdateItem(ctx, in); err != nil {
+		return fmt.Errorf("update profile: %w", err)
+	}
+	return nil
+}
+
+// SetPassword stores a new password hash and ends every existing session. It
+// returns the cut-off so the caller can keep its own session. The cut-off is
+// a second ahead because sessions are stamped in whole seconds.
+func (s *Store) SetPassword(ctx context.Context, c *Crab, hash []byte) (int64, error) {
+	now := s.now().Unix() + 1
+	_, err := s.db.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+		TableName:           s.tableName(),
+		Key:                 keyOf(c.PK, c.SK),
+		UpdateExpression:    aws.String("SET password_hash = :h, sessions_valid_after = :now"),
+		ConditionExpression: aws.String("attribute_exists(PK)"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":h":   &types.AttributeValueMemberB{Value: hash},
+			":now": num(now),
+		},
+	})
+	if err != nil {
+		return 0, fmt.Errorf("set password: %w", err)
+	}
+	return now, nil
 }
 
 // SetBanned bans or unbans an account and ends all of its sessions.

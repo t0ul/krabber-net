@@ -35,6 +35,10 @@
         <svg class="btn-icon" width="28" height="28"><use href="/static/img/sprites.svg?version=1704178675#search"></use></svg>
         <strong class="d-none d-lg-inline-block ml-2">Search</strong>
     </a>
+    <a href="/settings" class="btn rounded-pill mx-auto mx-lg-0 mt-2 nav-link-btn"{{ if eq $p "/settings" }} id="nav-active" aria-current="page"{{ end }}>
+        <svg class="btn-icon" width="28" height="28"><use href="/static/img/sprites.svg?version=1704178675#{{ if eq $p "/settings" }}cog-f{{ else }}cog{{ end }}"></use></svg>
+        <strong class="d-none d-lg-inline-block ml-2">Settings</strong>
+    </a>
     <a href="/moltinTime" id="molt-btn" class="btn btn-primary mx-auto mx-lg-0 subtle-shadow rounded-pill w-md-75 mt-4 d-block">
         <svg class="btn-icon d-lg-none" width="28" height="28"><use href="/static/img/sprites.svg?version=1704178675#write"></use></svg>
         <strong class="d-none d-lg-inline-block">Molt</strong>

@@ -3,6 +3,67 @@
 {{define "page"}}
 {{ template "shell-top" . }}
     {{ template "heading" "Settings" }}
-    <div class="p-4 text-center text-muted">Settings are coming soon.</div>
+    {{ $p := .Form.Profile }}
+    {{ $pw := .Form.Password }}
+
+    <form class="px-3 py-3 border-bottom border-dark kb-settings" method="POST" action="/settings/profile" novalidate>
+        <input type='hidden' name='csrf_token' value='{{ .CSRFToken }}'>
+        <h2 class="h6 font-weight-bold mb-3">Profile</h2>
+
+        <div class="form-group">
+            <label for="display-name">Display name</label>
+            {{ with $p.FieldErrors.display_name }}<div class="error small">{{ . }}</div>{{ end }}
+            <input type="text" name="display_name" id="display-name" class="form-control" maxlength="64" value="{{ $p.DisplayName }}" placeholder="{{ .CrabName }}">
+            <small class="form-text text-muted">Shown next to @{{ .CrabName }}. Leave empty to use your username.</small>
+        </div>
+
+        <div class="form-group">
+            <label for="bio">Bio</label>
+            {{ with $p.FieldErrors.bio }}<div class="error small">{{ . }}</div>{{ end }}
+            <textarea name="bio" id="bio" class="form-control" rows="3" maxlength="512" placeholder="Tell the other crabs about yourself.">{{ $p.Bio }}</textarea>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group col-md-6">
+                <label for="location">Location</label>
+                {{ with $p.FieldErrors.location }}<div class="error small">{{ . }}</div>{{ end }}
+                <input type="text" name="location" id="location" class="form-control" maxlength="128" value="{{ $p.Location }}" placeholder="Bikini Bottom">
+            </div>
+            <div class="form-group col-md-6">
+                <label for="website">Website</label>
+                {{ with $p.FieldErrors.website }}<div class="error small">{{ . }}</div>{{ end }}
+                <input type="url" name="website" id="website" class="form-control" maxlength="512" value="{{ $p.Website }}" placeholder="https://example.com">
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary rounded-pill">Save profile</button>
+        <a class="ml-3" href="/crabs/{{ .CrabName }}">View profile</a>
+    </form>
+
+    <form class="px-3 py-3 border-bottom border-dark kb-settings" method="POST" action="/settings/password" novalidate>
+        <input type='hidden' name='csrf_token' value='{{ .CSRFToken }}'>
+        <h2 class="h6 font-weight-bold mb-3">Change password</h2>
+        <input type="text" name="username" value="{{ .CrabName }}" autocomplete="username" hidden>
+
+        <div class="form-group">
+            <label for="current-password">Current password</label>
+            {{ with $pw.FieldErrors.current_password }}<div class="error small">{{ . }}</div>{{ end }}
+            <input type="password" name="current_password" id="current-password" class="form-control" autocomplete="current-password" required>
+        </div>
+        <div class="form-row">
+            <div class="form-group col-md-6">
+                <label for="new-password">New password</label>
+                {{ with $pw.FieldErrors.new_password }}<div class="error small">{{ . }}</div>{{ end }}
+                <input type="password" name="new_password" id="new-password" class="form-control" autocomplete="new-password" minlength="8" required>
+            </div>
+            <div class="form-group col-md-6">
+                <label for="confirm-password">Confirm new password</label>
+                {{ with $pw.FieldErrors.confirm_password }}<div class="error small">{{ . }}</div>{{ end }}
+                <input type="password" name="confirm_password" id="confirm-password" class="form-control" autocomplete="new-password" minlength="8" required>
+            </div>
+        </div>
+        <small class="form-text text-muted mb-3">Changing it signs you out on every other device.</small>
+        <button type="submit" class="btn btn-secondary rounded-pill">Change password</button>
+    </form>
 {{ template "shell-bottom" . }}
 {{end}}

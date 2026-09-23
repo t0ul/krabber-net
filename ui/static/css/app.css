@@ -183,6 +183,25 @@
   text-decoration: none;
 }
 
+.kb-bio {
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+}
+
+.kb-profile-meta svg {
+    fill: currentColor;
+    vertical-align: -2px;
+}
+
+.kb-profile-meta a {
+    color: var(--primary);
+    overflow-wrap: anywhere;
+}
+
+.kb-settings label {
+    font-weight: 600;
+}
+
 .kb-profile-banner {
   height: 140px;
   background: url("../img/banner.png") center / cover no-repeat;

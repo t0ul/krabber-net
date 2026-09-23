@@ -153,7 +153,8 @@
 <div class="d-flex align-items-center border-bottom border-dark px-3 py-2 crab-row" data-name="{{ $c.UserName }}">
     <a href="/crabs/{{ $c.UserName }}" class="mr-3 kb-avatar-link">{{ template "avatar" $c.UserName }}</a>
     <div class="flex-grow-1 min-w-0">
-        <a href="/crabs/{{ $c.UserName }}" class="text-light font-weight-bold">@{{ $c.UserName }}</a>
+        <a href="/crabs/{{ $c.UserName }}" class="text-light font-weight-bold">{{ $c.Name }}</a>
+        {{ if $c.DisplayName }}<span class="text-muted small">@{{ $c.UserName }}</span>{{ end }}
         <div class="text-muted small">{{ $c.FollowerCount }} followers · {{ $c.MoltCount }} molts</div>
     </div>
     {{ template "follow-button" . }}

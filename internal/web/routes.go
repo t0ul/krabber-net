@@ -32,6 +32,8 @@ func (app *App) Routes() http.Handler {
 	mux.HandleFunc("GET /notifications", app.requireAuthentication(app.notifications))
 	mux.HandleFunc("GET /notifications/badge", app.requireAuthentication(app.notificationBadge))
 	mux.HandleFunc("GET /settings", app.requireAuthentication(app.settings))
+	mux.HandleFunc("POST /settings/profile", app.requireAuthentication(app.settingsProfilePost))
+	mux.HandleFunc("POST /settings/password", app.requireAuthentication(app.settingsPasswordPost))
 	mux.HandleFunc("GET /crabs", app.requireAuthentication(app.allCrabs))
 	mux.HandleFunc("GET /crabs/{name}", app.profile)
 	mux.HandleFunc("GET /crabs/{name}/followers", app.followersList)

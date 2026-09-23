@@ -79,10 +79,6 @@ func (app *App) notificationBadge(w http.ResponseWriter, r *http.Request) {
 	app.renderTemplate(w, r, http.StatusOK, fragmentPage, "notification-badge", n)
 }
 
-func (app *App) settings(w http.ResponseWriter, r *http.Request) {
-	app.render(w, r, http.StatusOK, "settings.html", app.newTemplateData(r))
-}
-
 // profile shows a crab's page: counts, follow button and their molts.
 func (app *App) profile(w http.ResponseWriter, r *http.Request) {
 	p, ok := app.crabFromName(w, r)

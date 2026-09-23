@@ -7,10 +7,25 @@
     <div class="px-3 pb-3 border-bottom border-dark kb-profile-header">
         <div class="d-flex justify-content-between align-items-end">
             <img class="kb-avatar kb-avatar-lg" src="/static/img/crab_illustration.jpg" width="96" height="96" alt="">
-            <div class="mb-2">{{ template "follow-button" (dict "C" $p "D" . "Following" .IsFollowing) }}</div>
+            <div class="mb-2">
+                {{ if eq $p.ID .CrabID }}<a class="btn btn-sm btn-outline-light rounded-pill" href="/settings">Edit profile</a>{{ end }}
+                {{ template "follow-button" (dict "C" $p "D" . "Following" .IsFollowing) }}
+            </div>
         </div>
-        <h1 class="h4 mt-3 mb-0">@{{ $p.UserName }}</h1>
-        <div class="text-muted small">Joined {{ monthYear $p.CreatedAt }}</div>
+        <h1 class="h4 mt-3 mb-0">{{ $p.Name }}</h1>
+        <div class="text-muted">@{{ $p.UserName }}</div>
+        {{ with $p.Bio }}<p class="mt-2 mb-1 kb-bio">{{ . }}</p>{{ end }}
+        <div class="text-muted small mt-2 kb-profile-meta">
+            {{ with $p.Location }}<span class="mr-3">
+                <svg width="14" height="14"><use href="/static/img/sprites.svg?version=1704178675#map-marker"></use></svg> {{ . }}
+            </span>{{ end }}
+            {{ with $p.Website }}<a class="mr-3" href="{{ . }}" rel="nofollow ugc noopener noreferrer" target="_blank">
+                <svg width="14" height="14"><use href="/static/img/sprites.svg?version=1704178675#link"></use></svg> {{ websiteLabel . }}
+            </a>{{ end }}
+            <span>
+                <svg width="14" height="14"><use href="/static/img/sprites.svg?version=1704178675#calendar"></use></svg> Joined {{ monthYear $p.CreatedAt }}
+            </span>
+        </div>
         <div class="mt-3 kb-profile-stats">
             <span><strong>{{ $p.MoltCount }}</strong> <span class="text-muted">molts</span></span>
             <a class="ml-3 text-light" href="/crabs/{{ $p.UserName }}/following"><strong>{{ $p.FollowingCount }}</strong> <span class="text-muted">following</span></a>

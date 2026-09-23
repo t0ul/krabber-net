@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"net/http"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/t0ul/krabber-net/internal/store"
@@ -82,6 +83,12 @@ func ago(t time.Time) string {
 
 func monthYear(t time.Time) string { return t.UTC().Format("January 2006") }
 
+// websiteLabel shows a profile website without the scheme or trailing slash.
+func websiteLabel(u string) string {
+	u = strings.TrimPrefix(strings.TrimPrefix(u, "https://"), "http://")
+	return strings.TrimSuffix(u, "/")
+}
+
 // dict builds a map from key/value pairs so a partial can receive several
 // values: {{ template "molt" (dict "M" . "D" $d) }}.
 func dict(kv ...any) (map[string]any, error) {
@@ -123,11 +130,12 @@ var assetVersion = func() string {
 func asset(path string) string { return "/static/" + path + "?v=" + assetVersion }
 
 var templateFuncs = template.FuncMap{
-	"humanDate": humanDate,
-	"ago":       ago,
-	"monthYear": monthYear,
-	"dict":      dict,
-	"asset":     asset,
+	"humanDate":    humanDate,
+	"ago":          ago,
+	"monthYear":    monthYear,
+	"websiteLabel": websiteLabel,
+	"dict":         dict,
+	"asset":        asset,
 }
 
 func newTemplateCache() (map[string]*template.Template, error) {

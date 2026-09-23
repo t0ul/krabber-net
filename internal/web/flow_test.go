@@ -457,6 +457,64 @@ func TestNotifications(t *testing.T) {
 	}
 }
 
+func TestSettings(t *testing.T) {
+	h := newHarness(t)
+	h.signupAndActivate("gary", "gary@krabber.test", "meow-meow-meow")
+	h.login("gary@krabber.test", "meow-meow-meow")
+
+	tok := h.csrf("/settings")
+	status, body, _ := h.post("/settings/profile", url.Values{"csrf_token": {tok}, "display_name": {"Gary"}, "website": {"javascript:alert(1)"}})
+	if status != http.StatusUnprocessableEntity || !strings.Contains(body, "Use a web address") {
+		t.Fatalf("bad website: %d", status)
+	}
+	status, _, hdr := h.post("/settings/profile", url.Values{"csrf_token": {tok},
+		"display_name": {"  Gary the Snail  "}, "bio": {"Meow.\r\nSnail."}, "location": {"Pineapple"}, "website": {"garythesnail.example/"}})
+	if status != http.StatusSeeOther || hdr.Get("Location") != "/settings" {
+		t.Fatalf("save profile: %d", status)
+	}
+	_, body, _ = h.get("/crabs/gary")
+	for _, want := range []string{"Gary the Snail", "Meow.\nSnail.", "Pineapple", `href="https://garythesnail.example/"`, "</svg> garythesnail.example\n", "Edit profile"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("profile missing %q", want)
+		}
+	}
+
+	// Clearing a field removes it.
+	h.post("/settings/profile", url.Values{"csrf_token": {tok}, "display_name": {"Gary the Snail"}})
+	if c, _ := h.store.CrabByUsername(context.Background(), "gary"); c.Website != "" || c.Bio != "" || c.DisplayName != "Gary the Snail" {
+		t.Fatalf("after clearing: %+v", c.Profile)
+	}
+
+	// A second device is signed out by a password change; this one isn't.
+	mine := h.client
+	h.client = h.newClient()
+	h.login("gary@krabber.test", "meow-meow-meow")
+	other := h.client
+	h.client = mine
+
+	status, body, _ = h.post("/settings/password", url.Values{"csrf_token": {tok}, "current_password": {"woof"}, "new_password": {"shell-polish-1"}, "confirm_password": {"shell-polish-1"}})
+	if status != http.StatusUnprocessableEntity || !strings.Contains(body, "isn&#39;t your current password") {
+		t.Fatalf("wrong current password: %d", status)
+	}
+	status, _, _ = h.post("/settings/password", url.Values{"csrf_token": {tok}, "current_password": {"meow-meow-meow"}, "new_password": {"shell-polish-1"}, "confirm_password": {"shell-polish-1"}})
+	if status != http.StatusSeeOther {
+		t.Fatalf("change password: %d", status)
+	}
+	if status, _, _ := h.get("/settings"); status != http.StatusOK {
+		t.Fatalf("this session after change: %d", status)
+	}
+	h.client = other
+	if status, _, _ := h.get("/settings"); status != http.StatusSeeOther {
+		t.Fatalf("other session after change: %d", status)
+	}
+	if status, _ := h.login("gary@krabber.test", "meow-meow-meow"); status == http.StatusSeeOther {
+		t.Fatal("old password still works")
+	}
+	if status, _ := h.login("gary@krabber.test", "shell-polish-1"); status != http.StatusSeeOther {
+		t.Fatalf("new password: %d", status)
+	}
+}
+
 func currentID(t *testing.T, h *harness, name string) string {
 	t.Helper()
 	c, err := h.store.CrabByUsername(context.Background(), name)
