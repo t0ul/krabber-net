@@ -18,12 +18,12 @@
     </a>
     {{ if .IsAuthenticated }}
     <a href="/notifications" class="btn rounded-pill mx-auto mx-lg-0 mt-2 nav-link-btn kb-nav-notifications"{{ if eq $p "/notifications" }} id="nav-active" aria-current="page"{{ end }}>
-        <svg class="btn-icon" width="28" height="28"><use href="/static/img/sprites.svg?version=1704178675#{{ if eq $p "/notifications" }}bell-f{{ else }}bell{{ end }}"></use></svg>
+        <svg class="btn-icon" width="28" height="28"><use href="{{ asset "img/sprites.svg" }}#horn"></use></svg>
         {{ template "notification-badge" .Unread }}
         <strong class="d-none d-lg-inline-block ml-2">Notifications</strong>
     </a>
     <a href="/bookmarks" class="btn rounded-pill mx-auto mx-lg-0 mt-2 nav-link-btn"{{ if eq $p "/bookmarks" }} id="nav-active" aria-current="page"{{ end }}>
-        <svg class="btn-icon" width="28" height="28"><use href="{{ asset "img/sprites.svg" }}#{{ if eq $p "/bookmarks" }}bookmark-f{{ else }}bookmark{{ end }}"></use></svg>
+        <svg class="btn-icon" width="28" height="28"><use href="{{ asset "img/sprites.svg" }}#anchor"></use></svg>
         <strong class="d-none d-lg-inline-block ml-2">Bookmarks</strong>
     </a>
     {{ $me := printf "/crabs/%s" .CrabName }}

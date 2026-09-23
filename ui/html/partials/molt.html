@@ -154,7 +154,7 @@
 <form hx-post="/molt/bookmark/{{ $m.ID }}" hx-swap="outerHTML">
     <input type='hidden' name='csrf_token' value='{{ .D.CSRFToken }}'>
     <button type="submit" class="kb-menu-item">
-        <svg width="19" height="19"><use href="{{ asset "img/sprites.svg" }}#{{ if $m.Bookmarked }}bookmark-remove{{ else }}bookmark{{ end }}"></use></svg>
+        <svg width="19" height="19"><use href="{{ asset "img/sprites.svg" }}#anchor"></use></svg>
         {{ if $m.Bookmarked }}Remove Molt from Bookmarks{{ else }}Add Molt to Bookmarks{{ end }}
     </button>
 </form>
