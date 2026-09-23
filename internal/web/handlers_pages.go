@@ -48,11 +48,6 @@ func (app *App) trench(w http.ResponseWriter, r *http.Request) {
 	app.renderFeed(w, r, "trench.html", molts, err, "Your trench is empty. Molt something, or follow some crabs.")
 }
 
-func (app *App) moltinTime(w http.ResponseWriter, r *http.Request) {
-	molts, err := app.store.MoltsByOwner(r.Context(), currentCrab(r).ID, pageSize)
-	app.renderFeed(w, r, "moltinTime.html", molts, err, "You haven't molted anything yet.")
-}
-
 // notifications lists the crab's notifications and clears the unread badge.
 func (app *App) notifications(w http.ResponseWriter, r *http.Request) {
 	c := currentCrab(r)

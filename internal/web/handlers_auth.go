@@ -318,7 +318,7 @@ func (app *App) loginPost(w http.ResponseWriter, r *http.Request) {
 	app.sessions.Put(ctx, sessionCrabPK, crab.PK)
 	app.sessions.Put(ctx, sessionCrabSK, crab.SK)
 	app.sessions.Put(ctx, sessionAuthAt, time.Now().Unix())
-	http.Redirect(w, r, "/moltinTime", http.StatusSeeOther)
+	http.Redirect(w, r, "/trench", http.StatusSeeOther)
 }
 
 func (app *App) logoutPost(w http.ResponseWriter, r *http.Request) {

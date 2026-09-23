@@ -153,9 +153,13 @@ func (h *harness) newClient() *http.Client {
 
 var csrfRX = regexp.MustCompile(`name='csrf_token' value='([^']+)'`)
 
-func (h *harness) get(path string) (int, string, http.Header) {
+func (h *harness) get(path string, headers ...string) (int, string, http.Header) {
 	h.t.Helper()
-	res, err := h.client.Get(h.srv.URL + path)
+	req, _ := http.NewRequest(http.MethodGet, h.srv.URL+path, nil)
+	for i := 0; i+1 < len(headers); i += 2 {
+		req.Header.Set(headers[i], headers[i+1])
+	}
+	res, err := h.client.Do(req)
 	if err != nil {
 		h.t.Fatal(err)
 	}
@@ -258,13 +262,13 @@ func TestSignupActivateLoginMoltLogout(t *testing.T) {
 		}
 	}
 
-	tok := h.csrf("/moltinTime")
+	tok := h.csrf("/trench")
 	status, body, _ := h.post("/molt/create", url.Values{"csrf_token": {tok}, "content": {"I'm ready!"}}, "HX-Request", "true")
 	if status != http.StatusOK || !strings.Contains(body, "I&#39;m ready!") {
 		t.Fatalf("create molt: %d %s", status, body)
 	}
-	if status, body, _ := h.get("/moltinTime"); status != http.StatusOK || !strings.Contains(body, "I&#39;m ready!") {
-		t.Fatalf("moltinTime: %d", status)
+	if status, body, _ := h.get("/trench"); status != http.StatusOK || !strings.Contains(body, "I&#39;m ready!") {
+		t.Fatalf("trench: %d", status)
 	}
 
 	// No CSRF token: rejected with 400 (never 403).
@@ -1487,5 +1491,53 @@ func TestEditable(t *testing.T) {
 	gone := store.Molt{CreatedAt: time.Now(), Deleted: true}
 	if !editable(fresh) || !editable(&fresh) || editable(old) || editable(gone) || editable((*store.Molt)(nil)) {
 		t.Error("editable is wrong about the edit window")
+	}
+}
+
+func TestComposeModals(t *testing.T) {
+	h := newHarness(t)
+	h.signupAndActivate("karen", "karen@krabber.test", "computer-wife!")
+	tok := h.csrf("/crab/login")
+	if status, _, hdr := h.post("/crab/login", url.Values{"csrf_token": {tok}, "email": {"karen@krabber.test"}, "password": {"computer-wife!"}}); status != http.StatusSeeOther || hdr.Get("Location") != "/trench" {
+		t.Fatalf("login lands on %d %s, want the Trench", status, hdr.Get("Location"))
+	}
+	if status, _, _ := h.get("/moltinTime"); status != http.StatusNotFound {
+		t.Errorf("/moltinTime: %d", status)
+	}
+	_, body, _ := h.get("/sea")
+	if !strings.Contains(body, `data-open-modal="compose-modal"`) || !strings.Contains(body, `<dialog class="kb-modal" id="compose-modal"`) ||
+		!strings.Contains(body, `id="molt-modal-content"`) || !strings.Contains(body, `class="mini-character-counter`) {
+		t.Error("the page is missing the compose modal, the molt modal, or the counter")
+	}
+
+	// Line breaks arrive as CRLF but count once, as in the counter.
+	tok = h.csrf("/trench")
+	text := strings.Repeat("ab\r\n", 70)
+	if status, _, _ := h.post("/molt/create", url.Values{"csrf_token": {tok}, "content": {text}}); status != http.StatusSeeOther {
+		t.Fatalf("a 280-character molt with line breaks: %d", status)
+	}
+	molts, _ := h.store.MoltsByOwner(context.Background(), currentID(t, h, "karen"), 1)
+	id := molts[0].ID
+	if molts[0].Content != strings.Repeat("ab\n", 70) {
+		t.Errorf("stored %q", molts[0].Content)
+	}
+
+	for _, kind := range []string{"quote", "edit"} {
+		path := "/molt/" + kind + "/" + id
+		status, body, _ := h.get(path, "HX-Request", "true")
+		if status != http.StatusOK || strings.Contains(body, "<html") || !strings.Contains(body, "data-close-modal") || !strings.Contains(body, `hx-post="`+path+`"`) {
+			t.Errorf("%s modal: %d %s", kind, status, body)
+		}
+		status, body, _ = h.post(path, url.Values{"csrf_token": {tok}, "content": {"  "}}, "HX-Request", "true")
+		if status != http.StatusUnprocessableEntity || strings.Contains(body, "<html") || strings.Contains(body, "data-close-modal") || !strings.HasPrefix(strings.TrimSpace(body), "<form") {
+			t.Errorf("rejected %s: %d %s", kind, status, body)
+		}
+		if status, body, _ := h.get(path); status != http.StatusOK || !strings.Contains(body, "<html") {
+			t.Errorf("%s page: %d", kind, status)
+		}
+	}
+	status, _, hdr := h.post("/molt/edit/"+id, url.Values{"csrf_token": {tok}, "content": {"Fixed it"}}, "HX-Request", "true")
+	if status != http.StatusNoContent || hdr.Get("HX-Redirect") != "/molt/view/"+id {
+		t.Errorf("save from the modal: %d %v", status, hdr)
 	}
 }

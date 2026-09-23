@@ -37,7 +37,6 @@ func (app *App) Routes() http.Handler {
 
 	// Signed-in pages and actions.
 	mux.HandleFunc("GET /trench", app.requireAuthentication(app.trench))
-	mux.HandleFunc("GET /moltinTime", app.requireAuthentication(app.moltinTime))
 	mux.HandleFunc("GET /notifications", app.requireAuthentication(app.notifications))
 	mux.HandleFunc("GET /notifications/badge", app.requireAuthentication(app.notificationBadge))
 	mux.HandleFunc("GET /bookmarks", app.requireAuthentication(app.bookmarksPage))

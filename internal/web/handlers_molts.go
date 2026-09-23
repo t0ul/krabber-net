@@ -19,15 +19,27 @@ type moltForm struct {
 	validator.Validator `form:"-"`
 }
 
+// decodeMoltForm reads molt text from a posted form. Browsers send textarea
+// line breaks as CRLF; the text keeps LF so its length matches the compose
+// counter's.
+func (app *App) decodeMoltForm(w http.ResponseWriter, r *http.Request) (moltForm, bool) {
+	var f moltForm
+	if err := app.decodePostForm(w, r, &f); err != nil {
+		app.clientError(w, http.StatusBadRequest)
+		return f, false
+	}
+	f.Content = strings.ReplaceAll(f.Content, "\r\n", "\n")
+	return f, true
+}
+
 // maxAncestors is how many parents the thread page shows above a reply.
 const maxAncestors = 5
 
 // moltCreatePost stores a molt and queues its fan-out. htmx callers get the
 // rendered molt to put at the top of the list; others are redirected.
 func (app *App) moltCreatePost(w http.ResponseWriter, r *http.Request) {
-	var f moltForm
-	if err := app.decodePostForm(w, r, &f); err != nil {
-		app.clientError(w, http.StatusBadRequest)
+	f, ok := app.decodeMoltForm(w, r)
+	if !ok {
 		return
 	}
 	if !validator.NotBlank(f.Content) || !validator.MaxChars(f.Content, store.MaxMoltLength) {
@@ -94,7 +106,7 @@ func moltReturnPath(r *http.Request) string {
 		return "/trench"
 	}
 	switch ref.Path {
-	case "/trench", "/sea", "/moltinTime":
+	case "/trench", "/sea":
 		return ref.Path
 	}
 	if strings.HasPrefix(ref.Path, "/crabs/") {
@@ -363,9 +375,8 @@ func (app *App) moltLikesView(w http.ResponseWriter, r *http.Request) {
 // reply to append to the thread, plus the parent's refreshed action bar so
 // its reply count updates.
 func (app *App) replyCreatePost(w http.ResponseWriter, r *http.Request) {
-	var f moltForm
-	if err := app.decodePostForm(w, r, &f); err != nil {
-		app.clientError(w, http.StatusBadRequest)
+	f, ok := app.decodeMoltForm(w, r)
+	if !ok {
 		return
 	}
 	if !validator.NotBlank(f.Content) || !validator.MaxChars(f.Content, store.MaxMoltLength) {

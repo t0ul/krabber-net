@@ -363,3 +363,35 @@
   color: var(--light, #f8f9fa);
   border-bottom-color: var(--primary);
 }
+
+/* Modals are native <dialog>s dressed as Crabber's Bootstrap modals. */
+.kb-modal {
+  width: calc(100% - 1rem);
+  max-width: 600px;
+  margin: 1.75rem auto auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  overflow: visible;
+}
+
+.kb-modal::backdrop {
+  background: linear-gradient(#cfe6ff21, #cfe6ff21), rgba(0, 0, 0, 0.5);
+}
+
+.kb-modal .close {
+  margin: -1rem auto -1rem -1rem;
+  opacity: 1;
+}
+
+.kb-modal .close span {
+  text-shadow: none;
+}
+
+.kb-modal textarea {
+  background: none;
+  color: inherit;
+  border: none;
+  resize: none;
+}

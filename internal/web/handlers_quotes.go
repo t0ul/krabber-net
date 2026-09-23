@@ -23,14 +23,27 @@ func (app *App) renderQuote(w http.ResponseWriter, r *http.Request, status int, 
 	data := app.newTemplateData(r)
 	data.Molt = quoted[0]
 	data.Form = f
-	app.render(w, r, status, "quote.html", data)
+	app.renderCompose(w, r, status, "quote", data)
+}
+
+// renderCompose shows the quote or edit form (kind): as its page, or for
+// htmx as the modal's content (opening it) or the re-filled form (after a
+// rejected post).
+func (app *App) renderCompose(w http.ResponseWriter, r *http.Request, status int, kind string, data templateData) {
+	switch {
+	case !isHTMX(r):
+		app.render(w, r, status, kind+".html", data)
+	case r.Method == http.MethodGet:
+		app.renderTemplate(w, r, status, fragmentPage, kind+"-modal", data)
+	default:
+		app.renderTemplate(w, r, status, fragmentPage, kind+"-form", data)
+	}
 }
 
 // quoteCreatePost stores a quote of the molt in the URL and opens its thread.
 func (app *App) quoteCreatePost(w http.ResponseWriter, r *http.Request) {
-	var f moltForm
-	if err := app.decodePostForm(w, r, &f); err != nil {
-		app.clientError(w, http.StatusBadRequest)
+	f, ok := app.decodeMoltForm(w, r)
+	if !ok {
 		return
 	}
 	f.CheckField(validator.NotBlank(f.Content), "content", "Say something about it.")

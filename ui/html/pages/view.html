@@ -48,8 +48,11 @@
     {{ if $d.IsAuthenticated }}
     <form class="px-3 py-2 border-bottom border-dark" hx-post="/molt/reply/{{ .ID }}" hx-target="#reply-list" hx-swap="beforeend" hx-disabled-elt="find button" data-reset-on-success>
         <input type='hidden' name='csrf_token' value='{{ $d.CSRFToken }}'>
-        <textarea class="form-control mb-2" name="content" rows="2" maxlength="280" placeholder="Molt your reply" aria-label="Reply to @{{ .Author }}" required></textarea>
-        <button type="submit" class="btn btn-sm btn-primary rounded-pill">Reply</button>
+        <textarea class="form-control mb-2" name="content" rows="2" placeholder="Molt your reply" aria-label="Reply to @{{ .Author }}" required></textarea>
+        <div class="d-flex flex-row justify-content-end">
+            {{ template "counter" }}
+            <button type="submit" class="btn btn-sm btn-primary rounded-pill">Reply</button>
+        </div>
     </form>
     {{ else }}
     <p class="px-3 py-2 text-muted"><a href="/crab/login">Log in</a> to reply.</p>

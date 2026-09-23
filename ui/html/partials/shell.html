@@ -16,6 +16,7 @@
     {{ template "search" . }}
 </div>
 </div>
+{{ if .IsAuthenticated }}{{ template "modals" . }}{{ end }}
 </body>
 </html>
 {{end}}

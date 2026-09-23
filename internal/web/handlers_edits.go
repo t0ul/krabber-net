@@ -24,14 +24,13 @@ func (app *App) renderEdit(w http.ResponseWriter, r *http.Request, status int, m
 	data := app.newTemplateData(r)
 	data.Molt = *m
 	data.Form = f
-	app.render(w, r, status, "edit.html", data)
+	app.renderCompose(w, r, status, "edit", data)
 }
 
 // editPost saves the new text and opens the molt's thread.
 func (app *App) editPost(w http.ResponseWriter, r *http.Request) {
-	var f moltForm
-	if err := app.decodePostForm(w, r, &f); err != nil {
-		app.clientError(w, http.StatusBadRequest)
+	f, ok := app.decodeMoltForm(w, r)
+	if !ok {
 		return
 	}
 	m, ok := app.ownMolt(w, r)

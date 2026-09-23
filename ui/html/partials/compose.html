@@ -1,0 +1,119 @@
+{{/*
+  Compose forms. The sidebar's Molt button opens the compose modal; a molt's
+  Quote and Edit load their forms into the molt modal over htmx. Each also
+  works as a plain page without JavaScript. The counter stays hidden until
+  app.js runs it.
+*/}}
+
+{{define "counter"}}<span class="mini-character-counter text-muted my-auto mr-3 d-none">280</span>{{end}}
+
+{{define "compose"}}
+<div class="mini-compose-box border-bottom border-dark px-3 py-2 d-flex flex-row focused">
+    <div class="mini-molt-profile-box">
+        <a href="/crabs/{{ .CrabName }}">{{ template "avatar" .CrabName }}</a>
+    </div>
+    <div class="mini-molt-text-box w-100 h-100 px-2">
+        <form hx-post="/molt/create" hx-target="#molt-list" hx-swap="afterbegin" hx-disabled-elt="find button" data-reset-on-success>
+            <input type='hidden' name='csrf_token' value='{{ .CSRFToken }}'>
+            <div class="mini-compose-textarea">
+                <textarea name="content" rows="3" class="my-2 w-100" placeholder="How are you feeling?" aria-label="Molt text" required></textarea>
+            </div>
+            <div class="mini-molt-actions d-flex flex-row justify-content-end w-100 compose-button-row">
+                {{ template "counter" }}
+                <button type="submit" class="btn btn-primary rounded-pill"><strong>Molt</strong></button>
+            </div>
+        </form>
+    </div>
+</div>
+{{end}}
+
+{{define "modals"}}
+<dialog class="kb-modal" id="compose-modal" aria-label="Compose a Molt">
+    <div class="modal-content bg-dark">
+        <div class="modal-header py-2 border-dark">
+            {{ template "modal-close" }}
+        </div>
+        <div class="modal-body row">
+            <div class="mini-molt-profile-box col-lg-1 mr-2">
+                <a href="/crabs/{{ .CrabName }}">{{ template "avatar" .CrabName }}</a>
+            </div>
+            <div class="mini-molt-text-box w-100 h-100 px-2 col">
+                <form method="POST" action="/molt/create">
+                    <input type='hidden' name='csrf_token' value='{{ .CSRFToken }}'>
+                    <div class="mini-compose-textarea">
+                        <textarea name="content" rows="5" class="my-2 w-100" placeholder="How are you feeling?" aria-label="Molt text" required></textarea>
+                    </div>
+                    <div class="mini-molt-actions d-flex flex-row justify-content-end w-100 compose-button-row">
+                        {{ template "counter" }}
+                        <button type="submit" class="btn btn-primary rounded-pill"><strong>Molt</strong></button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</dialog>
+<dialog class="kb-modal" id="molt-modal" aria-label="Molt">
+    <div class="modal-content bg-dark" id="molt-modal-content"></div>
+</dialog>
+{{end}}
+
+{{define "modal-close"}}<button type="button" class="close text-primary" data-close-modal aria-label="Close"><span aria-hidden="true">&times;</span></button>{{end}}
+
+{{/* The quote and edit forms swap themselves for the re-filled form when a post is rejected. */}}
+
+{{define "quote-form"}}
+<form method="POST" action="/molt/quote/{{ .Molt.ID }}" hx-post="/molt/quote/{{ .Molt.ID }}" hx-target="this" hx-swap="outerHTML" hx-disabled-elt="find button" data-swap-errors>
+    <input type='hidden' name='csrf_token' value='{{ .CSRFToken }}'>
+    <div class="mini-compose-reply-textarea">
+        <textarea name="content" rows="5" class="my-2 w-100" placeholder="Remember to be kind" aria-label="Your quote" required autofocus>{{ with .Form }}{{ .Content }}{{ end }}</textarea>
+        {{ with .Form }}{{ with .FieldErrors.content }}<div class="text-primary small mb-2">{{ . }}</div>{{ end }}{{ end }}
+    </div>
+    {{ template "quoted-molt" .Molt }}
+    <div class="mini-molt-actions d-flex flex-row justify-content-end w-100 compose-button-row">
+        {{ template "counter" }}
+        <button type="submit" class="btn btn-primary rounded-pill"><strong>Quote</strong></button>
+    </div>
+</form>
+{{end}}
+
+{{define "quote-title"}}Quoting <a class="text-light" href="/crabs/{{ .Author }}">{{ or .AuthorName .Author }}</a>{{end}}
+
+{{define "quote-modal"}}
+<div class="modal-header py-2 border-dark">
+    {{ template "modal-close" }}
+    <strong>{{ template "quote-title" .Molt }}</strong>
+</div>
+<div class="modal-body row">
+    <div class="mini-molt-profile-box col-lg-1 mr-2">
+        <a href="/crabs/{{ .CrabName }}">{{ template "avatar" .CrabName }}</a>
+    </div>
+    <div class="mini-molt-text-box w-100 h-100 px-2 col">{{ template "quote-form" . }}</div>
+</div>
+{{end}}
+
+{{define "edit-form"}}
+<form method="POST" action="/molt/edit/{{ .Molt.ID }}" hx-post="/molt/edit/{{ .Molt.ID }}" hx-target="this" hx-swap="outerHTML" hx-disabled-elt="find button" data-swap-errors>
+    <input type='hidden' name='csrf_token' value='{{ .CSRFToken }}'>
+    <div class="mini-compose-reply-textarea">
+        <textarea name="content" rows="5" class="my-2 w-100" placeholder="Remember to be kind" aria-label="Molt text" required autofocus>{{ with .Form }}{{ .Content }}{{ end }}</textarea>
+        {{ with .Form }}{{ with .FieldErrors.content }}<div class="text-primary small mb-2">{{ . }}</div>{{ end }}{{ end }}
+    </div>
+    <div class="mini-molt-actions d-flex flex-row justify-content-end w-100 compose-button-row">
+        {{ template "counter" }}
+        <button type="submit" class="btn btn-primary rounded-pill"><strong>Save</strong></button>
+    </div>
+</form>
+{{end}}
+
+{{define "edit-modal"}}
+<div class="modal-header py-2 border-dark">
+    {{ template "modal-close" }}
+    <strong>Editing your own Molt</strong>
+</div>
+<div class="modal-body row">
+    <div class="mini-molt-profile-box col-lg-1 mr-2">
+        <a href="/crabs/{{ .CrabName }}">{{ template "avatar" .CrabName }}</a>
+    </div>
+    <div class="mini-molt-text-box w-100 h-100 px-2 col">{{ template "edit-form" . }}</div>
+</div>
+{{end}}

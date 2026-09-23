@@ -7,25 +7,6 @@
 
 {{define "avatar"}}<img class="kb-avatar profile-picture" src="/static/img/crab_illustration.jpg" width="43" height="43" loading="lazy" alt="@{{ . }}">{{end}}
 
-{{define "compose"}}
-<div class="mini-compose-box border-bottom border-dark px-3 py-2 d-flex flex-row focused">
-    <div class="mini-molt-profile-box">
-        <a href="/crabs/{{ .CrabName }}">{{ template "avatar" .CrabName }}</a>
-    </div>
-    <div class="mini-molt-text-box w-100 h-100 px-2">
-        <form hx-post="/molt/create" hx-target="#molt-list" hx-swap="afterbegin" hx-disabled-elt="find button" data-reset-on-success>
-            <input type='hidden' name='csrf_token' value='{{ .CSRFToken }}'>
-            <div class="mini-compose-textarea">
-                <textarea name="content" rows="3" maxlength="280" class="my-2 w-100" placeholder="How are you feeling?" required></textarea>
-            </div>
-            <div class="mini-molt-actions d-flex flex-row justify-content-end w-100 compose-button-row">
-                <button type="submit" class="btn btn-primary rounded-pill"><strong>Molt</strong></button>
-            </div>
-        </form>
-    </div>
-</div>
-{{end}}
-
 {{define "molt"}}{{ $m := .M }}
 <div class="regular-molt mini-molt border-dark py-2 d-flex flex-row absolute-container border-bottom px-3" id="{{ $m.DOMID }}" data-molt-id="{{ $m.ID }}">
     <div class="mini-molt-profile-box{{ if .Pinned }} mt-4{{ end }}">
@@ -163,7 +144,7 @@
 {{define "molt-actions"}}{{ $m := .M }}{{ $d := .D }}
 <div class="mini-molt-actions d-flex flex-row justify-content-between mr-md-5">
     {{ if and $d.IsAuthenticated (eq $m.AuthorID $d.CrabID) (editable $m) }}
-    <a class="mini-molt-action edit rounded-circle zindex-front" href="/molt/edit/{{ $m.ID }}" title="Edit">
+    <a class="mini-molt-action edit rounded-circle zindex-front" href="/molt/edit/{{ $m.ID }}" hx-get="/molt/edit/{{ $m.ID }}" hx-target="#molt-modal-content" title="Edit">
         <svg class="mini-molt-action-icon" width="19" height="19"><use href="/static/img/sprites.svg?version=1704178675#pencil"></use></svg>
     </a>
     {{ end }}
@@ -195,7 +176,7 @@
                 </button>
             </form>
             {{ end }}
-            <a class="kb-menu-item" href="/molt/quote/{{ $m.ID }}">
+            <a class="kb-menu-item" href="/molt/quote/{{ $m.ID }}" hx-get="/molt/quote/{{ $m.ID }}" hx-target="#molt-modal-content">
                 <svg width="19" height="19"><use href="/static/img/sprites.svg?version=1704178675#pencil"></use></svg>
                 Quote Molt
             </a>
