@@ -266,13 +266,13 @@ func (app *App) crabFromName(w http.ResponseWriter, r *http.Request) (*store.Cra
 func (app *App) checkCrab(w http.ResponseWriter, r *http.Request, c *store.Crab, err error) (*store.Crab, bool) {
 	switch {
 	case errors.Is(err, store.ErrNotFound):
-		app.notFound(w)
+		app.notFound(w, r)
 		return nil, false
 	case err != nil:
 		app.serverError(w, r, err)
 		return nil, false
 	case !c.CanSignIn():
-		app.notFound(w)
+		app.notFound(w, r)
 		return nil, false
 	}
 	return c, true
@@ -281,6 +281,44 @@ func (app *App) checkCrab(w http.ResponseWriter, r *http.Request, c *store.Crab,
 func (app *App) healthz(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	_, _ = w.Write([]byte("ok\n"))
+}
+
+func (app *App) termsPage(w http.ResponseWriter, r *http.Request) {
+	data := app.newTemplateData(r)
+	data.ContactEmail = app.cfg.ContactEmail
+	app.render(w, r, http.StatusOK, "terms.html", data)
+}
+
+func (app *App) privacyPage(w http.ResponseWriter, r *http.Request) {
+	data := app.newTemplateData(r)
+	data.ContactEmail = app.cfg.ContactEmail
+	app.render(w, r, http.StatusOK, "privacy.html", data)
+}
+
+// robotsTxt keeps crawlers to public profiles and molts; pages behind sign-in
+// would only redirect them to the login form.
+const robotsTxt = `User-agent: *
+Disallow: /crab/
+Disallow: /crabmin
+Disallow: /settings
+Disallow: /notifications
+Disallow: /trench
+Disallow: /search
+Disallow: /molt/report/
+Disallow: /molt/likes/
+`
+
+func robots(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Cache-Control", "public, max-age=86400")
+	_, _ = w.Write([]byte(robotsTxt))
+}
+
+// favicon answers browsers that ask for /favicon.ico without reading the
+// page's <link rel="icon">.
+func favicon(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "public, max-age=86400")
+	http.Redirect(w, r, asset("img/favicon.svg"), http.StatusMovedPermanently)
 }
 
 // staticFiles serves embedded assets. CloudFront caches them for a day and the

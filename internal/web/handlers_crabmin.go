@@ -63,7 +63,7 @@ func (app *App) renderModLog(w http.ResponseWriter, r *http.Request, page string
 func (app *App) crabminCrab(w http.ResponseWriter, r *http.Request) {
 	c, err := app.store.CrabByUsername(r.Context(), r.PathValue("name"))
 	if errors.Is(err, store.ErrNotFound) {
-		app.notFound(w)
+		app.notFound(w, r)
 		return
 	} else if err != nil {
 		app.serverError(w, r, err)
@@ -84,7 +84,7 @@ func (app *App) crabminCrab(w http.ResponseWriter, r *http.Request) {
 func (app *App) crabminMolt(w http.ResponseWriter, r *http.Request) {
 	m, err := app.store.MoltForModeration(r.Context(), r.PathValue("id"))
 	if errors.Is(err, store.ErrNotFound) {
-		app.notFound(w)
+		app.notFound(w, r)
 		return
 	} else if err != nil {
 		app.serverError(w, r, err)
@@ -132,7 +132,7 @@ func (app *App) crabminCrabPost(w http.ResponseWriter, r *http.Request) {
 	}
 	target, err := app.store.CrabByID(r.Context(), r.PathValue("id"))
 	if errors.Is(err, store.ErrNotFound) {
-		app.notFound(w)
+		app.notFound(w, r)
 		return
 	} else if err != nil {
 		app.serverError(w, r, err)
@@ -254,7 +254,7 @@ func (app *App) crabminMoltPost(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/crabmin/reports", http.StatusSeeOther)
 		return
 	case errors.Is(err, store.ErrNotFound):
-		app.notFound(w)
+		app.notFound(w, r)
 		return
 	case err != nil:
 		app.serverError(w, r, err)

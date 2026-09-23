@@ -17,7 +17,8 @@ import (
 const MaxMoltLength = 280
 
 // Molt is a post. A remolt is a separate molt owned by the remolting crab that
-// copies the original's author and content.
+// points at the original and names its author; it doesn't copy the text, so
+// deleting the original erases it everywhere.
 type Molt struct {
 	PK     string `dynamodbav:"PK"`
 	SK     string `dynamodbav:"SK"`
@@ -106,7 +107,7 @@ func (s *Store) Remolt(ctx context.Context, by *Crab, original *Molt) (*Molt, er
 	if original.Remolt || original.Deleted || original.Removed {
 		return nil, ErrNotAllowed
 	}
-	m := s.newMolt(by, original.AuthorID, original.Author, original.Content)
+	m := s.newMolt(by, original.AuthorID, original.Author, "")
 	m.Remolt = true
 	m.RemoltOf = original.ID
 	m.RemoltOfPK, m.RemoltOfSK = original.PK, original.SK
@@ -140,9 +141,10 @@ func (s *Store) Remolt(ctx context.Context, by *Crab, original *Molt) (*Molt, er
 	return m, nil
 }
 
-// DeleteMolt soft-deletes a molt or remolt owned by crab c. It leaves the
-// feeds that point at it: every read skips deleted items, and trench entries
-// expire on their own. Deleting a remolt frees the crab to remolt it again.
+// DeleteMolt soft-deletes a molt or remolt owned by crab c and erases its
+// text. It leaves the feeds that point at it: every read skips deleted items,
+// and trench entries expire on their own. Deleting a remolt frees the crab to
+// remolt it again.
 func (s *Store) DeleteMolt(ctx context.Context, c *Crab, m *Molt) error {
 	if m.OwnerID != c.ID {
 		return ErrNotAllowed
@@ -151,7 +153,7 @@ func (s *Store) DeleteMolt(ctx context.Context, c *Crab, m *Molt) error {
 		{Update: &types.Update{
 			TableName:           s.tableName(),
 			Key:                 keyOf(m.PK, m.SK),
-			UpdateExpression:    aws.String("SET deleted = :t REMOVE GSI3PK, GSI3SK, GSI5PK, GSI5SK, GSI8PK, GSI8SK"),
+			UpdateExpression:    aws.String("SET deleted = :t REMOVE content, GSI3PK, GSI3SK, GSI5PK, GSI5SK, GSI8PK, GSI8SK"),
 			ConditionExpression: aws.String("attribute_exists(PK) AND deleted = :f AND owner_id = :me"),
 			ExpressionAttributeValues: map[string]types.AttributeValue{
 				":t": boolean(true), ":f": boolean(false), ":me": str(c.ID),

@@ -5,7 +5,7 @@ import "net/http"
 // Routes returns the full handler. Order, outermost first:
 //
 //	recoverPanic → originVerify → withClientIP → logRequests → securityHeaders
-//	  /static/*, /healthz: served directly (no session)
+//	  /static/*, /healthz, /robots.txt, /favicon.ico: served directly (no session)
 //	  everything else: sessions → crossOriginProtection → csrf → authenticate → mux
 func (app *App) Routes() http.Handler {
 	mux := http.NewServeMux()
@@ -15,6 +15,9 @@ func (app *App) Routes() http.Handler {
 	mux.HandleFunc("GET /sea", app.sea)
 	mux.HandleFunc("GET /molt/view/{id}", app.moltView)
 	mux.HandleFunc("GET /molt/likes/view/{id}", app.moltLikesView)
+	mux.HandleFunc("GET /terms", app.termsPage)
+	mux.HandleFunc("GET /privacy", app.privacyPage)
+	mux.HandleFunc("/", app.notFound)
 
 	// Accounts.
 	mux.HandleFunc("GET /crab/signup", app.signupPage)
@@ -70,6 +73,8 @@ func (app *App) Routes() http.Handler {
 	root := http.NewServeMux()
 	root.Handle("GET /static/", staticFiles())
 	root.HandleFunc("GET /healthz", app.healthz)
+	root.HandleFunc("GET /robots.txt", robots)
+	root.HandleFunc("GET /favicon.ico", favicon)
 	root.Handle("/", dynamic)
 
 	return app.recoverPanic(app.originVerify(app.withClientIP(app.logRequests(app.securityHeaders(root)))))

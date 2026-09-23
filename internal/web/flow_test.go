@@ -673,6 +673,31 @@ func TestReporting(t *testing.T) {
 	}
 }
 
+func TestSitePages(t *testing.T) {
+	h := newHarness(t)
+	for _, path := range []string{"/no-such-page", "/molt/view/nope", "/crabs/nobody"} {
+		status, body, hdr := h.get(path)
+		if status != http.StatusNotFound || !strings.Contains(body, "sank to the bottom of the sea") || !strings.HasPrefix(hdr.Get("Content-Type"), "text/html") {
+			t.Errorf("%s: %d %q", path, status, hdr.Get("Content-Type"))
+		}
+	}
+	for path, want := range map[string]string{
+		"/terms":      "The rules",
+		"/privacy":    "What we store",
+		"/robots.txt": "Disallow: /crabmin",
+	} {
+		if status, body, _ := h.get(path); status != http.StatusOK || !strings.Contains(body, want) {
+			t.Errorf("%s: %d, missing %q", path, status, want)
+		}
+	}
+	if status, _, hdr := h.get("/favicon.ico"); status != http.StatusMovedPermanently || !strings.Contains(hdr.Get("Location"), "favicon.svg") {
+		t.Errorf("/favicon.ico: %d %q", status, hdr.Get("Location"))
+	}
+	if _, body, _ := h.get("/crab/signup"); !strings.Contains(body, `href="/terms"`) || !strings.Contains(body, `href="/privacy"`) {
+		t.Error("signup doesn't link the terms and privacy policy")
+	}
+}
+
 func TestBlocking(t *testing.T) {
 	h := newHarness(t)
 	ctx := context.Background()

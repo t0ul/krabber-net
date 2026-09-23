@@ -1,0 +1,51 @@
+{{define "title"}}Privacy policy{{end}}
+
+{{define "page"}}
+{{ template "shell-top" . }}
+    {{ template "heading" "Privacy policy" }}
+    <div class="px-3 py-3 kb-legal">
+        <p class="text-muted small">Last updated September 23, 2026</p>
+        <p>Krabber collects as little as it can to run a small social site. No ads, no analytics, no tracking, and we don't sell or share your data for marketing.</p>
+
+        <h2>What we store</h2>
+        <ul>
+            <li><strong>Your account:</strong> email address, username, and your password as a bcrypt hash (we never store or see the password itself).</li>
+            <li><strong>Your profile:</strong> the display name, bio, location and website you choose to add.</li>
+            <li><strong>What you do:</strong> molts, remolts, comments, likes, follows, blocks, reports, and the notifications you receive.</li>
+            <li><strong>Security data:</strong> your IP address, used to limit sign-in, sign-up and reset attempts. Those counters delete themselves when their time window ends, within a day at most. Our server logs record the IP address, page and time for errors and a small sample of other requests, and are kept for 14 days.</li>
+            <li><strong>One cookie</strong> that keeps you signed in. It's needed for the site to work, so there's no cookie banner.</li>
+        </ul>
+
+        <h2>What's public</h2>
+        <p>Your username, display name, bio, location, website, join date, molts, remolts, comments and likes, and who you follow and who follows you. Anyone can see these, even without an account, and search engines may index profiles and molts.</p>
+        <p>Your email address, password, blocks, reports and notifications are private. A crab you block may notice they can't see your profile. Reports are seen only by moderators, and the reported crab isn't told who reported them.</p>
+
+        <h2>Who else handles it</h2>
+        <ul>
+            <li><strong>Amazon Web Services</strong> hosts Krabber in the United States (Ohio) and sends our emails. Your data is stored there, encrypted at rest.</li>
+            <li><strong>Cloudflare Turnstile</strong> checks that sign-ups and password resets come from a person. Cloudflare sees information about your browser when it runs.</li>
+        </ul>
+        <p>We'll only share data beyond that if the law requires it.</p>
+
+        <h2>Emails</h2>
+        <p>We only email you about your account: activating it, resetting your password, and telling you if a moderator bans it. No newsletters.</p>
+
+        <h2>How long we keep it</h2>
+        <ul>
+            <li>Your account and posts stay until you delete them. Deleting a molt erases its text, including from anyone's remolts. Notifications are deleted after 90 days.</li>
+            <li>When you <a href="/settings">delete your account</a>, your email, password and profile are erased right away, and you're signed out everywhere. Your molts, likes, follows and notifications are erased within minutes. Comments you left on other crabs' molts are hidden from everyone right away; for now they remain in our database.</li>
+            <li>Your username stays reserved after deletion, so nobody can pretend to be you.</li>
+            <li>Backups are kept for 35 days, so deleted data disappears from them within that time.</li>
+        </ul>
+
+        <h2>Your choices</h2>
+        <p>You can edit your profile, delete any molt, and delete your account in Settings.{{ with .ContactEmail }} To get a copy of your data, or with any other privacy question, write to <a href="mailto:{{ . }}">{{ . }}</a>.{{ end }}</p>
+
+        <h2>Children</h2>
+        <p>Krabber isn't for children under 13. If we learn that an account belongs to one, we'll delete it.</p>
+
+        <h2>Changes</h2>
+        <p>If this policy changes, we'll update the date at the top and announce big changes on the site first.</p>
+    </div>
+{{ template "shell-bottom" . }}
+{{end}}

@@ -261,6 +261,9 @@ func TestDeleteMoltAndRemolt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if got, _ := s.MoltByKey(ctx, re.PK, re.SK); got.Content != "" {
+		t.Fatalf("remolt copied the text: %q", got.Content)
+	}
 
 	if err := s.DeleteMolt(ctx, fan, m); !errors.Is(err, ErrNotAllowed) {
 		t.Fatalf("deleting someone else's molt: got %v", err)
@@ -289,6 +292,10 @@ func TestDeleteMoltAndRemolt(t *testing.T) {
 	}
 	if _, err := s.MoltByID(ctx, m.ID); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("deleted molt by id: got %v", err)
+	}
+	var raw Molt
+	if err := s.getItem(ctx, m.PK, m.SK, &raw); err != nil || !raw.Deleted || raw.Content != "" {
+		t.Fatalf("deleted molt keeps its text: %+v, %v", raw, err)
 	}
 	if sea, _ := s.Sea(ctx, 25); len(sea) != 0 {
 		t.Fatalf("sea after delete: %+v", sea)

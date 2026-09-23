@@ -32,7 +32,7 @@ func (app *App) reportPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if m.AuthorID == currentCrab(r).ID {
-		app.notFound(w)
+		app.notFound(w, r)
 		return
 	}
 	app.renderReport(w, r, http.StatusOK, m, reportForm{})
@@ -52,7 +52,7 @@ func (app *App) reportPost(w http.ResponseWriter, r *http.Request) {
 	}
 	c := currentCrab(r)
 	if m.AuthorID == c.ID {
-		app.notFound(w)
+		app.notFound(w, r)
 		return
 	}
 	var f reportForm

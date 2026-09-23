@@ -98,7 +98,7 @@ func (app *App) requireAuthentication(next http.HandlerFunc) http.HandlerFunc {
 func (app *App) requireModerator(next http.HandlerFunc) http.HandlerFunc {
 	return app.requireAuthentication(func(w http.ResponseWriter, r *http.Request) {
 		if !currentCrab(r).IsModerator() {
-			app.notFound(w)
+			app.notFound(w, r)
 			return
 		}
 		next(w, r)

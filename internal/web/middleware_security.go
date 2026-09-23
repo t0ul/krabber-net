@@ -95,7 +95,7 @@ func (app *App) originVerify(next http.Handler) http.Handler {
 				return
 			}
 		}
-		app.notFound(w)
+		app.clientError(w, http.StatusNotFound)
 	})
 }
 

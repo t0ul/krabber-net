@@ -354,13 +354,13 @@ Found while porting (all fixed, most with a test):
 ### 6.5 Product and legal pages
 | Page / feature | Notes |
 |---|---|
-| Privacy policy (`/privacy`) | Reuse `privacy-policy-url-com-main-2`: what's collected (email, username, posts), SES for email, no ads or tracking |
-| Terms (`/terms`) | Acceptable use, termination for abuse |
+| Privacy policy (`/privacy`) ✅ | What's stored and what's public, the one session cookie, AWS (Ohio) and Turnstile, emails, retention, deletion. No ads or tracking. Deleting a molt erases its text, and remolts don't copy it. Update the page whenever what's stored changes. |
+| Terms (`/terms`) ✅ | Age 13+, content license, rules, moderation and bans, leaving, no guarantees. Linked from signup, login, the welcome page and the sidebar footer. |
 | Account deletion (`POST /settings/delete`) ✅ | Asks for the password again. Deletes the crab's email and profile immediately (a tombstone keeps the username reserved), deletes their molts, likes, follows and trench entries in the background worker, and invalidates sessions. Details in `docs/NOTES.md` section 3.11. |
 | Report a molt ✅ | Writes an `R#` item (GSI8 `Q#report`); `/crabmin/reports` lists open reports with remove, dismiss and ban-author actions. Details in `docs/NOTES.md` section 3.12. |
 | Admin | A `role` attribute on the crab (`admin` or `moderator`) checked by `requireModerator`, replacing the hard-coded `Crabmin` ID. The first admin is set with `cmd/crabctl`; admins appoint moderators in Crabmin. See `docs/NOTES.md` section 3.9. |
 | Maintenance page | `ui/static/maintenance.html`, shown by CloudFront's custom error response for **403**, which is what WAF returns when the maintenance switch is on (section 7.2). So the app itself **never returns 403**: CSRF rejections use 400 (set with `CrossOriginProtection`'s deny handler), missing auth redirects to login, and admin-only pages return 404. |
-| `robots.txt`, `favicon.ico`, 404/500 pages | Small, but their absence shows in logs and browsers |
+| `robots.txt`, `favicon.ico`, 404/500 pages ✅ | `robots.txt` keeps crawlers out of private and per-crab pages; `/favicon.ico` redirects to the SVG; unknown URLs and server errors render `error.html` with the right status. |
 
 ### 6.6 Housekeeping
 - Don't carry over `.idea/` or `.DS_Store`; add them to `.gitignore`.

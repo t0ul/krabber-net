@@ -53,6 +53,9 @@ type templateData struct {
 	CrabRows    []crabRow
 	ListTitle   string
 	ListBack    string
+
+	Error        errorPage // error.html
+	ContactEmail string    // terms and privacy pages
 }
 
 type crabRow struct {

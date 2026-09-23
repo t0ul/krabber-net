@@ -51,7 +51,7 @@ func (app *App) unblockPost(w http.ResponseWriter, r *http.Request) {
 func (app *App) setBlock(w http.ResponseWriter, r *http.Request, block bool) {
 	other, err := app.store.CrabByID(r.Context(), r.PathValue("id"))
 	if errors.Is(err, store.ErrNotFound) {
-		app.notFound(w)
+		app.notFound(w, r)
 		return
 	} else if err != nil {
 		app.serverError(w, r, err)

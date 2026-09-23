@@ -81,7 +81,7 @@ func (app *App) moltLikePost(w http.ResponseWriter, r *http.Request) {
 	}
 	liked, err := app.store.ToggleLike(r.Context(), currentCrab(r), m)
 	if errors.Is(err, store.ErrNotFound) {
-		app.notFound(w)
+		app.notFound(w, r)
 		return
 	} else if err != nil {
 		app.serverError(w, r, err)
@@ -135,7 +135,7 @@ func (app *App) notify(r *http.Request, recipientID, kind, moltID, text string) 
 func (app *App) moltDeletePost(w http.ResponseWriter, r *http.Request) {
 	m, err := app.store.MoltByID(r.Context(), r.PathValue("id"))
 	if errors.Is(err, store.ErrNotFound) {
-		app.notFound(w)
+		app.notFound(w, r)
 		return
 	} else if err != nil {
 		app.serverError(w, r, err)
@@ -144,7 +144,7 @@ func (app *App) moltDeletePost(w http.ResponseWriter, r *http.Request) {
 	err = app.store.DeleteMolt(r.Context(), currentCrab(r), m)
 	switch {
 	case errors.Is(err, store.ErrNotAllowed), errors.Is(err, store.ErrNotFound):
-		app.notFound(w)
+		app.notFound(w, r)
 		return
 	case err != nil:
 		app.serverError(w, r, err)
@@ -178,7 +178,7 @@ func (app *App) moltFromPath(w http.ResponseWriter, r *http.Request) (*store.Mol
 	}
 	switch {
 	case errors.Is(err, store.ErrNotFound):
-		app.notFound(w)
+		app.notFound(w, r)
 		return nil, false
 	case err != nil:
 		app.serverError(w, r, err)
@@ -211,7 +211,7 @@ func (app *App) renderActions(w http.ResponseWriter, r *http.Request, m *store.M
 func (app *App) moltView(w http.ResponseWriter, r *http.Request) {
 	m, err := app.store.MoltByID(r.Context(), r.PathValue("id"))
 	if errors.Is(err, store.ErrNotFound) {
-		app.notFound(w)
+		app.notFound(w, r)
 		return
 	} else if err != nil {
 		app.serverError(w, r, err)
@@ -223,7 +223,7 @@ func (app *App) moltView(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(molts) == 0 {
-		app.notFound(w)
+		app.notFound(w, r)
 		return
 	}
 	shown := molts[0]
