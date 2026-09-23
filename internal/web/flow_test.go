@@ -714,7 +714,7 @@ func TestReplyThread(t *testing.T) {
 	}
 	nested, _ := h.store.RepliesByOwner(ctx, karenID, 1)
 	_, body, _ = h.get("/molt/view/" + nested[0].ID)
-	for _, want := range []string{"Dinner is ready", "Is it chum again?", "Yes. Eat it.", "Replying to", `href="/molt/view/` + reply + `"`} {
+	for _, want := range []string{"Dinner is ready", "Is it chum again?", "Yes. Eat it.", "replying to", `href="/molt/view/` + reply + `"`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("nested reply's thread is missing %q", want)
 		}
@@ -755,7 +755,7 @@ func TestProfileTabs(t *testing.T) {
 		active      string
 	}{
 		"/crabs/plankton":         {[]string{mine, `name="content"`}, []string{reply, root}, `/crabs/plankton" aria-current="page"`},
-		"/crabs/plankton/replies": {[]string{reply, "Replying to"}, []string{mine, root, `hx-post="/molt/create"`}, `/crabs/plankton/replies" aria-current="page"`},
+		"/crabs/plankton/replies": {[]string{reply, "replying to"}, []string{mine, root, `hx-post="/molt/create"`}, `/crabs/plankton/replies" aria-current="page"`},
 		"/crabs/plankton/likes":   {[]string{root, "liked"}, []string{mine, reply}, `/crabs/plankton/likes" aria-current="page"`},
 		"/crabs/karen/replies":    {[]string{"hasn&#39;t replied to anyone yet"}, []string{reply}, `/crabs/karen/replies" aria-current="page"`},
 	} {
@@ -776,6 +776,56 @@ func TestProfileTabs(t *testing.T) {
 	}
 }
 
+// TestAuthorNames checks molts show the author's current display name, looked
+// up by ID, and that profiles say when the crab follows you.
+func TestAuthorNames(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	h.signupAndActivate("karen", "karen@krabber.test", "computer-wife!")
+	h.signupAndActivate("plankton", "plankton@krabber.test", "formula-thief!")
+	karenID := currentID(t, h, "karen")
+
+	h.login("karen@krabber.test", "computer-wife!")
+	tok := h.csrf("/trench")
+	_, body, _ := h.post("/molt/create", url.Values{"csrf_token": {tok}, "content": {"Dinner is ready"}}, "HX-Request", "true")
+	if !strings.Contains(body, `mini-molt-display-name zindex-front" href="/crabs/karen">karen<`) {
+		t.Errorf("new molt doesn't fall back to the username: %s", body)
+	}
+	molts, _ := h.store.MoltsByOwner(ctx, karenID, 1)
+	root := molts[0].ID
+	h.post("/settings/profile", url.Values{"csrf_token": {tok}, "display_name": {"Karen 2.0"}})
+	h.post("/crab/logout", url.Values{"csrf_token": {tok}})
+
+	h.login("plankton@krabber.test", "formula-thief!")
+	tok = h.csrf("/trench")
+	if _, body, _ := h.get("/crabs/karen"); strings.Contains(body, "Follows you") {
+		t.Error("karen doesn't follow plankton yet")
+	}
+	h.post("/follow/"+karenID, url.Values{"csrf_token": {tok}}, "HX-Request", "true")
+	h.post("/molt/reply/"+root, url.Values{"csrf_token": {tok}, "content": {"Is it chum?"}}, "HX-Request", "true")
+	h.post("/remolt/"+root, url.Values{"csrf_token": {tok}}, "HX-Request", "true")
+	h.post("/settings/profile", url.Values{"csrf_token": {tok}, "display_name": {"Sheldon"}})
+	_, body, _ = h.get("/crabs/plankton")
+	for _, want := range []string{">Karen 2.0</a>", "@karen", ">Sheldon</a> Remolted"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("profile is missing %q", want)
+		}
+	}
+	if _, body, _ := h.get("/crabs/plankton/replies"); !strings.Contains(body, "Karen 2.0</a></small>") {
+		t.Error("reply doesn't name who it's replying to")
+	}
+	h.post("/crab/logout", url.Values{"csrf_token": {tok}})
+
+	h.login("karen@krabber.test", "computer-wife!")
+	_, body, _ = h.get("/crabs/plankton")
+	if !strings.Contains(body, `<small class="follows-you">Follows you</small>`) {
+		t.Error("plankton follows karen but the badge is missing")
+	}
+	if _, body, _ := h.get("/crabs/plankton/replies"); !strings.Contains(body, ">you</a></small>") {
+		t.Error("a reply to you should say \"replying to you\"")
+	}
+}
+
 // TestNavLayout keeps the nav in Crabber's order: main pages, the Molt button,
 // then the muted extras.
 func TestNavLayout(t *testing.T) {
@@ -785,18 +835,23 @@ func TestNavLayout(t *testing.T) {
 	_, body, _ := h.get("/trench")
 	nav := body[strings.Index(body, `id="nav-panel"`):strings.Index(body, `id="add-panel"`)]
 	last := -1
-	for _, want := range []string{`href="/trench"`, `href="/sea"`, `href="/notifications"`, `href="/search"`, `href="/crabs/karen"`, `id="molt-btn"`, `href="/settings"`, `action="/crab/logout"`} {
+	for _, want := range []string{`href="/trench"`, `href="/sea"`, `href="/notifications"`, `href="/crabs/karen"`, `id="molt-btn"`, `href="/settings"`, `action="/crab/logout"`} {
 		i := strings.Index(nav, want)
 		if i <= last {
 			t.Fatalf("nav: %s is missing or out of order", want)
 		}
 		last = i
 	}
-	if strings.Contains(nav, `href="/crabs"`) || strings.Contains(nav, `href="/crabmin"`) {
-		t.Error("nav shows Crabs, or Crabmin to a crab who isn't a moderator")
+	if strings.Contains(nav, `href="/crabs"`) || strings.Contains(nav, `href="/crabmin"`) || strings.Contains(nav, `href="/search"`) {
+		t.Error("nav shows Crabs, Search, or Crabmin to a crab who isn't a moderator")
 	}
-	if side := body[strings.Index(body, `id="add-panel"`):]; strings.Contains(side, `name="q"`) {
-		t.Error("the sidebar still has a search box")
+	side := body[strings.Index(body, `id="add-panel"`):]
+	if !strings.Contains(side, `action="/search"`) || strings.Index(side, `name="q"`) > strings.Index(side, `id="trending"`) {
+		t.Error("the search box should sit at the top of the sidebar")
+	}
+	h.post("/crab/logout", url.Values{"csrf_token": {h.csrf("/trench")}})
+	if _, body, _ = h.get("/sea"); strings.Contains(body, `href="/search"`) {
+		t.Error("signed-out nav shows Search")
 	}
 }
 

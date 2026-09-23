@@ -44,18 +44,23 @@ type Molt struct {
 	RemoltOfSK string `dynamodbav:"remolt_of_sk,omitempty"`
 	RemoltedBy string `dynamodbav:"remolted_by,omitempty"`
 
-	ReplyTo       string `dynamodbav:"reply_to,omitempty"` // parent molt ID
-	ReplyToPK     string `dynamodbav:"reply_to_pk,omitempty"`
-	ReplyToSK     string `dynamodbav:"reply_to_sk,omitempty"`
-	ReplyToAuthor string `dynamodbav:"reply_to_author,omitempty"`
+	ReplyTo         string `dynamodbav:"reply_to,omitempty"` // parent molt ID
+	ReplyToPK       string `dynamodbav:"reply_to_pk,omitempty"`
+	ReplyToSK       string `dynamodbav:"reply_to_sk,omitempty"`
+	ReplyToAuthor   string `dynamodbav:"reply_to_author,omitempty"`
+	ReplyToAuthorID string `dynamodbav:"reply_to_author_id,omitempty"`
 
 	ReplyCount  int `dynamodbav:"reply_count"`
 	LikeCount   int `dynamodbav:"like_count"`
 	RemoltCount int `dynamodbav:"remolt_count"`
 
 	// Not stored; filled in for display.
-	EntryID string `dynamodbav:"-"` // ID of the list entry (the remolt) when showing an original
-	Liked   bool   `dynamodbav:"-"` // the viewer has liked it
+	EntryID        string `dynamodbav:"-"` // ID of the list entry (the remolt) when showing an original
+	Liked          bool   `dynamodbav:"-"` // the viewer has liked it
+	RemoltedByID   string `dynamodbav:"-"`
+	AuthorName     string `dynamodbav:"-"` // display names, looked up by ID
+	RemoltedByName string `dynamodbav:"-"`
+	ReplyToName    string `dynamodbav:"-"`
 }
 
 // DOMID is unique per list entry, even when an original and its remolt are
@@ -305,6 +310,7 @@ func (s *Store) ResolveRemolts(ctx context.Context, molts []Molt) ([]Molt, error
 		}
 		o.Remolt = true
 		o.RemoltedBy = m.RemoltedBy
+		o.RemoltedByID = m.OwnerID
 		o.EntryID = m.ID
 		o.CreatedAt = m.CreatedAt // when it was remolted
 		out = append(out, o)

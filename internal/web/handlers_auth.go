@@ -174,7 +174,7 @@ func (app *App) activatePost(w http.ResponseWriter, r *http.Request) {
 	}
 	if c, err := app.store.CrabByID(r.Context(), tok.CrabID); err == nil {
 		c.Activated = true
-		app.dir.addCrab(*c)
+		app.dir.putCrab(*c)
 	}
 	app.sessions.Put(r.Context(), sessionFlash, "You're activated! Log in to start molting.")
 	http.Redirect(w, r, "/crab/login", http.StatusSeeOther)

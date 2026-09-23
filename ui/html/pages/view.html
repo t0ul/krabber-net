@@ -18,13 +18,20 @@
 
     {{ with .Molt }}
     <div class="large-molt mini-molt border-bottom border-dark px-3 pt-3 pb-1" id="{{ .DOMID }}" data-molt-id="{{ .ID }}">
+        {{ if .Remolt }}
+        <small class="mini-molt-remolt text-muted d-block ml-4 mb-1">
+            <svg class="mini-molt-action-icon remolt-icon" width="12" height="12"><use href="/static/img/sprites.svg?version=1704178675#repeat"></use></svg>
+            <a href="/crabs/{{ .RemoltedBy }}">{{ or .RemoltedByName .RemoltedBy }}</a> Remolted</small>
+        {{ end }}
+        {{ if .ReplyTo }}<div class="ml-4 mb-1">{{ template "replying-to" (dict "M" . "D" $d) }}</div>{{ end }}
         <div class="d-flex align-items-center mb-2">
             <a href="/crabs/{{ .Author }}" class="mr-2">{{ template "avatar" .Author }}</a>
-            <a href="/crabs/{{ .Author }}" class="text-light font-weight-bold flex-grow-1">@{{ .Author }}</a>
+            <div class="mini-molt-credentials-text flex-grow-1">
+                <a href="/crabs/{{ .Author }}" class="mini-molt-display-name d-block">{{ or .AuthorName .Author }}</a>
+                <span class="mini-molt-username">@{{ .Author }}</span>
+            </div>
             {{ template "molt-menu" (dict "M" . "D" $d "Thread" true) }}
         </div>
-        {{ if .Remolt }}<div class="text-muted small mb-2">Remolted by <a class="text-muted" href="/crabs/{{ .RemoltedBy }}">@{{ .RemoltedBy }}</a></div>{{ end }}
-        {{ if .ReplyTo }}{{ template "replying-to" . }}{{ end }}
         <p class="large-molt-text mb-2">{{ .Content }}</p>
         <div class="text-muted small pb-2 border-bottom border-dark">{{ template "time" .CreatedAt }}</div>
         <div id="thread-actions">{{ template "molt-actions" (dict "M" . "D" $d) }}</div>

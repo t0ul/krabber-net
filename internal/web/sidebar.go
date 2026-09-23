@@ -114,18 +114,26 @@ func (app *App) goneCrabs(r *http.Request) map[string]bool {
 	return app.dir.gone
 }
 
-// addCrab adds a crab that just activated on this instance.
-func (d *directory) addCrab(c store.Crab) {
+// putCrab adds a crab that just activated on this instance, or replaces one
+// that just changed its profile.
+func (d *directory) putCrab(c store.Crab) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	if d.byID == nil {
 		return
 	}
-	if _, exists := d.byID[c.ID]; exists {
-		return
-	}
 	crabs := make([]store.Crab, 0, len(d.crabs)+1)
-	d.crabs = append(append(crabs, d.crabs...), c)
+	replaced := false
+	for _, old := range d.crabs {
+		if old.ID == c.ID {
+			old, replaced = c, true
+		}
+		crabs = append(crabs, old)
+	}
+	if !replaced {
+		crabs = append(crabs, c)
+	}
+	d.crabs = crabs
 	byID := make(map[string]store.Crab, len(d.byID)+1)
 	for k, v := range d.byID {
 		byID[k] = v

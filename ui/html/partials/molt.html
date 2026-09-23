@@ -33,20 +33,19 @@
     </div>
     <div class="mini-molt-text-box w-100 h-100 px-2">
         {{ if $m.Remolt }}
-        <div class="text-muted small mb-1">
-            <svg width="14" height="14"><use href="/static/img/sprites.svg?version=1704178675#repeat"></use></svg>
-            <a class="text-muted" href="/crabs/{{ $m.RemoltedBy }}">@{{ $m.RemoltedBy }}</a> remolted
-        </div>
+        <small class="mini-molt-remolt text-muted zindex-front">
+            <svg class="mini-molt-action-icon remolt-icon" width="12" height="12"><use href="/static/img/sprites.svg?version=1704178675#repeat"></use></svg>
+            <a href="/crabs/{{ $m.RemoltedBy }}">{{ or $m.RemoltedByName $m.RemoltedBy }}</a> Remolted</small>
         {{ end }}
-        <div class="mini-molt-credentials absolute-container">
+        {{ if and $m.ReplyTo (not .InThread) }}{{ template "replying-to" . }}{{ end }}
+        <div class="mini-molt-credentials absolute-container{{ if or $m.Remolt (and $m.ReplyTo (not .InThread)) }} mt-1{{ end }}">
             <div class="mini-molt-credentials-text">
-                <a class="mini-molt-username zindex-front" href="/crabs/{{ $m.Author }}">@{{ $m.Author }}</a>
-                <span class="text-muted">·</span>
-                <a class="mini-molt-timestamp zindex-front text-muted" href="/molt/view/{{ $m.ID }}">{{ template "time" $m.CreatedAt }}</a>
+                <a class="mini-molt-display-name zindex-front" href="/crabs/{{ $m.Author }}">{{ or $m.AuthorName $m.Author }}</a>
+                <span class="mini-molt-username zindex-front">@{{ $m.Author }}</span>
+                <a class="mini-molt-timestamp zindex-front" href="/molt/view/{{ $m.ID }}">· {{ template "time" $m.CreatedAt }}</a>
             </div>
             {{ template "molt-menu" . }}
         </div>
-        {{ if and $m.ReplyTo (not .InThread) }}{{ template "replying-to" $m }}{{ end }}
         <div class="mini-molt-content">
             <p class="mb-2">
                 <a class="zindex-front text-light molt-text" href="/molt/view/{{ $m.ID }}">{{ $m.Content }}</a>
@@ -57,8 +56,11 @@
 </div>
 {{end}}
 
-{{define "replying-to"}}
-<div class="text-muted small kb-replying-to">Replying to <a class="zindex-front" href="/molt/view/{{ .ReplyTo }}">@{{ .ReplyToAuthor }}</a></div>
+{{/* "replying to" line; takes (dict "M" <reply> "D" <page data>). */}}
+{{define "replying-to"}}{{ $m := .M }}
+<small class="mini-molt-remolt text-muted zindex-front">
+    <svg class="mini-molt-action-icon remolt-icon" width="12" height="12"><use href="/static/img/sprites.svg?version=1704178675#message"></use></svg>
+    replying to <a href="/molt/view/{{ $m.ReplyTo }}">{{ if and $m.ReplyToAuthorID (eq $m.ReplyToAuthorID .D.CrabID) }}you{{ else }}{{ or $m.ReplyToName $m.ReplyToAuthor }}{{ end }}</a></small>
 {{end}}
 
 {{/* The response to a reply posted on the thread page: the reply for the list,

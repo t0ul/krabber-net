@@ -34,7 +34,9 @@
             </div>
         </div>
         <h1 class="h4 mt-3 mb-0">{{ $p.Name }}</h1>
-        <div class="text-muted">@{{ $p.UserName }}</div>
+        <p class="text-muted mb-1">@{{ $p.UserName }}
+            {{ if .FollowsYou }}<small class="follows-you">Follows you</small>{{ end }}
+        </p>
         {{ with $p.Bio }}<p class="mt-2 mb-1 kb-bio">{{ . }}</p>{{ end }}
         <div class="text-muted small mt-2 kb-profile-meta">
             {{ with $p.Location }}<span class="mr-3">

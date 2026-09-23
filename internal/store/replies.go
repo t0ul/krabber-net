@@ -27,20 +27,21 @@ func (s *Store) Reply(ctx context.Context, author *Crab, parent *Molt, content s
 	}
 	id := newID()
 	m := &Molt{
-		PK:            moltPK(author.ID),
-		SK:            replySK(id),
-		GSI5PK:        moltIDKey(id),
-		GSI5SK:        moltIDKey(id),
-		ID:            id,
-		OwnerID:       author.ID,
-		AuthorID:      author.ID,
-		Author:        author.UserName,
-		Content:       content,
-		CreatedAt:     s.now(),
-		ReplyTo:       parent.ID,
-		ReplyToPK:     parent.PK,
-		ReplyToSK:     parent.SK,
-		ReplyToAuthor: parent.Author,
+		PK:              moltPK(author.ID),
+		SK:              replySK(id),
+		GSI5PK:          moltIDKey(id),
+		GSI5SK:          moltIDKey(id),
+		ID:              id,
+		OwnerID:         author.ID,
+		AuthorID:        author.ID,
+		Author:          author.UserName,
+		Content:         content,
+		CreatedAt:       s.now(),
+		ReplyTo:         parent.ID,
+		ReplyToPK:       parent.PK,
+		ReplyToSK:       parent.SK,
+		ReplyToAuthor:   parent.Author,
+		ReplyToAuthorID: parent.AuthorID,
 	}
 	item, err := marshal(m)
 	if err != nil {

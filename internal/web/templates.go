@@ -46,6 +46,7 @@ type templateData struct {
 
 	Profile     *store.Crab
 	IsFollowing bool
+	FollowsYou  bool
 	IsBlocking  bool
 	Blocked     []store.Crab
 	ModLog      []store.ModAction
@@ -255,11 +256,31 @@ func (app *App) newTemplateData(r *http.Request) templateData {
 
 // withLikes resolves remolts to their originals and marks which molts the
 // viewer has liked.
+// withNames fills in the display names on molts from the directory, by crab
+// ID, so a crab's current name shows on everything they wrote. Crabs the
+// snapshot doesn't have yet keep the username stored on the molt.
+func (app *App) withNames(r *http.Request, molts []store.Molt) {
+	_, byID, _ := app.snapshot(r)
+	for i := range molts {
+		m := &molts[i]
+		if c, ok := byID[m.AuthorID]; ok {
+			m.Author, m.AuthorName = c.UserName, c.Name()
+		}
+		if c, ok := byID[m.RemoltedByID]; ok {
+			m.RemoltedBy, m.RemoltedByName = c.UserName, c.Name()
+		}
+		if c, ok := byID[m.ReplyToAuthorID]; ok {
+			m.ReplyToAuthor, m.ReplyToName = c.UserName, c.Name()
+		}
+	}
+}
+
 func (app *App) withLikes(r *http.Request, molts []store.Molt) ([]store.Molt, error) {
 	molts, err := app.store.ResolveRemolts(r.Context(), app.visibleMolts(r, molts))
 	if err != nil {
 		return nil, err
 	}
+	app.withNames(r, molts)
 	c := currentCrab(r)
 	if c == nil || len(molts) == 0 {
 		return molts, nil

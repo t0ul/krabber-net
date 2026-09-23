@@ -92,8 +92,8 @@ func (app *App) settingsProfilePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	c := currentCrab(r)
-	err := app.store.UpdateProfile(r.Context(), c, store.Profile{
+	c := *currentCrab(r)
+	err := app.store.UpdateProfile(r.Context(), &c, store.Profile{
 		DisplayName: f.DisplayName,
 		Bio:         f.Bio,
 		Location:    f.Location,
@@ -103,7 +103,8 @@ func (app *App) settingsProfilePost(w http.ResponseWriter, r *http.Request) {
 		app.serverError(w, r, err)
 		return
 	}
-	app.dir.invalidate()
+	c.DisplayName, c.Bio, c.Location, c.Website = f.DisplayName, f.Bio, f.Location, f.Website
+	app.dir.putCrab(c)
 	app.sessions.Put(r.Context(), sessionFlash, "Profile saved.")
 	http.Redirect(w, r, "/settings", http.StatusSeeOther)
 }

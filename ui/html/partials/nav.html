@@ -22,10 +22,6 @@
         {{ template "notification-badge" .Unread }}
         <strong class="d-none d-lg-inline-block ml-2">Notifications</strong>
     </a>
-    <a href="/search" class="btn rounded-pill mx-auto mx-lg-0 mt-2 nav-link-btn"{{ if eq $p "/search" }} id="nav-active" aria-current="page"{{ end }}>
-        <svg class="btn-icon" width="28" height="28"><use href="/static/img/sprites.svg?version=1704178675#search"></use></svg>
-        <strong class="d-none d-lg-inline-block ml-2">Search</strong>
-    </a>
     {{ $me := printf "/crabs/%s" .CrabName }}
     <a href="{{ $me }}" class="btn rounded-pill mx-auto mx-lg-0 mt-2 nav-link-btn"{{ if or (eq $p $me) (hasPrefix $p (print $me "/")) }} id="nav-active" aria-current="page"{{ end }}>
         <img class="rounded-circle profile-picture kb-nav-avatar" src="/static/img/crab_illustration.jpg" width="28" height="28" alt="">
@@ -53,10 +49,6 @@
         </button>
     </form>
     {{ else }}
-    <a href="/search" class="btn rounded-pill mx-auto mx-lg-0 mt-2 nav-link-btn"{{ if eq $p "/search" }} id="nav-active" aria-current="page"{{ end }}>
-        <svg class="btn-icon" width="28" height="28"><use href="/static/img/sprites.svg?version=1704178675#search"></use></svg>
-        <strong class="d-none d-lg-inline-block ml-2">Search</strong>
-    </a>
     <a href="/crab/login" class="btn btn-primary rounded-pill mx-auto mx-lg-0 mt-4 d-block"><strong>Log in</strong></a>
     <a href="/crab/signup" class="btn btn-secondary rounded-pill mx-auto mx-lg-0 mt-2 d-block"><strong>Sign up</strong></a>
     {{ end }}

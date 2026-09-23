@@ -46,6 +46,7 @@ func (app *App) moltCreatePost(w http.ResponseWriter, r *http.Request) {
 	}
 	app.fanout.Enqueue(m)
 	app.dir.addMolt(*m)
+	m.AuthorName = currentCrab(r).Name()
 
 	if !isHTMX(r) {
 		http.Redirect(w, r, moltReturnPath(r), http.StatusSeeOther)
@@ -315,6 +316,7 @@ func (app *App) replyCreatePost(w http.ResponseWriter, r *http.Request) {
 	if ids, err := app.store.LikedIDs(r.Context(), currentCrab(r).ID, []string{fresh.ID}); err == nil {
 		fresh.Liked = ids[fresh.ID]
 	}
+	reply.AuthorName = currentCrab(r).Name()
 	app.renderTemplate(w, r, http.StatusOK, fragmentPage, "reply-created",
 		map[string]any{"M": reply, "Parent": fresh, "D": app.newTemplateData(r), "InThread": true})
 }

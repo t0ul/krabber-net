@@ -139,6 +139,10 @@ func (app *App) profileTab(w http.ResponseWriter, r *http.Request, tab string) {
 			app.serverError(w, r, err)
 			return
 		}
+		if data.FollowsYou, err = app.store.IsFollowing(r.Context(), p.ID, c.ID); err != nil {
+			app.serverError(w, r, err)
+			return
+		}
 	}
 	app.render(w, r, http.StatusOK, "profile.html", data)
 }
