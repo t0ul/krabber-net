@@ -33,6 +33,15 @@ document.addEventListener("moltDeleted", function (event) {
   });
 });
 
+// Plain forms marked data-confirm ask before submitting (htmx forms use hx-confirm).
+document.addEventListener("submit", function (event) {
+  var form = event.target;
+  var message = form.getAttribute && form.getAttribute("data-confirm");
+  if (message && !window.confirm(message)) {
+    event.preventDefault();
+  }
+});
+
 // Only one "…" menu is open at a time, and clicking elsewhere closes it.
 document.addEventListener("click", function (event) {
   document.querySelectorAll("details.kb-menu[open]").forEach(function (menu) {

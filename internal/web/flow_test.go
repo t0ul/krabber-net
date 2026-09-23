@@ -776,6 +776,30 @@ func TestProfileTabs(t *testing.T) {
 	}
 }
 
+// TestNavLayout keeps the nav in Crabber's order: main pages, the Molt button,
+// then the muted extras.
+func TestNavLayout(t *testing.T) {
+	h := newHarness(t)
+	h.signupAndActivate("karen", "karen@krabber.test", "computer-wife!")
+	h.login("karen@krabber.test", "computer-wife!")
+	_, body, _ := h.get("/trench")
+	nav := body[strings.Index(body, `id="nav-panel"`):strings.Index(body, `id="add-panel"`)]
+	last := -1
+	for _, want := range []string{`href="/trench"`, `href="/sea"`, `href="/notifications"`, `href="/search"`, `href="/crabs/karen"`, `id="molt-btn"`, `href="/settings"`, `action="/crab/logout"`} {
+		i := strings.Index(nav, want)
+		if i <= last {
+			t.Fatalf("nav: %s is missing or out of order", want)
+		}
+		last = i
+	}
+	if strings.Contains(nav, `href="/crabs"`) || strings.Contains(nav, `href="/crabmin"`) {
+		t.Error("nav shows Crabs, or Crabmin to a crab who isn't a moderator")
+	}
+	if side := body[strings.Index(body, `id="add-panel"`):]; strings.Contains(side, `name="q"`) {
+		t.Error("the sidebar still has a search box")
+	}
+}
+
 func TestSitePages(t *testing.T) {
 	h := newHarness(t)
 	for _, path := range []string{"/no-such-page", "/molt/view/nope", "/crabs/nobody"} {

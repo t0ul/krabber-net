@@ -248,8 +248,8 @@ func (app *App) newTemplateData(r *http.Request) templateData {
 			app.log.Warn("unread notifications", "err", err)
 		}
 		d.Unread = n
+		d.Sidebar = app.sidebarFor(r)
 	}
-	d.Sidebar = app.sidebarFor(r)
 	return d
 }
 

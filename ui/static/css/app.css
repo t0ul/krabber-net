@@ -157,13 +157,31 @@
   fill: var(--primary);
 }
 
-#nav-panel button.extra-navs {
+/* The muted group under the Molt button (Crabmin, Settings, Log out). */
+#nav-panel .extra-navs {
+  display: block;
+  width: fit-content;
   background: none;
   border: none;
+  text-align: left;
+  white-space: nowrap;
 }
 
-#nav-panel button.extra-navs:hover {
+#nav-panel .extra-navs:hover {
   background: var(--primary-faded);
+  text-decoration: none;
+}
+
+#nav-panel .extra-navs:not(#nav-active) strong {
+  color: var(--light-faded);
+}
+
+#nav-panel .extra-navs:not(#nav-active) .btn-icon {
+  fill: var(--light-faded);
+}
+
+#nav-panel .extra-navs#nav-active strong {
+  color: var(--primary);
 }
 
 .molt-text,

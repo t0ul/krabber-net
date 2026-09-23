@@ -1,32 +1,27 @@
 {{ define "search" }}
 <div class="d-none d-lg-block col-2 col-xl-3 ml-2 p-1 pt-2" id="add-panel">
-    <form action="/search" method="GET" role="search">
-        <div class="rounded-pill search-box mini-compose-box px-3 p-2 d-flex flex-row">
-            <svg class="mr-2" width="28" height="28"><use href="/static/img/sprites.svg?version=1704178675#search"></use></svg>
-            <input class="w-100" type="search" name="q" value="{{ .Query }}" placeholder="Search crabs and molts" minlength="2" maxlength="50" required>
-        </div>
-    </form>
-
-    <div class="panel" id="recommended-crabs">
+    {{ if .IsAuthenticated }}
+    {{ $d := . }}
+    {{ with .Sidebar.WhoToFollow }}
+    <div class="panel d-none d-xl-block" id="recommended-crabs">
         <div class="panel-title"><span>Who to follow</span></div>
-        {{ $d := . }}
-        {{ range .Sidebar.WhoToFollow }}{{ template "crab-row" (dict "C" .Crab "D" $d "Following" .Following) }}{{ else }}
-        <p class="text-muted nothing px-3 mb-0">You're already following everyone here.</p>
-        {{ end }}
+        {{ range . }}{{ template "crab-row" (dict "C" .Crab "D" $d "Following" .Following) }}{{ end }}
         <div class="px-3 py-2"><a href="/crabs">See all crabs</a></div>
     </div>
+    {{ end }}
 
     <div class="panel" id="trending">
-        <div class="panel-title"><span>Trending this week</span></div>
+        <div class="panel-title"><span>Trending</span></div>
         {{ range .Sidebar.Trending }}
         <a class="d-block px-3 py-2 border-bottom border-dark text-light trending-item" href="/molt/view/{{ .ID }}">
             <div class="text-muted small">@{{ .Author }} · {{ .LikeCount }} likes · {{ .RemoltCount }} remolts</div>
             <div class="text-truncate">{{ .Content }}</div>
         </a>
         {{ else }}
-        <p class="text-muted nothing px-3">Nothing yet. Molt something to get things going.</p>
+        <p class="text-muted nothing px-3">Nothing right now.</p>
         {{ end }}
     </div>
+    {{ end }}
 
     <div id="nav-footer" class="text-muted-more d-none d-lg-block mb-3 mt-3">
         <small>&copy; {{ .CurrentYear }} Krabber · open-source and non-profit · <a class="text-muted" href="/terms">Terms</a> · <a class="text-muted" href="/privacy">Privacy</a></small>
