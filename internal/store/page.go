@@ -75,6 +75,16 @@ func decodeCursor(s string) (map[string]types.AttributeValue, error) {
 	return key, nil
 }
 
+func queryCount(ctx context.Context, db *dynamodb.Client, in *dynamodb.QueryInput, limit int) (int, error) {
+	in.Select = types.SelectCount
+	in.Limit = pageLimit(limit)
+	res, err := db.Query(ctx, in)
+	if err != nil {
+		return 0, err
+	}
+	return int(res.Count), nil
+}
+
 func (s *Store) queryMolts(ctx context.Context, in *dynamodb.QueryInput, after string, limit int) (Page, error) {
 	molts, next, err := queryPage[Molt](ctx, s.db, in, after, limit)
 	if err != nil {

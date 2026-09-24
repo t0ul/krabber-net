@@ -88,6 +88,15 @@ func (m Molt) DOMID() string { //nolint:gocritic // value receiver so templates 
 	return "molt-" + m.ID
 }
 
+// FeedID is the list entry's ID: the remolt's when showing an original, so
+// "newer than this" uses the remolt's place in the Sea and Trench.
+func (m Molt) FeedID() string { //nolint:gocritic // value receiver so templates can call it on list items
+	if m.EntryID != "" {
+		return m.EntryID
+	}
+	return m.ID
+}
+
 func (s *Store) newMolt(owner *Crab, authorID, author, content string) *Molt {
 	id := newID()
 	now := s.now()

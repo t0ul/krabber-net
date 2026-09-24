@@ -83,3 +83,23 @@ func (s *Store) TrenchPage(ctx context.Context, crabID, after string, limit int)
 	}
 	return Page{Molts: molts, Next: next}, nil
 }
+
+// TrenchNewer is how many trench entries are newer than since (a molt ID).
+// An empty since counts from the top of the feed. The count stops at limit.
+func (s *Store) TrenchNewer(ctx context.Context, crabID, since string, limit int) (int, error) {
+	in := &dynamodb.QueryInput{
+		TableName:                 s.tableName(),
+		ExpressionAttributeValues: map[string]types.AttributeValue{":pk": str(trenchPK(crabID))},
+	}
+	if since != "" {
+		in.KeyConditionExpression = aws.String("PK = :pk AND SK > :sk")
+		in.ExpressionAttributeValues[":sk"] = str(trenchSK(since))
+	} else {
+		in.KeyConditionExpression = aws.String("PK = :pk")
+	}
+	n, err := queryCount(ctx, s.db, in, limit)
+	if err != nil {
+		return 0, fmt.Errorf("trench newer: %w", err)
+	}
+	return n, nil
+}

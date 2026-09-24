@@ -435,6 +435,17 @@ body,
   background-color: var(--dark-lesserest);
 }
 
+.kb-new-molts-link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+
+.kb-new-molts-link:hover {
+  color: inherit;
+  text-decoration: none;
+}
+
 #content-body > #content-heading {
   position: sticky;
   top: 0;

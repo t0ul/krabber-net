@@ -1063,3 +1063,37 @@ func TestPages(t *testing.T) {
 		t.Fatalf("bad cursor: %v", err)
 	}
 }
+
+func TestNewer(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+	karen := mustCrab(t, s, "karen")
+	var ids []string
+	for _, text := range []string{"oldest", "middle", "newest"} {
+		m, err := s.CreateMolt(ctx, karen, text)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := s.AddToTrenches(ctx, m, []string{karen.ID}); err != nil {
+			t.Fatal(err)
+		}
+		ids = append(ids, m.ID)
+	}
+	oldest, newest := ids[0], ids[2]
+	n, err := s.SeaNewer(ctx, newest, 20)
+	if err != nil || n != 0 {
+		t.Fatalf("sea at top: %d, %v", n, err)
+	}
+	n, err = s.SeaNewer(ctx, oldest, 20)
+	if err != nil || n != 2 {
+		t.Fatalf("sea since oldest: %d, %v", n, err)
+	}
+	n, err = s.TrenchNewer(ctx, karen.ID, newest, 20)
+	if err != nil || n != 0 {
+		t.Fatalf("trench at top: %d, %v", n, err)
+	}
+	n, err = s.TrenchNewer(ctx, karen.ID, oldest, 20)
+	if err != nil || n != 2 {
+		t.Fatalf("trench since oldest: %d, %v", n, err)
+	}
+}

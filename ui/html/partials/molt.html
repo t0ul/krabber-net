@@ -202,6 +202,19 @@
 </div>
 {{end}}
 
+{{define "new-molts"}}
+<div id="new-molts" class="{{ if .NewCount }}p-2 border-bottom border-dark clickable hoverable-light text-primary text-center{{ else }}d-none{{ end }}"
+    hx-get="{{ .FeedPath }}/new{{ if .Since }}?since={{ .Since }}{{ end }}"
+    hx-trigger="every 30s"
+    hx-swap="outerHTML">
+    {{ if .NewCount }}
+    <a href="{{ .FeedPath }}" class="kb-new-molts-link">
+        <strong id="new-molt-counter">{{ .NewCount }}</strong> new molt{{ if ne .NewCount 1 }}s{{ end }} <span class="text-muted">(click to refresh)</span>
+    </a>
+    {{ end }}
+</div>
+{{end}}
+
 {{define "molt-list"}}
 <div id="molt-list">
     {{ $d := . }}

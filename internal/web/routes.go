@@ -13,6 +13,7 @@ func (app *App) Routes() http.Handler {
 	// Public pages.
 	mux.HandleFunc("GET /{$}", app.home)
 	mux.HandleFunc("GET /sea", app.sea)
+	mux.HandleFunc("GET /sea/new", app.seaNew)
 	mux.HandleFunc("GET /molt/view/{id}", app.moltView)
 	mux.HandleFunc("GET /molt/likes/view/{id}", app.moltLikesView)
 	mux.HandleFunc("GET /molt/view/{id}/quotes", app.moltQuotesView)
@@ -37,6 +38,7 @@ func (app *App) Routes() http.Handler {
 
 	// Signed-in pages and actions.
 	mux.HandleFunc("GET /trench", app.requireAuthentication(app.trench))
+	mux.HandleFunc("GET /trench/new", app.requireAuthentication(app.trenchNew))
 	mux.HandleFunc("GET /notifications", app.requireAuthentication(app.notifications))
 	mux.HandleFunc("GET /notifications/badge", app.requireAuthentication(app.notificationBadge))
 	mux.HandleFunc("GET /bookmarks", app.requireAuthentication(app.bookmarksPage))

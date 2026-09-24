@@ -4,6 +4,7 @@
 {{ template "shell-top" . }}
     {{ template "heading" "🌊 The latest molts from the seven seas 🌊" }}
     {{ if .IsAuthenticated }}{{ template "compose" . }}{{ end }}
+    {{ template "new-molts" . }}
     {{ template "molt-list" . }}
 {{ template "shell-bottom" . }}
 {{end}}

@@ -21,8 +21,23 @@ document.addEventListener("htmx:afterSwap", function (event) {
   localizeTimes(event.target);
   var list = document.getElementById("molt-list");
   if (list) localizeTimes(list);
+  if (event.target.id === "molt-list") {
+    syncNewMoltsSince(list);
+  }
   initCounters(document);
 });
+
+// A molt prepended to the feed (compose) moves the "new molts" cursor so
+// the banner doesn't count the one you just wrote.
+function syncNewMoltsSince(list) {
+  var box = document.getElementById("new-molts");
+  var first = list && list.querySelector("[data-molt-id]");
+  if (!box || !first) return;
+  var path = box.getAttribute("hx-get") || "";
+  var q = path.indexOf("?");
+  var base = q === -1 ? path : path.slice(0, q);
+  box.setAttribute("hx-get", base + "?since=" + encodeURIComponent(first.getAttribute("data-molt-id")));
+}
 
 // A rejected quote or edit (422) swaps in the re-filled form with its error.
 document.addEventListener("htmx:beforeSwap", function (event) {

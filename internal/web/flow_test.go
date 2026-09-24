@@ -1581,3 +1581,50 @@ func TestLoadMore(t *testing.T) {
 		t.Errorf("bad cursor: %d", status)
 	}
 }
+
+func TestNewMolts(t *testing.T) {
+	h := newHarness(t)
+	h.signupAndActivate("karen", "karen@krabber.test", "computer-wife!")
+	c, err := h.store.CrabByUsername(context.Background(), "karen")
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := h.store.CreateMolt(context.Background(), c, "first")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	status, body, _ := h.get("/sea")
+	if status != http.StatusOK || !strings.Contains(body, `id="new-molts"`) ||
+		!strings.Contains(body, `/sea/new?since=`+first.ID) || strings.Contains(body, "click to refresh") {
+		t.Fatalf("sea poller: %d", status)
+	}
+
+	second, err := h.store.CreateMolt(context.Background(), c, "second")
+	if err != nil {
+		t.Fatal(err)
+	}
+	status, body, _ = h.get("/sea/new?since=" + first.ID)
+	if status != http.StatusOK || strings.Contains(body, "<html") ||
+		!strings.Contains(body, ">1</strong> new molt ") || !strings.Contains(body, "click to refresh") {
+		t.Fatalf("one new: %d %s", status, body)
+	}
+
+	status, body, _ = h.get("/sea/new?since=" + second.ID)
+	if status != http.StatusOK || strings.Contains(body, "click to refresh") {
+		t.Fatalf("none newer: %d %s", status, body)
+	}
+
+	if status, _, _ := h.get("/trench/new"); status != http.StatusSeeOther {
+		t.Errorf("trench poller signed out: %d", status)
+	}
+
+	h.login("karen@krabber.test", "computer-wife!")
+	if err := h.store.AddToTrenches(context.Background(), first, []string{c.ID}); err != nil {
+		t.Fatal(err)
+	}
+	status, body, _ = h.get("/trench")
+	if status != http.StatusOK || !strings.Contains(body, `/trench/new?since=`) {
+		t.Fatalf("trench poller: %d", status)
+	}
+}

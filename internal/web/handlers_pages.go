@@ -30,7 +30,40 @@ func (app *App) renderFeed(w http.ResponseWriter, r *http.Request, page string, 
 		return
 	}
 	data.EmptyMessage = empty
+	if path := r.URL.Path; path == "/sea" || path == "/trench" {
+		data.FeedPath = path
+		if len(data.Molts) > 0 {
+			data.Since = data.Molts[0].FeedID()
+		}
+	}
 	app.renderMolts(w, r, page, data)
+}
+
+const newMoltsCap = 99
+
+func (app *App) seaNew(w http.ResponseWriter, r *http.Request) {
+	app.renderNewMolts(w, r, "/sea", func(since string) (int, error) {
+		return app.store.SeaNewer(r.Context(), since, newMoltsCap)
+	})
+}
+
+func (app *App) trenchNew(w http.ResponseWriter, r *http.Request) {
+	app.renderNewMolts(w, r, "/trench", func(since string) (int, error) {
+		return app.store.TrenchNewer(r.Context(), currentCrab(r).ID, since, newMoltsCap)
+	})
+}
+
+func (app *App) renderNewMolts(w http.ResponseWriter, r *http.Request, feed string, count func(string) (int, error)) {
+	since := r.URL.Query().Get("since")
+	n, err := count(since)
+	if err != nil {
+		app.log.Warn("new molts", "err", err)
+	}
+	data := app.newTemplateData(r)
+	data.FeedPath = feed
+	data.Since = since
+	data.NewCount = n
+	app.renderTemplate(w, r, http.StatusOK, fragmentPage, "new-molts", data)
 }
 
 func (app *App) sea(w http.ResponseWriter, r *http.Request) {
