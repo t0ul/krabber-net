@@ -58,19 +58,28 @@ func (s *Store) AddToTrenches(ctx context.Context, m *Molt, followerIDs []string
 
 // Trench returns the newest molts from the crabs that crabID follows.
 func (s *Store) Trench(ctx context.Context, crabID string, limit int) ([]Molt, error) {
-	entries, err := queryAll[trenchEntry](ctx, s.db, &dynamodb.QueryInput{
+	p, err := s.TrenchPage(ctx, crabID, "", limit)
+	return p.Molts, err
+}
+
+// TrenchPage is Trench starting after the cursor from a previous page.
+func (s *Store) TrenchPage(ctx context.Context, crabID, after string, limit int) (Page, error) {
+	entries, next, err := queryPage[trenchEntry](ctx, s.db, &dynamodb.QueryInput{
 		TableName:                 s.tableName(),
 		KeyConditionExpression:    aws.String("PK = :pk"),
 		ExpressionAttributeValues: map[string]types.AttributeValue{":pk": str(trenchPK(crabID))},
 		ScanIndexForward:          aws.Bool(false),
-		Limit:                     pageLimit(limit),
-	}, limit)
+	}, after, limit)
 	if err != nil {
-		return nil, fmt.Errorf("trench: %w", err)
+		return Page{}, fmt.Errorf("trench: %w", err)
 	}
 	keys := make([][2]string, 0, len(entries))
 	for _, e := range entries {
 		keys = append(keys, [2]string{e.MoltPK, e.MoltSK})
 	}
-	return s.MoltsByKeys(ctx, keys)
+	molts, err := s.MoltsByKeys(ctx, keys)
+	if err != nil {
+		return Page{}, fmt.Errorf("trench: %w", err)
+	}
+	return Page{Molts: molts, Next: next}, nil
 }

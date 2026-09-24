@@ -8,10 +8,12 @@
     {{ template "nav" . }}
     <div class="col col-lg-6 content border-dark border-left border-right p-0" id="main-panel">
         {{ with .Flash }}<div class="alert alert-info m-2 flash" role="status">{{ . }}</div>{{ end }}
+        <div id="content-body" class="h-100">
 {{end}}
 
 {{define "shell-bottom"}}
         <div class="d-inline-block w-100 p-5 my-5"></div>
+        </div>
     </div>
     {{ template "search" . }}
 </div>

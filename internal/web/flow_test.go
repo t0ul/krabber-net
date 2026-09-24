@@ -1541,3 +1541,43 @@ func TestComposeModals(t *testing.T) {
 		t.Errorf("save from the modal: %d %v", status, hdr)
 	}
 }
+
+func TestLoadMore(t *testing.T) {
+	old := pageSize
+	pageSize = 2
+	t.Cleanup(func() { pageSize = old })
+
+	h := newHarness(t)
+	h.signupAndActivate("karen", "karen@krabber.test", "computer-wife!")
+	h.login("karen@krabber.test", "computer-wife!")
+	c, err := h.store.CrabByUsername(context.Background(), "karen")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, text := range []string{"oldest", "middle", "newest"} {
+		if _, err := h.store.CreateMolt(context.Background(), c, text); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	status, body, _ := h.get("/sea")
+	if status != http.StatusOK || !strings.Contains(body, "newest") || !strings.Contains(body, "middle") ||
+		strings.Contains(body, "oldest") || !strings.Contains(body, `id="load-more"`) || !strings.Contains(body, `id="content-body"`) {
+		t.Fatalf("first page: %d", status)
+	}
+	chunk := body[strings.Index(body, `id="load-more"`):]
+	after := chunk[strings.Index(chunk, `hx-get="`)+8:]
+	after = after[:strings.Index(after, `"`)]
+	if !strings.HasPrefix(after, "/sea?after=") {
+		t.Fatalf("load more href: %s", after)
+	}
+
+	status, more, _ := h.get(after, "HX-Request", "true")
+	if status != http.StatusOK || strings.Contains(more, "<html") || !strings.Contains(more, "oldest") ||
+		strings.Contains(more, "newest") || strings.Contains(more, `id="load-more"`) {
+		t.Fatalf("next page: %d %s", status, more)
+	}
+	if status, _, _ := h.get("/sea?after=not-a-cursor"); status != http.StatusNotFound {
+		t.Errorf("bad cursor: %d", status)
+	}
+}

@@ -206,9 +206,24 @@
 <div id="molt-list">
     {{ $d := . }}
     {{ range .Molts }}{{ template "molt" (dict "M" . "D" $d) }}{{ end }}
+    {{ template "load-more" . }}
 </div>
 {{ if not .Molts }}
 <div class="p-4 text-center text-muted" id="empty-list">{{ .EmptyMessage }}</div>
+{{ end }}
+{{end}}
+
+{{define "molt-more"}}
+{{ $d := . }}
+{{ range .Molts }}{{ template "molt" (dict "M" . "D" $d) }}{{ end }}
+{{ template "load-more" . }}
+{{end}}
+
+{{define "load-more"}}
+{{ if .LoadMore }}
+<nav class="kb-load-more py-4 text-center" id="load-more" aria-label="More molts">
+    <a class="btn btn-outline-light rounded-pill px-4" href="{{ .LoadMore }}" hx-get="{{ .LoadMore }}" hx-target="#load-more" hx-swap="outerHTML">Load more</a>
+</nav>
 {{ end }}
 {{end}}
 

@@ -129,7 +129,7 @@ func TestTemplatesParse(t *testing.T) {
 			t.Errorf("missing template %s", page)
 		}
 	}
-	for _, fragment := range []string{"molt", "molt-actions", "follow-button", "quote-modal", "quote-form", "edit-modal", "edit-form"} {
+	for _, fragment := range []string{"molt", "molt-actions", "follow-button", "quote-modal", "quote-form", "edit-modal", "edit-form", "molt-more", "load-more"} {
 		if cache[fragmentPage].Lookup(fragment) == nil {
 			t.Errorf("%s must define the %s fragment used by htmx responses", fragmentPage, fragment)
 		}

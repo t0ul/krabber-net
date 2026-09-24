@@ -76,17 +76,12 @@ func (app *App) moltQuotesView(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	quotes, err := app.store.Quotes(r.Context(), m.ID, 100)
-	if err == nil {
-		quotes, err = app.withLikes(r, quotes)
-	}
-	if err != nil {
-		app.serverError(w, r, err)
+	p, err := app.store.QuotesPage(r.Context(), m.ID, afterParam(r), pageSize)
+	data := app.newTemplateData(r)
+	if !app.setPage(w, r, &data, p, err) {
 		return
 	}
-	data := app.newTemplateData(r)
 	data.Molt = *m
-	data.Molts = quotes
 	data.EmptyMessage = "No quotes yet."
-	app.render(w, r, http.StatusOK, "quotes.html", data)
+	app.renderMolts(w, r, "quotes.html", data)
 }

@@ -9,18 +9,13 @@ import (
 
 // bookmarksPage lists the viewer's bookmarks, most recently bookmarked first.
 func (app *App) bookmarksPage(w http.ResponseWriter, r *http.Request) {
-	molts, err := app.store.Bookmarks(r.Context(), currentCrab(r).ID, pageSize)
-	if err == nil {
-		molts, err = app.withLikes(r, molts)
-	}
-	if err != nil {
-		app.serverError(w, r, err)
+	p, err := app.store.BookmarksPage(r.Context(), currentCrab(r).ID, afterParam(r), pageSize)
+	data := app.newTemplateData(r)
+	if !app.setPage(w, r, &data, p, err) {
 		return
 	}
-	data := app.newTemplateData(r)
-	data.Molts = molts
 	data.EmptyMessage = "You have no bookmarks."
-	app.render(w, r, http.StatusOK, "bookmarks.html", data)
+	app.renderMolts(w, r, "bookmarks.html", data)
 }
 
 // bookmarkPost adds the molt to the viewer's bookmarks, or removes it, and

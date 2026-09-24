@@ -49,11 +49,17 @@ func (s *Store) Quote(ctx context.Context, author *Crab, quoted *Molt, content s
 
 // Quotes returns the quotes of a molt, newest first, skipping deleted ones.
 func (s *Store) Quotes(ctx context.Context, quotedID string, limit int) ([]Molt, error) {
-	quotes, err := s.pointedMolts(ctx, quotePointerPK(quotedID), false, limit)
+	p, err := s.QuotesPage(ctx, quotedID, "", limit)
+	return p.Molts, err
+}
+
+// QuotesPage is Quotes starting after the cursor from a previous page.
+func (s *Store) QuotesPage(ctx context.Context, quotedID, after string, limit int) (Page, error) {
+	p, err := s.pointedPage(ctx, quotePointerPK(quotedID), false, after, limit)
 	if err != nil {
-		return nil, fmt.Errorf("quotes: %w", err)
+		return Page{}, fmt.Errorf("quotes: %w", err)
 	}
-	return quotes, nil
+	return p, nil
 }
 
 // UndoRemolt deletes the crab's remolt of original. It returns the ID of the

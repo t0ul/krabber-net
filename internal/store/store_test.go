@@ -1033,3 +1033,33 @@ func TestEditMolt(t *testing.T) {
 		t.Fatalf("edit after the window: %v", err)
 	}
 }
+
+func TestPages(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+	karen := mustCrab(t, s, "karen")
+	for _, text := range []string{"one", "two", "three"} {
+		if _, err := s.CreateMolt(ctx, karen, text); err != nil {
+			t.Fatal(err)
+		}
+	}
+	first, err := s.MoltsByOwnerPage(ctx, karen.ID, "", 2)
+	if err != nil || len(first.Molts) != 2 || first.Molts[0].Content != "three" || first.Next == "" {
+		t.Fatalf("first page: %+v, %v", first, err)
+	}
+	second, err := s.MoltsByOwnerPage(ctx, karen.ID, first.Next, 2)
+	if err != nil || len(second.Molts) != 1 || second.Molts[0].Content != "one" || second.Next != "" {
+		t.Fatalf("second page: %+v, %v", second, err)
+	}
+	sea, err := s.SeaPage(ctx, "", 2)
+	if err != nil || len(sea.Molts) != 2 || sea.Next == "" {
+		t.Fatalf("sea first page: %+v, %v", sea, err)
+	}
+	rest, err := s.SeaPage(ctx, sea.Next, 2)
+	if err != nil || len(rest.Molts) != 1 || rest.Next != "" {
+		t.Fatalf("sea second page: %+v, %v", rest, err)
+	}
+	if _, err := s.MoltsByOwnerPage(ctx, karen.ID, "not-a-cursor", 2); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("bad cursor: %v", err)
+	}
+}

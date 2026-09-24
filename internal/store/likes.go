@@ -105,15 +105,20 @@ func (s *Store) LikesOn(ctx context.Context, moltID string, limit int) ([]Like, 
 // LikedMolts returns the molts and replies a crab liked, newest molt first
 // (the like partition is sorted by molt ID, not by when the like happened).
 func (s *Store) LikedMolts(ctx context.Context, crabID string, limit int) ([]Molt, error) {
-	likes, err := queryAll[Like](ctx, s.db, &dynamodb.QueryInput{
+	p, err := s.LikedMoltsPage(ctx, crabID, "", limit)
+	return p.Molts, err
+}
+
+// LikedMoltsPage is LikedMolts starting after the cursor from a previous page.
+func (s *Store) LikedMoltsPage(ctx context.Context, crabID, after string, limit int) (Page, error) {
+	likes, next, err := queryPage[Like](ctx, s.db, &dynamodb.QueryInput{
 		TableName:                 s.tableName(),
 		KeyConditionExpression:    aws.String("PK = :pk"),
 		ExpressionAttributeValues: map[string]types.AttributeValue{":pk": str(likePK(crabID))},
 		ScanIndexForward:          aws.Bool(false),
-		Limit:                     pageLimit(limit),
-	}, limit)
+	}, after, limit)
 	if err != nil {
-		return nil, fmt.Errorf("liked molts: %w", err)
+		return Page{}, fmt.Errorf("liked molts: %w", err)
 	}
 	keys := make([][2]string, 0, len(likes))
 	for _, l := range likes {
@@ -121,10 +126,14 @@ func (s *Store) LikedMolts(ctx context.Context, crabID string, limit int) ([]Mol
 			if l.MoltPK, l.MoltSK, err = s.moltKey(ctx, l.MoltID); errors.Is(err, ErrNotFound) {
 				continue
 			} else if err != nil {
-				return nil, err
+				return Page{}, err
 			}
 		}
 		keys = append(keys, [2]string{l.MoltPK, l.MoltSK})
 	}
-	return s.MoltsByKeys(ctx, keys)
+	molts, err := s.MoltsByKeys(ctx, keys)
+	if err != nil {
+		return Page{}, fmt.Errorf("liked molts: %w", err)
+	}
+	return Page{Molts: molts, Next: next}, nil
 }

@@ -24,28 +24,23 @@ func (app *App) home(w http.ResponseWriter, r *http.Request) {
 }
 
 // renderFeed renders a page whose main content is a list of molts.
-func (app *App) renderFeed(w http.ResponseWriter, r *http.Request, page string, molts []store.Molt, err error, empty string) {
-	if err == nil {
-		molts, err = app.withLikes(r, molts)
-	}
-	if err != nil {
-		app.serverError(w, r, err)
+func (app *App) renderFeed(w http.ResponseWriter, r *http.Request, page string, p store.Page, err error, empty string) {
+	data := app.newTemplateData(r)
+	if !app.setPage(w, r, &data, p, err) {
 		return
 	}
-	data := app.newTemplateData(r)
-	data.Molts = molts
 	data.EmptyMessage = empty
-	app.render(w, r, http.StatusOK, page, data)
+	app.renderMolts(w, r, page, data)
 }
 
 func (app *App) sea(w http.ResponseWriter, r *http.Request) {
-	molts, err := app.store.Sea(r.Context(), pageSize)
-	app.renderFeed(w, r, "sea.html", molts, err, "The sea is calm. Nobody has molted this week.")
+	p, err := app.store.SeaPage(r.Context(), afterParam(r), pageSize)
+	app.renderFeed(w, r, "sea.html", p, err, "The sea is calm. Nobody has molted this week.")
 }
 
 func (app *App) trench(w http.ResponseWriter, r *http.Request) {
-	molts, err := app.store.Trench(r.Context(), currentCrab(r).ID, pageSize)
-	app.renderFeed(w, r, "trench.html", molts, err, "Your trench is empty. Molt something, or follow some crabs.")
+	p, err := app.store.TrenchPage(r.Context(), currentCrab(r).ID, afterParam(r), pageSize)
+	app.renderFeed(w, r, "trench.html", p, err, "Your trench is empty. Molt something, or follow some crabs.")
 }
 
 // notifications lists the crab's notifications and clears the unread badge.
@@ -108,38 +103,34 @@ func (app *App) profileTab(w http.ResponseWriter, r *http.Request, tab string) {
 		app.render(w, r, http.StatusOK, "profile.html", data)
 		return
 	}
-	var molts []store.Molt
+	var page store.Page
 	var err error
 	switch tab {
 	case tabReplies:
 		data.EmptyMessage = "@" + p.UserName + " hasn't replied to anyone yet."
-		molts, err = app.store.RepliesByOwner(r.Context(), p.ID, pageSize)
+		page, err = app.store.RepliesByOwnerPage(r.Context(), p.ID, afterParam(r), pageSize)
 	case tabLikes:
 		data.EmptyMessage = "@" + p.UserName + " hasn't liked any molts yet."
-		molts, err = app.store.LikedMolts(r.Context(), p.ID, pageSize)
+		page, err = app.store.LikedMoltsPage(r.Context(), p.ID, afterParam(r), pageSize)
 	default:
 		data.EmptyMessage = "@" + p.UserName + " hasn't molted yet."
-		molts, err = app.store.MoltsByOwner(r.Context(), p.ID, pageSize)
+		page, err = app.store.MoltsByOwnerPage(r.Context(), p.ID, afterParam(r), pageSize)
 	}
 	// The pin rides along in the same display pass, then comes off the front.
+	// Later pages skip it so "Load more" doesn't repeat the pin.
 	var pinned *store.Molt
-	if err == nil && tab == tabMolts {
+	if err == nil && tab == tabMolts && afterParam(r) == "" {
 		if pinned, err = app.store.PinnedMolt(r.Context(), p); pinned != nil {
-			molts = append([]store.Molt{*pinned}, molts...)
+			page.Molts = append([]store.Molt{*pinned}, page.Molts...)
 		}
 	}
-	if err == nil {
-		molts, err = app.withLikes(r, molts)
-	}
-	if err != nil {
-		app.serverError(w, r, err)
+	if !app.setPage(w, r, &data, page, err) {
 		return
 	}
-	if pinned != nil && len(molts) > 0 && molts[0].ID == pinned.ID {
-		data.Pinned = &molts[0]
-		molts = molts[1:]
+	if pinned != nil && len(data.Molts) > 0 && data.Molts[0].ID == pinned.ID {
+		data.Pinned = &data.Molts[0]
+		data.Molts = data.Molts[1:]
 	}
-	data.Molts = molts
 	if c := currentCrab(r); c != nil && c.ID != p.ID {
 		if data.IsFollowing, err = app.store.IsFollowing(r.Context(), c.ID, p.ID); err != nil {
 			app.serverError(w, r, err)
@@ -150,7 +141,7 @@ func (app *App) profileTab(w http.ResponseWriter, r *http.Request, tab string) {
 			return
 		}
 	}
-	app.render(w, r, http.StatusOK, "profile.html", data)
+	app.renderMolts(w, r, "profile.html", data)
 }
 
 func (app *App) followersList(w http.ResponseWriter, r *http.Request) {

@@ -156,11 +156,17 @@ func tagKeys(m *Molt) [][2]string {
 
 // MoltsWithTag returns the molts using a crabtag, newest first.
 func (s *Store) MoltsWithTag(ctx context.Context, tag string, limit int) ([]Molt, error) {
-	molts, err := s.pointedMolts(ctx, tagPK(tag), false, limit)
+	p, err := s.MoltsWithTagPage(ctx, tag, "", limit)
+	return p.Molts, err
+}
+
+// MoltsWithTagPage is MoltsWithTag starting after the cursor from a previous page.
+func (s *Store) MoltsWithTagPage(ctx context.Context, tag, after string, limit int) (Page, error) {
+	p, err := s.pointedPage(ctx, tagPK(tag), false, after, limit)
 	if err != nil {
-		return nil, fmt.Errorf("molts with tag: %w", err)
+		return Page{}, fmt.Errorf("molts with tag: %w", err)
 	}
-	return molts, nil
+	return p, nil
 }
 
 // Remolt shares an existing molt on the remolter's timeline. Each crab can
@@ -381,59 +387,128 @@ func (s *Store) ResolveRemolts(ctx context.Context, molts []Molt) ([]Molt, error
 // MoltsByOwner returns a crab's own timeline (molts and remolts, no
 // replies), newest first.
 func (s *Store) MoltsByOwner(ctx context.Context, crabID string, limit int) ([]Molt, error) {
-	return s.ownerMolts(ctx, crabID, moltSK(""), limit)
+	p, err := s.MoltsByOwnerPage(ctx, crabID, "", limit)
+	return p.Molts, err
+}
+
+// MoltsByOwnerPage is MoltsByOwner starting after the cursor from a previous page.
+func (s *Store) MoltsByOwnerPage(ctx context.Context, crabID, after string, limit int) (Page, error) {
+	return s.ownerMolts(ctx, crabID, moltSK(""), after, limit)
 }
 
 // RepliesByOwner returns the replies a crab wrote, newest first.
 func (s *Store) RepliesByOwner(ctx context.Context, crabID string, limit int) ([]Molt, error) {
-	return s.ownerMolts(ctx, crabID, replySK(""), limit)
+	p, err := s.RepliesByOwnerPage(ctx, crabID, "", limit)
+	return p.Molts, err
 }
 
-func (s *Store) ownerMolts(ctx context.Context, crabID, prefix string, limit int) ([]Molt, error) {
-	molts, err := queryAll[Molt](ctx, s.db, &dynamodb.QueryInput{
+// RepliesByOwnerPage is RepliesByOwner starting after the cursor from a previous page.
+func (s *Store) RepliesByOwnerPage(ctx context.Context, crabID, after string, limit int) (Page, error) {
+	return s.ownerMolts(ctx, crabID, replySK(""), after, limit)
+}
+
+func (s *Store) ownerMolts(ctx context.Context, crabID, prefix, after string, limit int) (Page, error) {
+	p, err := s.queryMolts(ctx, &dynamodb.QueryInput{
 		TableName:                 s.tableName(),
 		KeyConditionExpression:    aws.String("PK = :pk AND begins_with(SK, :m)"),
 		ExpressionAttributeValues: map[string]types.AttributeValue{":pk": str(moltPK(crabID)), ":m": str(prefix)},
 		ScanIndexForward:          aws.Bool(false),
-		Limit:                     pageLimit(limit),
-	}, limit)
+	}, after, limit)
 	if err != nil {
-		return nil, fmt.Errorf("molts by owner: %w", err)
+		return Page{}, fmt.Errorf("molts by owner: %w", err)
 	}
-	return withoutDeleted(molts), nil
+	return p, nil
 }
 
 // LatestMolts returns the newest molts across the last week (UTC days), newest
 // first. Each day is one query on the day index; the items are then loaded
 // from the base table so counters match what the thread page shows.
 func (s *Store) LatestMolts(ctx context.Context, limit int) ([]Molt, error) {
+	p, err := s.LatestMoltsPage(ctx, "", limit)
+	return p.Molts, err
+}
+
+// LatestMoltsPage is LatestMolts starting after the last molt of a previous
+// page. The cursor is that molt's day key and SK, so the next page picks up
+// on the same day and walks older days if needed.
+func (s *Store) LatestMoltsPage(ctx context.Context, after string, limit int) (Page, error) {
 	now := s.now()
+	afterDay, afterSK, err := parseSeaCursor(after)
+	if err != nil {
+		return Page{}, err
+	}
 	var keys [][2]string
 	seen := map[string]bool{}
+	var lastDay, lastSK string
 	for d := 0; d < 7 && len(keys) < limit; d++ {
 		day := now.AddDate(0, 0, -d)
-		molts, err := queryAll[Molt](ctx, s.db, &dynamodb.QueryInput{
-			TableName:                 s.tableName(),
-			IndexName:                 aws.String(gsiMoltsByDay),
-			KeyConditionExpression:    aws.String("GSI3PK = :day"),
-			ExpressionAttributeValues: map[string]types.AttributeValue{":day": str(moltDayKey(day))},
-			ScanIndexForward:          aws.Bool(false),
-		}, limit-len(keys))
-		if err != nil {
-			return nil, fmt.Errorf("latest molts: %w", err)
+		dayKey := moltDayKey(day)
+		if afterDay != "" && dayKey > afterDay {
+			continue
 		}
+		in := &dynamodb.QueryInput{
+			TableName:              s.tableName(),
+			IndexName:              aws.String(gsiMoltsByDay),
+			KeyConditionExpression: aws.String("GSI3PK = :day"),
+			ExpressionAttributeValues: map[string]types.AttributeValue{
+				":day": str(dayKey),
+			},
+			ScanIndexForward: aws.Bool(false),
+		}
+		if afterDay == dayKey && afterSK != "" {
+			in.KeyConditionExpression = aws.String("GSI3PK = :day AND GSI3SK < :sk")
+			in.ExpressionAttributeValues[":sk"] = str(afterSK)
+		}
+		molts, err := queryAll[Molt](ctx, s.db, in, limit-len(keys)+1)
+		if err != nil {
+			return Page{}, fmt.Errorf("latest molts: %w", err)
+		}
+		afterDay, afterSK = "", ""
 		for _, m := range withoutDeleted(molts) {
 			if m.PK == "" || m.SK == "" || seen[m.ID] {
 				continue
 			}
 			seen[m.ID] = true
-			keys = append(keys, [2]string{m.PK, m.SK})
 			if len(keys) >= limit {
 				break
 			}
+			keys = append(keys, [2]string{m.PK, m.SK})
+			lastDay, lastSK = dayKey, m.SK
 		}
 	}
-	return s.MoltsByKeys(ctx, keys)
+	molts, err := s.MoltsByKeys(ctx, keys)
+	if err != nil {
+		return Page{}, err
+	}
+	next := ""
+	if len(keys) == limit && lastSK != "" {
+		next = encodeSeaCursor(lastDay, lastSK)
+	}
+	return Page{Molts: molts, Next: next}, nil
+}
+
+func encodeSeaCursor(day, sk string) string {
+	return encodeCursor(map[string]types.AttributeValue{"d": str(day), "s": str(sk)})
+}
+
+func parseSeaCursor(after string) (day, sk string, err error) {
+	if after == "" {
+		return "", "", nil
+	}
+	key, err := decodeCursor(after)
+	if err != nil {
+		return "", "", err
+	}
+	if d, ok := key["d"].(*types.AttributeValueMemberS); ok {
+		day = d.Value
+	}
+	if s, ok := key["s"].(*types.AttributeValueMemberS); ok {
+		sk = s.Value
+	}
+	if day == "" || sk == "" {
+		return "", "", fmt.Errorf("%w: cursor", ErrNotFound)
+	}
+	return day, sk, nil
 }
 
 // MoltsByKeys batch-fetches molts by table key, newest first, skipping any

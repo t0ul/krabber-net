@@ -12,7 +12,47 @@ import (
 	"github.com/t0ul/krabber-net/internal/validator"
 )
 
-const pageSize = 25
+// pageSize is how many molts a feed shows before "Load more". Tests shrink it.
+var pageSize = 20
+
+func afterParam(r *http.Request) string { return r.URL.Query().Get("after") }
+
+func loadMoreURL(r *http.Request, next string) string {
+	q := r.URL.Query()
+	q.Set("after", next)
+	return r.URL.Path + "?" + q.Encode()
+}
+
+// setPage fills data with a page of molts (and the Load more URL). A bad
+// cursor is a 404; other errors are a 500.
+func (app *App) setPage(w http.ResponseWriter, r *http.Request, data *templateData, p store.Page, err error) bool {
+	if errors.Is(err, store.ErrNotFound) && afterParam(r) != "" {
+		app.notFound(w, r)
+		return false
+	}
+	if err == nil {
+		p.Molts, err = app.withLikes(r, p.Molts)
+	}
+	if err != nil {
+		app.serverError(w, r, err)
+		return false
+	}
+	data.Molts = p.Molts
+	if p.Next != "" {
+		data.LoadMore = loadMoreURL(r, p.Next)
+	}
+	return true
+}
+
+// renderMolts shows the full list page, or just the next molts and the new
+// Load more button when htmx asked for another page.
+func (app *App) renderMolts(w http.ResponseWriter, r *http.Request, page string, data templateData) {
+	if isHTMX(r) && afterParam(r) != "" {
+		app.renderTemplate(w, r, http.StatusOK, fragmentPage, "molt-more", data)
+		return
+	}
+	app.render(w, r, http.StatusOK, page, data)
+}
 
 type moltForm struct {
 	Content             string `form:"content"`

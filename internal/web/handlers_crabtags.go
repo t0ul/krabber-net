@@ -14,17 +14,12 @@ func (app *App) crabtagPage(w http.ResponseWriter, r *http.Request) {
 		app.notFound(w, r)
 		return
 	}
-	molts, err := app.store.MoltsWithTag(r.Context(), tag, pageSize)
-	if err == nil {
-		molts, err = app.withLikes(r, molts)
-	}
-	if err != nil {
-		app.serverError(w, r, err)
+	p, err := app.store.MoltsWithTagPage(r.Context(), tag, afterParam(r), pageSize)
+	data := app.newTemplateData(r)
+	if !app.setPage(w, r, &data, p, err) {
 		return
 	}
-	data := app.newTemplateData(r)
 	data.Query = tag
-	data.Molts = molts
 	data.EmptyMessage = "No molts use %" + tag + " yet."
-	app.render(w, r, http.StatusOK, "crabtag.html", data)
+	app.renderMolts(w, r, "crabtag.html", data)
 }

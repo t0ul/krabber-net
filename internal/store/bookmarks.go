@@ -92,20 +92,26 @@ func (s *Store) ToggleBookmark(ctx context.Context, c *Crab, m *Molt) (bool, err
 // first. Molts deleted since are skipped; their bookmarks stay until the
 // crab's account is purged.
 func (s *Store) Bookmarks(ctx context.Context, crabID string, limit int) ([]Molt, error) {
-	keys, err := s.pointerKeys(ctx, bookmarkListPK(crabID), false, limit)
+	p, err := s.BookmarksPage(ctx, crabID, "", limit)
+	return p.Molts, err
+}
+
+// BookmarksPage is Bookmarks starting after the cursor from a previous page.
+func (s *Store) BookmarksPage(ctx context.Context, crabID, after string, limit int) (Page, error) {
+	keys, next, err := s.pointerPage(ctx, bookmarkListPK(crabID), false, after, limit)
 	if err != nil {
-		return nil, fmt.Errorf("bookmarks: %w", err)
+		return Page{}, fmt.Errorf("bookmarks: %w", err)
 	}
 	molts, err := s.MoltsByKeys(ctx, keys)
 	if err != nil {
-		return nil, fmt.Errorf("bookmarks: %w", err)
+		return Page{}, fmt.Errorf("bookmarks: %w", err)
 	}
 	rank := make(map[string]int, len(keys))
 	for i, k := range keys {
 		rank[k[1]] = i
 	}
 	sort.SliceStable(molts, func(i, j int) bool { return rank[molts[i].SK] < rank[molts[j].SK] })
-	return molts, nil
+	return Page{Molts: molts, Next: next}, nil
 }
 
 // Marks is what a crab has done to a molt: liked it, remolted it (as the

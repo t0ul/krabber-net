@@ -19,6 +19,8 @@ document.addEventListener("htmx:afterSwap", function (event) {
     openModal(document.getElementById("molt-modal"));
   }
   localizeTimes(event.target);
+  var list = document.getElementById("molt-list");
+  if (list) localizeTimes(list);
   initCounters(document);
 });
 
@@ -164,6 +166,13 @@ document.addEventListener("click", function (event) {
     if (!menu.contains(event.target)) menu.removeAttribute("open");
   });
 });
+
+// A wheel over the side columns scrolls the middle feed, as in Crabber.
+document.addEventListener("wheel", function (event) {
+  var body = document.getElementById("content-body");
+  if (!body || body.contains(event.target) || event.target.closest("dialog")) return;
+  body.scrollTop += event.deltaY;
+}, { passive: true });
 
 // Relative times ("5m") show the exact moment in the reader's own timezone on hover.
 function localizeTimes(root) {
