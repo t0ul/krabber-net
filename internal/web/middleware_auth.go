@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/t0ul/krabber-net/internal/avatar"
 	"github.com/t0ul/krabber-net/internal/store"
 )
 
@@ -58,6 +59,14 @@ func (app *App) authenticate(next http.Handler) http.Handler {
 		case !c.CanSignIn() || app.sessions.GetInt64(ctx, sessionAuthAt) < c.SessionsValidAfter:
 			app.endSession(r)
 		default:
+			if !avatar.Valid(c.Avatar) {
+				if code, err := app.store.EnsureAvatar(ctx, c); err != nil {
+					app.log.Warn("ensure avatar", "err", err, "crab", c.ID)
+				} else {
+					c.Avatar = code
+					app.dir.putCrab(*c)
+				}
+			}
 			ctx = context.WithValue(ctx, ctxCrab, c)
 			if c.BlockLinks > 0 {
 				b, err := app.store.BlocksOf(ctx, c.ID)

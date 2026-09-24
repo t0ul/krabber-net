@@ -11,6 +11,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+
+	"github.com/t0ul/krabber-net/internal/avatar"
 )
 
 // Crab is a user account.
@@ -36,6 +38,8 @@ type Crab struct {
 	Role      string `dynamodbav:"role,omitempty"`       // RoleAdmin, RoleModerator or empty
 
 	Profile
+
+	Avatar string `dynamodbav:"avatar,omitempty"` // seven-digit generated-crab code
 
 	// The molt shown at the top of the crab's profile, if any.
 	PinnedMoltID string `dynamodbav:"pinned_molt_id,omitempty"`
@@ -115,25 +119,38 @@ func (s *Store) CreateCrab(ctx context.Context, username, email string, password
 		PasswordHash: passwordHash,
 		CreatedAt:    s.now(),
 	}
-	crabItem, err := marshal(c)
+	nameItem, err := marshal(usernameMarker{PK: usernamePK(username), SK: usernameSK(), CrabID: id})
 	if err != nil {
 		return nil, err
 	}
-	markerItem, err := marshal(usernameMarker{PK: usernamePK(username), SK: usernameSK(), CrabID: id})
-	if err != nil {
-		return nil, err
+	for range avatarAttempts {
+		code, err := avatar.Random()
+		if err != nil {
+			return nil, err
+		}
+		c.Avatar = code
+		crabItem, err := marshal(c)
+		if err != nil {
+			return nil, err
+		}
+		avItem, err := s.avatarItem(code, id)
+		if err != nil {
+			return nil, err
+		}
+		err = s.transact(ctx, s.putNew(crabItem), s.putNew(nameItem), s.putNew(avItem))
+		switch {
+		case cancelledAt(err, 0):
+			return nil, ErrDuplicateEmail
+		case cancelledAt(err, 1):
+			return nil, ErrDuplicateUsername
+		case cancelledAt(err, 2):
+			continue
+		case err != nil:
+			return nil, fmt.Errorf("create crab: %w", err)
+		}
+		return c, nil
 	}
-
-	err = s.transact(ctx, s.putNew(crabItem), s.putNew(markerItem))
-	switch {
-	case cancelledAt(err, 0):
-		return nil, ErrDuplicateEmail
-	case cancelledAt(err, 1):
-		return nil, ErrDuplicateUsername
-	case err != nil:
-		return nil, fmt.Errorf("create crab: %w", err)
-	}
-	return c, nil
+	return nil, fmt.Errorf("create crab: no free avatar")
 }
 
 // CrabByEmail returns the account for an email address.
@@ -191,7 +208,7 @@ func (s *Store) ListCrabs(ctx context.Context, limit int) ([]Crab, map[string]bo
 	p := dynamodb.NewScanPaginator(s.db, &dynamodb.ScanInput{
 		TableName:            s.tableName(),
 		IndexName:            aws.String(gsiCrabByID),
-		ProjectionExpression: aws.String("#id, #un, #frc, #fgc, #mc, #act, #ban, #del, #ca, #dn, #bio"),
+		ProjectionExpression: aws.String("#id, #un, #frc, #fgc, #mc, #act, #ban, #del, #ca, #dn, #bio, #av"),
 		ExpressionAttributeNames: map[string]string{
 			"#dn":  "display_name",
 			"#bio": "bio",
@@ -204,6 +221,7 @@ func (s *Store) ListCrabs(ctx context.Context, limit int) ([]Crab, map[string]bo
 			"#act": "activated",
 			"#ban": "banned",
 			"#del": "deleted",
+			"#av":  "avatar",
 		},
 	})
 	for p.HasMorePages() && len(out) < limit {

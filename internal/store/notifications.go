@@ -42,6 +42,8 @@ type Notification struct {
 	Snippet     string    `dynamodbav:"snippet,omitempty"`
 	CreatedAt   time.Time `dynamodbav:"created_at"`
 	ExpiresAt   int64     `dynamodbav:"expires_at"`
+
+	ActorAvatar string `dynamodbav:"-"`
 }
 
 type notificationCounter struct {

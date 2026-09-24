@@ -175,6 +175,16 @@ func (d *directory) snapshot(ctx context.Context, s *store.Store, log func(error
 	d.mu.Unlock()
 
 	crabs, gone, err := s.ListCrabs(ctx, directoryCrabs)
+	if err == nil {
+		for i := range crabs {
+			if crabs[i].Avatar != "" {
+				continue
+			}
+			if code, e := s.EnsureAvatar(ctx, &crabs[i]); e == nil {
+				crabs[i].Avatar = code
+			}
+		}
+	}
 	var recent []store.Molt
 	if err == nil {
 		recent, err = s.LatestMolts(ctx, directoryMolts)

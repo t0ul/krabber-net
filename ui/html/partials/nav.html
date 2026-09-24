@@ -28,7 +28,7 @@
     </a>
     {{ $me := printf "/crabs/%s" .CrabName }}
     <a href="{{ $me }}" class="btn rounded-pill mx-auto mx-lg-0 mt-2 nav-link-btn"{{ if or (eq $p $me) (hasPrefix $p (print $me "/")) }} id="nav-active" aria-current="page"{{ end }}>
-        <img class="rounded-circle profile-picture kb-nav-avatar" src="/static/img/crab_illustration.jpg" width="28" height="28" alt="">
+        <img class="rounded-circle profile-picture kb-nav-avatar" src="{{ avatarSrc .Avatar }}" width="28" height="28" alt="">
         <strong class="d-none d-lg-inline-block ml-2">Profile</strong>
     </a>
     <a href="/trench" data-open-modal="compose-modal" id="molt-btn" class="btn btn-primary mx-auto mx-lg-0 subtle-shadow rounded-pill w-md-75 mt-4 d-block">

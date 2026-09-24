@@ -6,7 +6,7 @@
     <div class="kb-profile-banner"></div>
     <div class="px-3 pb-3 border-bottom border-dark kb-profile-header">
         <div class="d-flex justify-content-between align-items-end">
-            <img class="kb-avatar kb-avatar-lg" src="/static/img/crab_illustration.jpg" width="96" height="96" alt="">
+            <img class="kb-avatar kb-avatar-lg" src="{{ avatarSrc $p.Avatar }}" width="96" height="96" alt="">
             <div class="mb-2 d-flex align-items-center">
                 {{ if eq $p.ID .CrabID }}<a class="btn btn-sm btn-outline-light rounded-pill" href="/settings">Edit profile</a>
                 {{ else if .IsBlocking }}

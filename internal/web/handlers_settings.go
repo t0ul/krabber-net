@@ -39,9 +39,10 @@ type deleteForm struct {
 }
 
 type settingsForms struct {
-	Profile  profileForm
-	Password passwordForm
-	Delete   deleteForm
+	Profile     profileForm
+	Password    passwordForm
+	Delete      deleteForm
+	AvatarError string
 }
 
 func (app *App) settings(w http.ResponseWriter, r *http.Request) {
@@ -58,8 +59,13 @@ func (app *App) renderSettings(w http.ResponseWriter, r *http.Request, status in
 	f.Password.Current, f.Password.New, f.Password.Confirm, f.Delete.Password = "", "", "", ""
 	data := app.newTemplateData(r)
 	data.Form = f
+	_, byID, _ := app.snapshot(r)
 	for id, name := range blocksOf(r).Blocking {
-		data.Blocked = append(data.Blocked, store.Crab{ID: id, UserName: name})
+		av := ""
+		if c, ok := byID[id]; ok {
+			av = c.Avatar
+		}
+		data.Blocked = append(data.Blocked, store.Crab{ID: id, UserName: name, Avatar: av})
 	}
 	sort.Slice(data.Blocked, func(i, j int) bool { return data.Blocked[i].UserName < data.Blocked[j].UserName })
 	app.render(w, r, status, "settings.html", data)

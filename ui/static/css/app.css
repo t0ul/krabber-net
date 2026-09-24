@@ -238,6 +238,11 @@
   border: 4px solid #0e1014;
 }
 
+.kb-settings .kb-avatar-lg {
+  margin-top: 0;
+  border-width: 2px;
+}
+
 .kb-nav-avatar {
   width: 28px;
   height: 28px;

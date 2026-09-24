@@ -51,6 +51,7 @@ func (app *App) Routes() http.Handler {
 	mux.HandleFunc("POST /block/{id}", app.requireAuthentication(app.blockPost))
 	mux.HandleFunc("POST /unblock/{id}", app.requireAuthentication(app.unblockPost))
 	mux.HandleFunc("POST /settings/profile", app.requireAuthentication(app.settingsProfilePost))
+	mux.HandleFunc("POST /settings/avatar", app.requireAuthentication(app.settingsAvatarPost))
 	mux.HandleFunc("POST /settings/password", app.requireAuthentication(app.settingsPasswordPost))
 	mux.HandleFunc("POST /settings/delete", app.requireAuthentication(app.settingsDeletePost))
 	mux.HandleFunc("GET /crabs", app.requireAuthentication(app.allCrabs))
@@ -86,6 +87,7 @@ func (app *App) Routes() http.Handler {
 
 	root := http.NewServeMux()
 	root.Handle("GET /static/", staticFiles())
+	root.HandleFunc("GET /avatar/{code}", app.avatarSVG)
 	root.HandleFunc("GET /healthz", app.healthz)
 	root.HandleFunc("GET /robots.txt", robots)
 	root.HandleFunc("GET /favicon.ico", favicon)

@@ -90,10 +90,15 @@ func (app *App) notifications(w http.ResponseWriter, r *http.Request) {
 	data := app.newTemplateData(r)
 	data.Unread = 0
 	hidden := app.hidden(r)
+	_, byID, _ := app.snapshot(r)
 	for _, n := range notes {
-		if !hidden(n.ActorID) {
-			data.Notifications = append(data.Notifications, n)
+		if hidden(n.ActorID) {
+			continue
 		}
+		if a, ok := byID[n.ActorID]; ok {
+			n.ActorAvatar = a.Avatar
+		}
+		data.Notifications = append(data.Notifications, n)
 	}
 	app.render(w, r, http.StatusOK, "notifications.html", data)
 }

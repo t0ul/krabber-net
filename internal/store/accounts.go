@@ -8,6 +8,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+
+	"github.com/t0ul/krabber-net/internal/avatar"
 )
 
 // Deleting an account takes two steps. DeleteAccount runs in the request: it
@@ -41,15 +43,22 @@ func (s *Store) DeleteAccount(ctx context.Context, c *Crab) (*Crab, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = s.transact(ctx,
-		types.TransactWriteItem{Delete: &types.Delete{
+	items := []types.TransactWriteItem{
+		{Delete: &types.Delete{
 			TableName:                 s.tableName(),
 			Key:                       keyOf(c.PK, c.SK),
 			ConditionExpression:       aws.String("attribute_exists(PK) AND deleted = :f"),
 			ExpressionAttributeValues: map[string]types.AttributeValue{":f": boolean(false)},
 		}},
 		s.putNew(item),
-	)
+	}
+	if avatar.Valid(c.Avatar) {
+		items = append(items, types.TransactWriteItem{Delete: &types.Delete{
+			TableName: s.tableName(),
+			Key:       keyOf(avatarPK(c.Avatar), avatarSK()),
+		}})
+	}
+	err = s.transact(ctx, items...)
 	switch {
 	case cancelledAt(err, 0), cancelledAt(err, 1):
 		return nil, ErrNotFound

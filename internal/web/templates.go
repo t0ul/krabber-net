@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/t0ul/krabber-net/internal/avatar"
 	"github.com/t0ul/krabber-net/internal/richtext"
 	"github.com/t0ul/krabber-net/internal/store"
 	"github.com/t0ul/krabber-net/ui"
@@ -26,6 +27,7 @@ type templateData struct {
 	IsModerator      bool
 	CrabID           string
 	CrabName         string
+	Avatar           string // current crab's generated-crab code
 	CSRFToken        string
 	TurnstileSiteKey string
 	Form             any
@@ -194,6 +196,14 @@ var templateFuncs = template.FuncMap{
 	"dict":           dict,
 	"asset":          asset,
 	"editable":       editable,
+	"avatarSrc":      avatarSrc,
+}
+
+func avatarSrc(code string) string {
+	if p := avatar.Path(code); p != "" {
+		return p
+	}
+	return asset("img/crab_illustration.jpg")
 }
 
 // editable reports whether a molt is still inside its edit window. Templates
@@ -261,6 +271,7 @@ func (app *App) newTemplateData(r *http.Request) templateData {
 		d.IsAuthenticated = true
 		d.CrabID = c.ID
 		d.CrabName = c.UserName
+		d.Avatar = c.Avatar
 		d.IsAdmin = c.IsAdmin()
 		d.IsModerator = c.IsModerator()
 		n, err := app.store.UnreadNotifications(r.Context(), c.ID)
@@ -295,7 +306,7 @@ func (app *App) withDisplay(r *http.Request, molts []store.Molt) {
 	for i := range molts {
 		m := &molts[i]
 		if c, ok := byID[m.AuthorID]; ok {
-			m.Author, m.AuthorName = c.UserName, c.Name()
+			m.Author, m.AuthorName, m.AuthorAvatar = c.UserName, c.Name(), c.Avatar
 		}
 		if c, ok := byID[m.RemoltedByID]; ok {
 			m.RemoltedBy, m.RemoltedByName = c.UserName, c.Name()

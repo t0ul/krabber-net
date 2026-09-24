@@ -5,7 +5,7 @@
     {{ template "heading" "Liked by" }}
     {{ range .Likes }}
         <div class="d-flex align-items-center border-bottom border-dark px-3 py-2">
-            <a href="/crabs/{{ .CrabName }}" class="mr-3">{{ template "avatar" .CrabName }}</a>
+            <a href="/crabs/{{ .CrabName }}" class="mr-3">{{ template "avatar" .Avatar }}</a>
             <a href="/crabs/{{ .CrabName }}" class="text-light font-weight-bold">@{{ .CrabName }}</a>
             <span class="ml-auto text-muted small">{{ template "time" .CreatedAt }}</span>
         </div>

@@ -22,6 +22,7 @@ import (
 	"github.com/segmentio/ksuid"
 
 	"github.com/t0ul/krabber-net/internal/auth"
+	"github.com/t0ul/krabber-net/internal/avatar"
 	"github.com/t0ul/krabber-net/internal/config"
 	"github.com/t0ul/krabber-net/internal/mail"
 	"github.com/t0ul/krabber-net/internal/platform"
@@ -335,7 +336,7 @@ func TestFeedsProfileSearchAndLiveCounts(t *testing.T) {
 	if status != http.StatusOK || !strings.Contains(body, "Following") || !strings.Contains(body, "/unfollow/"+sandy.ID) {
 		t.Fatalf("follow fragment: %d %s", status, body)
 	}
-	if _, body, _ := h.get("/crabs/sandy/followers"); !strings.Contains(body, "@gary") {
+	if _, body, _ := h.get("/crabs/sandy/followers"); !strings.Contains(body, `data-name="gary"`) {
 		t.Fatal("followers list is missing gary")
 	}
 
@@ -1626,5 +1627,52 @@ func TestNewMolts(t *testing.T) {
 	status, body, _ = h.get("/trench")
 	if status != http.StatusOK || !strings.Contains(body, `/trench/new?since=`) {
 		t.Fatalf("trench poller: %d", status)
+	}
+}
+
+func TestGeneratedAvatars(t *testing.T) {
+	h := newHarness(t)
+	h.signupAndActivate("karen", "karen@krabber.test", "computer-wife!")
+	h.login("karen@krabber.test", "computer-wife!")
+
+	status, body, _ := h.get("/settings")
+	i := strings.Index(body, `/avatar/`)
+	if status != http.StatusOK || i < 0 {
+		t.Fatalf("settings avatar: %d", status)
+	}
+	code := body[i+len(`/avatar/`):]
+	code = code[:strings.Index(code, `.svg`)]
+	if !avatar.Valid(code) {
+		t.Fatalf("code on settings: %q", code)
+	}
+
+	status, svg, hdr := h.get("/avatar/" + code + ".svg")
+	if status != http.StatusOK || !strings.Contains(svg, "<svg") || hdr.Get("Content-Type") != "image/svg+xml; charset=utf-8" {
+		t.Fatalf("svg: %d %s", status, hdr.Get("Content-Type"))
+	}
+	if status, _, _ := h.get("/avatar/not-a-crab.svg"); status != http.StatusNotFound {
+		t.Errorf("junk code: %d", status)
+	}
+
+	tok := h.csrf("/settings")
+	status, _, _ = h.post("/settings/avatar", url.Values{"csrf_token": {tok}})
+	if status != http.StatusSeeOther {
+		t.Fatalf("reroll: %d", status)
+	}
+	_, body, _ = h.get("/settings")
+	if strings.Contains(body, "/avatar/"+code+".svg") {
+		t.Fatal("reroll left the old crab")
+	}
+
+	for i := 0; i < 2; i++ {
+		tok = h.csrf("/settings")
+		if status, _, _ := h.post("/settings/avatar", url.Values{"csrf_token": {tok}}); status != http.StatusSeeOther {
+			t.Fatalf("reroll %d: %d", i+2, status)
+		}
+	}
+	tok = h.csrf("/settings")
+	status, body, _ = h.post("/settings/avatar", url.Values{"csrf_token": {tok}})
+	if status != http.StatusTooManyRequests || !strings.Contains(body, "enough rerolls") {
+		t.Fatalf("fourth reroll: %d %s", status, body)
 	}
 }

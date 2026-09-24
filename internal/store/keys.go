@@ -13,6 +13,7 @@ import (
 //	Crab              C#<email>              C#                   GSI2 ID#<id> / ID#<id>
 //	Deleted crab      C#deleted#<id>         C#                   GSI2 as above; GSI8 Q#purge / <id> (until purged)
 //	Username marker   U#<username>           U#
+//	Avatar marker     AV#<trait code>        AV#
 //	Molt              M#<authorCrabID>       M#<moltID>           GSI3 M#<yyyy-mm-dd> / M#<moltID>
 //	                                                              GSI5 M#<moltID> / M#<moltID>
 //	                                                              GSI8 Q#fanout / <moltID> (while pending)
@@ -62,6 +63,8 @@ func deletedCrabPK(id string) string { return "C#deleted#" + id } // no "@", so 
 func crabIDKey(id string) string     { return "ID#" + id }
 func usernamePK(name string) string  { return "U#" + strings.ToLower(name) }
 func usernameSK() string             { return "U#" }
+func avatarPK(code string) string    { return "AV#" + code }
+func avatarSK() string               { return "AV#" }
 func moltPK(authorID string) string  { return "M#" + authorID }
 func moltSK(moltID string) string    { return "M#" + moltID }
 func moltIDKey(moltID string) string { return "M#" + moltID }

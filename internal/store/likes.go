@@ -23,6 +23,7 @@ type Like struct {
 	MoltPK    string    `dynamodbav:"molt_pk,omitempty"`
 	MoltSK    string    `dynamodbav:"molt_sk,omitempty"`
 	CreatedAt time.Time `dynamodbav:"created_at"`
+	Avatar    string    `dynamodbav:"-"`
 }
 
 // LikeMolt records a like and bumps the molt's counter. Liking twice returns

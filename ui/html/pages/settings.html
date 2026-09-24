@@ -40,6 +40,19 @@
         <a class="ml-3" href="/crabs/{{ .CrabName }}">View profile</a>
     </form>
 
+    <form class="px-3 py-3 border-bottom border-dark kb-settings" method="POST" action="/settings/avatar">
+        <input type='hidden' name='csrf_token' value='{{ .CSRFToken }}'>
+        <h2 class="h6 font-weight-bold mb-3">Your crab</h2>
+        <div class="d-flex align-items-center">
+            <img class="kb-avatar kb-avatar-lg" src="{{ avatarSrc .Avatar }}" width="96" height="96" alt="">
+            <div class="ml-3">
+                {{ with .Form.AvatarError }}<div class="error small mb-2">{{ . }}</div>{{ end }}
+                <button type="submit" class="btn btn-outline-light rounded-pill">Reroll my crab</button>
+                <small class="form-text text-muted">A new look, three times a day. The old combination goes back in the pot.</small>
+            </div>
+        </div>
+    </form>
+
     <form class="px-3 py-3 border-bottom border-dark kb-settings" method="POST" action="/settings/password" novalidate>
         <input type='hidden' name='csrf_token' value='{{ .CSRFToken }}'>
         <h2 class="h6 font-weight-bold mb-3">Change password</h2>
@@ -70,7 +83,7 @@
         <h2 class="h6 font-weight-bold mb-3">Blocked crabs</h2>
         {{ range .Blocked }}
         <div class="d-flex align-items-center py-1">
-            {{ template "avatar" .UserName }}
+            {{ template "avatar" .Avatar }}
             <span class="ml-3 font-weight-bold">@{{ .UserName }}</span>
             <form class="ml-auto" hx-post="/unblock/{{ .ID }}" hx-swap="none">
                 <input type='hidden' name='csrf_token' value='{{ $.CSRFToken }}'>

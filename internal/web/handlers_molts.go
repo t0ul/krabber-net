@@ -116,6 +116,9 @@ func (app *App) publish(r *http.Request, m *store.Molt, skipMention string) {
 	if m.AuthorName == "" {
 		m.AuthorName = currentCrab(r).Name()
 	}
+	if m.AuthorAvatar == "" {
+		m.AuthorAvatar = currentCrab(r).Avatar
+	}
 }
 
 // notifyMentions tells the crabs mentioned in m, except skipID (who already
@@ -403,10 +406,15 @@ func (app *App) moltLikesView(w http.ResponseWriter, r *http.Request) {
 	}
 	data := app.newTemplateData(r)
 	hidden := app.hidden(r)
+	_, byID, _ := app.snapshot(r)
 	for _, l := range likes {
-		if !hidden(l.CrabID) {
-			data.Likes = append(data.Likes, l)
+		if hidden(l.CrabID) {
+			continue
 		}
+		if c, ok := byID[l.CrabID]; ok {
+			l.Avatar = c.Avatar
+		}
+		data.Likes = append(data.Likes, l)
 	}
 	app.render(w, r, http.StatusOK, "likes.html", data)
 }

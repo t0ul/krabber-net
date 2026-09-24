@@ -14,6 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/segmentio/ksuid"
 
+	"github.com/t0ul/krabber-net/internal/avatar"
 	"github.com/t0ul/krabber-net/internal/platform"
 )
 
@@ -80,7 +81,7 @@ func TestCrabEmailAndUsernameAreUnique(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.UserName != "Bob" || c.Activated {
+	if c.UserName != "Bob" || c.Activated || !avatar.Valid(c.Avatar) {
 		t.Fatalf("unexpected crab: %+v", c)
 	}
 	byID, err := s.CrabByID(ctx, c.ID)
@@ -1031,6 +1032,28 @@ func TestEditMolt(t *testing.T) {
 	latest, _ := s.MoltByID(ctx, m.ID)
 	if _, err := s.EditMolt(ctx, plankton, latest, "too late"); !errors.Is(err, ErrNotAllowed) {
 		t.Fatalf("edit after the window: %v", err)
+	}
+}
+
+func TestAvatars(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+	karen := mustCrab(t, s, "karen")
+	if !avatar.Valid(karen.Avatar) {
+		t.Fatalf("signup avatar: %q", karen.Avatar)
+	}
+	old := karen.Avatar
+	code, err := s.RerollAvatar(ctx, karen)
+	if err != nil || code == old || !avatar.Valid(code) {
+		t.Fatalf("reroll: %s %v (was %s)", code, err, old)
+	}
+	fresh, err := s.CrabByID(ctx, karen.ID)
+	if err != nil || fresh.Avatar != code {
+		t.Fatalf("stored: %+v %v", fresh, err)
+	}
+	again, err := s.EnsureAvatar(ctx, fresh)
+	if err != nil || again != code {
+		t.Fatalf("ensure keeps it: %s %v", again, err)
 	}
 }
 

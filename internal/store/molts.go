@@ -75,6 +75,7 @@ type Molt struct {
 	ContentHTML    template.HTML `dynamodbav:"-"` // Content with mentions and crabtags linked
 	RemoltedByID   string        `dynamodbav:"-"`
 	AuthorName     string        `dynamodbav:"-"` // display names, looked up by ID
+	AuthorAvatar   string        `dynamodbav:"-"` // generated-crab code, from the directory
 	RemoltedByName string        `dynamodbav:"-"`
 	ReplyToName    string        `dynamodbav:"-"`
 }
