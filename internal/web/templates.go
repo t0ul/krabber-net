@@ -22,16 +22,17 @@ import (
 
 // templateData is everything a page template can use.
 type templateData struct {
-	CurrentYear      int
-	Flash            string
-	IsAuthenticated  bool
-	IsAdmin          bool
-	IsModerator      bool
-	CrabID           string
-	CrabName         string
-	Avatar           string // current crab's generated-crab code
-	ShowNSFW         bool
-	MutedWords       []string
+	CurrentYear     int
+	Flash           string
+	IsAuthenticated bool
+	IsAdmin         bool
+	IsModerator     bool
+	CrabID          string
+	CrabName        string
+	Avatar          string // current crab's generated-crab code
+	ShowNSFW        bool
+	MutedWords      []string
+	store.Appearance
 	CSRFToken        string
 	TurnstileSiteKey string
 	Form             any
@@ -307,7 +308,7 @@ func (app *App) newTemplateData(r *http.Request) templateData {
 		d.CrabID = c.ID
 		d.CrabName = c.UserName
 		d.Avatar = c.Avatar
-		d.ShowNSFW, d.MutedWords = c.ShowNSFW, c.MutedWords
+		d.ShowNSFW, d.MutedWords, d.Appearance = c.ShowNSFW, c.MutedWords, c.Appearance
 		d.IsAdmin = c.IsAdmin()
 		d.IsModerator = c.IsModerator()
 		n, err := app.store.UnreadNotifications(r.Context(), c.ID)

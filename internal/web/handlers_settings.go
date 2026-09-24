@@ -166,6 +166,24 @@ func (app *App) settingsProfilePost(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/settings", http.StatusSeeOther)
 }
 
+func (app *App) settingsAppearancePost(w http.ResponseWriter, r *http.Request) {
+	var f struct {
+		Light    bool `form:"light_mode"`
+		Dyslexic bool `form:"dyslexic_mode"`
+	}
+	if err := app.decodePostForm(w, r, &f); err != nil {
+		app.clientError(w, http.StatusBadRequest)
+		return
+	}
+	c := *currentCrab(r)
+	if err := app.store.SetAppearance(r.Context(), &c, store.Appearance{LightMode: f.Light, DyslexicMode: f.Dyslexic}); err != nil {
+		app.serverError(w, r, err)
+		return
+	}
+	app.sessions.Put(r.Context(), sessionFlash, "Changes saved.")
+	http.Redirect(w, r, "/settings", http.StatusSeeOther)
+}
+
 func (app *App) settingsUsernamePost(w http.ResponseWriter, r *http.Request) {
 	var f usernameForm
 	if err := app.decodePostForm(w, r, &f); err != nil {

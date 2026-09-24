@@ -97,6 +97,20 @@
         <button type="submit" class="btn btn-outline-light rounded-pill">Save</button>
     </form>
 
+    <form class="px-3 py-3 border-bottom border-dark kb-settings" method="POST" action="/settings/appearance">
+        <input type='hidden' name='csrf_token' value='{{ .CSRFToken }}'>
+        <h2 class="h6 font-weight-bold mb-3">Appearance</h2>
+        <div class="custom-control custom-switch mb-2">
+            <input type="checkbox" class="custom-control-input" id="light-mode" name="light_mode" value="true"{{ if .LightMode }} checked{{ end }}>
+            <label class="custom-control-label" for="light-mode">Light mode</label>
+        </div>
+        <div class="custom-control custom-switch mb-3">
+            <input type="checkbox" class="custom-control-input" id="dyslexic-mode" name="dyslexic_mode" value="true"{{ if .DyslexicMode }} checked{{ end }}>
+            <label class="custom-control-label" for="dyslexic-mode">Dyslexic mode <span class="text-muted">(the OpenDyslexic typeface everywhere)</span></label>
+        </div>
+        <button type="submit" class="btn btn-outline-light rounded-pill">Save</button>
+    </form>
+
     <form class="px-3 py-3 border-bottom border-dark kb-settings" method="POST" action="/settings/password" novalidate>
         <input type='hidden' name='csrf_token' value='{{ .CSRFToken }}'>
         <h2 class="h6 font-weight-bold mb-3">Change password</h2>

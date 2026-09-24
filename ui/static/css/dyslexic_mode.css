@@ -1,0 +1,34 @@
+/* OpenDyslexic (SIL Open Font License), loaded only with this stylesheet. */
+@font-face {
+    font-family: "OpenDyslexic";
+    src: url("/static/fonts/OpenDyslexic-Regular.otf") format("opentype");
+    font-display: swap;
+}
+@font-face {
+    font-family: "OpenDyslexic";
+    src: url("/static/fonts/OpenDyslexic-Bold.otf") format("opentype");
+    font-weight: bold;
+    font-display: swap;
+}
+@font-face {
+    font-family: "OpenDyslexic";
+    src: url("/static/fonts/OpenDyslexic-Italic.otf") format("opentype");
+    font-style: italic;
+    font-display: swap;
+}
+@font-face {
+    font-family: "OpenDyslexic";
+    src: url("/static/fonts/OpenDyslexic-BoldItalic.otf") format("opentype");
+    font-weight: bold;
+    font-style: italic;
+    font-display: swap;
+}
+
+* {
+    font-family: "OpenDyslexic" !important;
+}
+
+.verified {
+    vertical-align: middle !important;
+    margin-bottom: .2em !important;
+}

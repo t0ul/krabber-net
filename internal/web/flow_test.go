@@ -2196,6 +2196,42 @@ func TestChangeUsername(t *testing.T) {
 	}
 }
 
+func TestAppearance(t *testing.T) {
+	h := newHarness(t)
+	h.signupAndActivate("gary", "gary@krabber.test", "meow-meow-meow")
+	h.login("gary@krabber.test", "meow-meow-meow")
+	if _, body, _ := h.get("/sea"); strings.Contains(body, "light_mode.css") || strings.Contains(body, "dyslexic_mode.css") {
+		t.Fatal("themes should be off by default")
+	}
+	tok := h.csrf("/settings")
+	if status, _, _ := h.post("/settings/appearance", url.Values{"csrf_token": {tok}, "light_mode": {"true"}, "dyslexic_mode": {"true"}}); status != http.StatusSeeOther {
+		t.Fatalf("save: %d", status)
+	}
+	_, body, _ := h.get("/sea")
+	if !strings.Contains(body, "/static/css/light_mode.css?v=") || !strings.Contains(body, "/static/css/dyslexic_mode.css?v=") {
+		t.Error("the theme stylesheets aren't linked")
+	}
+	if strings.Index(body, "light_mode.css") < strings.Index(body, "app.css") {
+		t.Error("light mode must load after app.css to win")
+	}
+	if _, body, _ := h.get("/settings"); !strings.Contains(body, `id="light-mode" name="light_mode" value="true" checked`) {
+		t.Error("settings don't show light mode on")
+	}
+	for _, path := range []string{"/static/css/light_mode.css", "/static/css/dyslexic_mode.css", "/static/fonts/OpenDyslexic-Regular.otf"} {
+		if status, _, _ := h.get(path); status != http.StatusOK {
+			t.Errorf("%s: %d", path, status)
+		}
+	}
+	h.post("/settings/appearance", url.Values{"csrf_token": {tok}, "dyslexic_mode": {"true"}})
+	if _, body, _ := h.get("/sea"); strings.Contains(body, "light_mode.css") || !strings.Contains(body, "dyslexic_mode.css") {
+		t.Error("turning light mode off should keep dyslexic mode")
+	}
+	h.post("/krab/logout", url.Values{"csrf_token": {h.csrf("/sea")}})
+	if _, body, _ := h.get("/sea"); strings.Contains(body, "dyslexic_mode.css") {
+		t.Error("signed-out visitors get the default theme")
+	}
+}
+
 func TestLegacyCrabURLsRedirect(t *testing.T) {
 	h := newHarness(t)
 	noFollow := h.newClient()

@@ -43,6 +43,7 @@ type Crab struct {
 	Avatar string `dynamodbav:"avatar,omitempty"` // seven-digit generated-crab code
 
 	ContentFilters
+	Appearance
 
 	UsernameChangedAt int64 `dynamodbav:"username_changed_at,omitempty"` // Unix seconds of the last rename
 
@@ -90,6 +91,49 @@ func (f FunFacts) Empty() bool { return f == FunFacts{} }
 type ContentFilters struct {
 	ShowNSFW   bool     `dynamodbav:"show_nsfw,omitempty"`   // show NSFW molts without a click
 	MutedWords []string `dynamodbav:"muted_words,omitempty"` // lowercase; molts containing any are left out of lists
+}
+
+// Appearance is how a crab likes the site drawn, as in Crabber's style settings.
+type Appearance struct {
+	LightMode    bool `dynamodbav:"light_mode,omitempty"`
+	DyslexicMode bool `dynamodbav:"dyslexic_mode,omitempty"` // OpenDyslexic everywhere
+}
+
+// SetAppearance saves the crab's theme choices.
+func (s *Store) SetAppearance(ctx context.Context, c *Crab, a Appearance) error {
+	var set, remove []string
+	values := map[string]types.AttributeValue{}
+	for _, f := range []struct {
+		attr string
+		on   bool
+	}{{"light_mode", a.LightMode}, {"dyslexic_mode", a.DyslexicMode}} {
+		if f.on {
+			set, values[":t"] = append(set, f.attr+" = :t"), boolean(true)
+		} else {
+			remove = append(remove, f.attr)
+		}
+	}
+	expr := ""
+	if len(set) > 0 {
+		expr = "SET " + strings.Join(set, ", ")
+	}
+	if len(remove) > 0 {
+		expr += " REMOVE " + strings.Join(remove, ", ")
+	}
+	in := &dynamodb.UpdateItemInput{
+		TableName:           s.tableName(),
+		Key:                 keyOf(c.PK, c.SK),
+		UpdateExpression:    aws.String(strings.TrimSpace(expr)),
+		ConditionExpression: aws.String("attribute_exists(PK)"),
+	}
+	if len(values) > 0 {
+		in.ExpressionAttributeValues = values
+	}
+	if _, err := s.db.UpdateItem(ctx, in); err != nil {
+		return fmt.Errorf("set appearance: %w", err)
+	}
+	c.Appearance = a
+	return nil
 }
 
 // Muted word limits, in characters for the lengths.

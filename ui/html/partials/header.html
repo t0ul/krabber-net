@@ -9,6 +9,8 @@
     <link rel="stylesheet" href="{{ asset "css/style.css" }}" />
     <link rel="stylesheet" href="{{ asset "css/color_overrides.css" }}">
     <link rel="stylesheet" href="{{ asset "css/app.css" }}">
+    {{ if .LightMode }}<link rel="stylesheet" href="{{ asset "css/light_mode.css" }}">{{ end }}
+    {{ if .DyslexicMode }}<link rel="stylesheet" href="{{ asset "css/dyslexic_mode.css" }}">{{ end }}
     <script src="{{ asset "js/htmx.min.js" }}" defer></script>
     <script src="{{ asset "js/app.js" }}" defer></script>
 </head>
