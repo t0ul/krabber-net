@@ -135,10 +135,11 @@ func clientIP(r *http.Request) string {
 
 // securityHeaders sets the browser hardening headers on every response.
 func (app *App) securityHeaders(next http.Handler) http.Handler {
-	scriptSrc, frameSrc := "'self'", "'none'"
+	// YouTube players load only after a click (app.js), from the no-cookie domain.
+	scriptSrc, frameSrc := "'self'", "https://www.youtube-nocookie.com"
 	if app.cfg.TurnstileEnabled() {
 		scriptSrc += " https://challenges.cloudflare.com"
-		frameSrc = "https://challenges.cloudflare.com"
+		frameSrc += " https://challenges.cloudflare.com"
 	}
 	csp := strings.Join([]string{
 		"default-src 'self'",

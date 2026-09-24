@@ -23,6 +23,18 @@
 </a>
 {{end}}
 
+{{/* A YouTube video waits behind a click: app.js swaps in the no-cookie player,
+     and without JavaScript the link opens the video on YouTube. Takes the ID. */}}
+{{define "youtube"}}
+<div class="kb-youtube zindex-front rounded-media mb-2" data-youtube="{{ . }}">
+    <a class="kb-youtube-play" href="https://www.youtube.com/watch?v={{ . }}" target="_blank" rel="nofollow noopener noreferrer">
+        <svg width="40" height="40"><use href="{{ asset "img/sprites.svg" }}#youtube"></use></svg>
+        <span class="kb-youtube-label">Play YouTube video</span>
+        <small class="text-muted">Loads from youtube-nocookie.com</small>
+    </a>
+</div>
+{{end}}
+
 {{/* The click target in front of a veiled molt's text. */}}
 {{define "nsfw-veil"}}<summary class="kb-nsfw-summary">This molt is marked NSFW. <span class="text-primary">Show it</span></summary>{{end}}
 
@@ -58,10 +70,12 @@
             <details class="kb-nsfw zindex-front mb-2">
                 {{ template "nsfw-veil" }}
                 <p class="mt-2 mb-2"><span class="molt-text clickable" data-href="/molt/view/{{ $m.ID }}">{{ or $m.ContentHTML $m.Content }}</span></p>
+                {{ with $m.YouTube }}{{ template "youtube" . }}{{ end }}
                 {{ with $m.Card }}{{ template "link-card" . }}{{ end }}
             </details>
             {{ else }}
             <p class="mb-2"><span class="zindex-front molt-text clickable" data-href="/molt/view/{{ $m.ID }}">{{ or $m.ContentHTML $m.Content }}</span></p>
+            {{ with $m.YouTube }}{{ template "youtube" . }}{{ end }}
             {{ with $m.Card }}{{ template "link-card" . }}{{ end }}
             {{ end }}
         </div>

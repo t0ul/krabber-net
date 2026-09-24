@@ -67,4 +67,33 @@ func TestLinks(t *testing.T) {
 	if got := Mentions("https://x.test/@bob"); len(got) != 0 {
 		t.Errorf("mention inside a link: %q", got)
 	}
+	if got := URLs("a https://one.test b https://two.test."); !slices.Equal(got, []string{"https://one.test", "https://two.test"}) {
+		t.Errorf("URLs = %q", got)
+	}
+}
+
+func TestYouTubeID(t *testing.T) {
+	good := map[string]string{
+		"https://www.youtube.com/watch?v=dQw4w9WgXcQ":           "dQw4w9WgXcQ",
+		"https://youtube.com/watch?feature=share&v=dQw4w9WgXcQ": "dQw4w9WgXcQ",
+		"https://m.youtube.com/watch?v=dQw4w9WgXcQ&t=42":        "dQw4w9WgXcQ",
+		"https://youtu.be/dQw4w9WgXcQ?si=abc":                   "dQw4w9WgXcQ",
+		"https://www.youtube.com/shorts/dQw4w9WgXcQ":            "dQw4w9WgXcQ",
+		"https://www.youtube.com/embed/dQw4w9WgXcQ/":            "dQw4w9WgXcQ",
+		"http://youtube.com/live/dQw4w9WgXcQ":                   "dQw4w9WgXcQ",
+	}
+	for in, want := range good {
+		if got := YouTubeID(in); got != want {
+			t.Errorf("YouTubeID(%q) = %q, want %q", in, got, want)
+		}
+	}
+	for _, in := range []string{
+		"https://www.youtube.com/watch?v=short", "https://youtube.com/channel/UCabcdefghijk",
+		"https://evilyoutube.com/watch?v=dQw4w9WgXcQ", "https://youtube.com.evil.test/watch?v=dQw4w9WgXcQ",
+		"https://youtu.be/dQw4w9WgXcQ\"><script>", "javascript://youtube.com/watch?v=dQw4w9WgXcQ",
+	} {
+		if got := YouTubeID(in); got != "" {
+			t.Errorf("YouTubeID(%q) = %q, want none", in, got)
+		}
+	}
 }

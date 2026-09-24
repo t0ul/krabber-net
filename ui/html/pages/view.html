@@ -37,10 +37,12 @@
         <details class="kb-nsfw mb-2">
             {{ template "nsfw-veil" }}
             <p class="large-molt-text mt-2 mb-2 molt-text">{{ or .ContentHTML .Content }}</p>
+            {{ with .YouTube }}{{ template "youtube" . }}{{ end }}
             {{ with .Card }}{{ template "link-card" . }}{{ end }}
         </details>
         {{ else }}
         <p class="large-molt-text mb-2 molt-text">{{ or .ContentHTML .Content }}</p>
+        {{ with .YouTube }}{{ template "youtube" . }}{{ end }}
         {{ with .Card }}{{ template "link-card" . }}{{ end }}
         {{ end }}
         {{ if .QuoteOf }}{{ template "quoted-molt" .Quoted }}{{ end }}

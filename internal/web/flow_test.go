@@ -1908,6 +1908,30 @@ func TestLinkCards(t *testing.T) {
 	}
 }
 
+func TestYouTube(t *testing.T) {
+	h := newHarness(t)
+	h.signupAndActivate("karen", "karen@krabber.test", "computer-wife!")
+	h.login("karen@krabber.test", "computer-wife!")
+	tok := h.csrf("/trench")
+	text := "never gonna https://youtu.be/dQw4w9WgXcQ?si=x and https://krabber.net/about"
+	if status, _, _ := h.post("/molt/create", url.Values{"csrf_token": {tok}, "content": {text}}); status != http.StatusSeeOther {
+		t.Fatalf("create: %d", status)
+	}
+	if h.cards.asked("https://youtu.be/dQw4w9WgXcQ?si=x") || !h.cards.asked("https://krabber.net/about") {
+		t.Errorf("the card should be for the non-YouTube link: %v", h.cards.urls)
+	}
+	molts, _ := h.store.MoltsByOwner(context.Background(), currentID(t, h, "karen"), 1)
+	for _, path := range []string{"/sea", "/molt/view/" + molts[0].ID} {
+		_, body, _ := h.get(path)
+		if !strings.Contains(body, `data-youtube="dQw4w9WgXcQ"`) || !strings.Contains(body, `href="https://www.youtube.com/watch?v=dQw4w9WgXcQ"`) {
+			t.Errorf("%s has no YouTube placeholder", path)
+		}
+		if strings.Contains(body, "<iframe") {
+			t.Errorf("%s loads the player before a click", path)
+		}
+	}
+}
+
 func TestParseMutedWords(t *testing.T) {
 	got := parseMutedWords("Chum, ,chum,  Secret   Formula ,\tplankton\n," + strings.Repeat("x", 65))
 	if want := []string{"chum", "secret formula", "plankton"}; !slices.Equal(got, want) {

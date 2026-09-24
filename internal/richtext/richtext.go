@@ -45,16 +45,58 @@ func linkEnd(s string, start, end int) int {
 	return end
 }
 
-// FirstURL returns the first web link in s, or "".
-func FirstURL(s string) string {
+// URLs returns the web links in s, in order.
+func URLs(s string) []string {
+	var out []string
 	for _, m := range token.FindAllStringSubmatchIndex(s, -1) {
 		if m[6] >= 0 {
 			if end := linkEnd(s, m[6], m[7]); end > m[6] {
-				return s[m[6]:end]
+				out = append(out, s[m[6]:end])
 			}
 		}
 	}
+	return out
+}
+
+// FirstURL returns the first web link in s, or "".
+func FirstURL(s string) string {
+	if urls := URLs(s); len(urls) > 0 {
+		return urls[0]
+	}
 	return ""
+}
+
+var youtubeIDRe = regexp.MustCompile(`^[A-Za-z0-9_-]{11}$`)
+
+// YouTubeID returns the video ID of a YouTube watch, share, Shorts, embed or
+// live link, or "".
+func YouTubeID(link string) string {
+	u, err := url.Parse(link)
+	if err != nil || (!strings.EqualFold(u.Scheme, "https") && !strings.EqualFold(u.Scheme, "http")) {
+		return ""
+	}
+	host := strings.ToLower(u.Hostname())
+	host = strings.TrimPrefix(strings.TrimPrefix(host, "www."), "m.")
+	var id string
+	switch host {
+	case "youtu.be":
+		id = strings.TrimPrefix(u.Path, "/")
+	case "youtube.com":
+		if u.Path == "/watch" {
+			id = u.Query().Get("v")
+			break
+		}
+		for _, prefix := range []string{"/shorts/", "/embed/", "/live/"} {
+			if rest, ok := strings.CutPrefix(u.Path, prefix); ok {
+				id = rest
+			}
+		}
+	}
+	id = strings.TrimSuffix(id, "/")
+	if !youtubeIDRe.MatchString(id) {
+		return ""
+	}
+	return id
 }
 
 // linkText is how a link reads in a molt: without the scheme, shortened.

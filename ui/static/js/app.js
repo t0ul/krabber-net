@@ -151,6 +151,26 @@ document.addEventListener("click", function (event) {
   window.location.href = text.getAttribute("data-href");
 });
 
+// A YouTube placeholder becomes the no-cookie player only when clicked, so
+// nothing loads from YouTube until the reader asks.
+document.addEventListener("click", function (event) {
+  var play = event.target.closest && event.target.closest(".kb-youtube-play");
+  if (!play) return;
+  var box = play.closest("[data-youtube]");
+  var id = box && box.getAttribute("data-youtube");
+  if (!id || !/^[A-Za-z0-9_-]{11}$/.test(id)) return;
+  event.preventDefault();
+  var frame = document.createElement("iframe");
+  frame.src = "https://www.youtube-nocookie.com/embed/" + id + "?autoplay=1";
+  frame.title = "YouTube video";
+  frame.allow = "autoplay; encrypted-media; picture-in-picture; fullscreen";
+  frame.allowFullscreen = true;
+  frame.referrerPolicy = "strict-origin-when-cross-origin";
+  frame.setAttribute("sandbox", "allow-scripts allow-same-origin allow-presentation allow-popups");
+  box.replaceChildren(frame);
+  box.classList.add("playing");
+});
+
 // A deleted molt leaves the page: an undone remolt removes just that entry,
 // a deleted molt removes every entry showing it.
 document.addEventListener("moltDeleted", function (event) {

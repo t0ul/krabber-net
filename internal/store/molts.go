@@ -81,6 +81,7 @@ type Molt struct {
 	ReplyToName    string        `dynamodbav:"-"`
 	Veiled         bool          `dynamodbav:"-"` // NSFW and the viewer hasn't opted in, so the text waits behind a click
 	Card           *LinkCard     `dynamodbav:"-"` // the first link's card, once fetched
+	YouTube        string        `dynamodbav:"-"` // video ID of the first YouTube link, for the click-to-load player
 }
 
 // MoltOption sets something extra on a molt, reply or quote as it's written.

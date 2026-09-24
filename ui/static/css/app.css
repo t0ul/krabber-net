@@ -347,6 +347,47 @@
   cursor: pointer;
 }
 
+.kb-youtube {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  border: 1px solid var(--border-dark-less, #2f3336);
+  background: #000;
+  overflow: hidden;
+}
+
+.kb-youtube-play {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  color: var(--light);
+}
+
+.kb-youtube-play:hover {
+  text-decoration: none;
+  color: var(--light);
+  background: var(--dark-lesser, #16181c);
+}
+
+.kb-youtube-play svg {
+  fill: var(--primary);
+}
+
+.kb-youtube-label {
+  font-weight: 600;
+}
+
+.kb-youtube iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
 /* Crabber's card is sized around an image; Krabber's cards are text only. */
 .link-card {
   height: auto;

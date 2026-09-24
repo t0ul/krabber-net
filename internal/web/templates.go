@@ -322,6 +322,7 @@ func (app *App) withDisplay(r *http.Request, molts []store.Molt) {
 	for i := range molts {
 		molts[i].ContentHTML = richtext.HTML(molts[i].Content, known)
 		molts[i].Veiled = molts[i].NSFW && !showNSFW && molts[i].AuthorID != viewer
+		molts[i].YouTube = firstYouTube(molts[i].Content)
 	}
 	for i := range molts {
 		m := &molts[i]
@@ -373,11 +374,27 @@ func (app *App) withLikes(r *http.Request, molts []store.Molt) ([]store.Molt, er
 	return molts, nil
 }
 
-// cardURL is the address a molt's card is cached under: its first link, when
-// that's a plain HTTPS address.
+// firstYouTube is the video ID of the first YouTube link in content, or "".
+func firstYouTube(content string) string {
+	for _, u := range richtext.URLs(content) {
+		if id := richtext.YouTubeID(u); id != "" {
+			return id
+		}
+	}
+	return ""
+}
+
+// cardURL is the address a molt's card is cached under: its first link that
+// isn't a YouTube video (those get the player), when that's a plain HTTPS
+// address.
 func cardURL(content string) string {
-	u, _ := linkcard.Normalize(richtext.FirstURL(content))
-	return u
+	for _, link := range richtext.URLs(content) {
+		if richtext.YouTubeID(link) == "" {
+			u, _ := linkcard.Normalize(link)
+			return u
+		}
+	}
+	return ""
 }
 
 // withCards attaches the cached card for each molt's first link, and asks for
