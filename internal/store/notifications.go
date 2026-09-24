@@ -43,7 +43,8 @@ type Notification struct {
 	CreatedAt   time.Time `dynamodbav:"created_at"`
 	ExpiresAt   int64     `dynamodbav:"expires_at"`
 
-	ActorAvatar string `dynamodbav:"-"`
+	ActorAvatar   string `dynamodbav:"-"`
+	ActorVerified bool   `dynamodbav:"-"`
 }
 
 type notificationCounter struct {

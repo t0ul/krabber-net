@@ -211,6 +211,19 @@ func (app *App) crabminCrabPost(w http.ResponseWriter, r *http.Request) {
 		err = app.store.UpdateProfile(ctx, target, p)
 		app.dir.invalidate()
 		msg = "Cleared @" + target.UserName + "'s " + strings.ReplaceAll(field, "_", " ") + "."
+	case "verify", "unverify":
+		if !mod.IsAdmin() {
+			entry.Action = "attempted_" + f.Action
+			app.logMod(r, entry)
+			done("Only admins can verify crabs.")
+			return
+		}
+		err = app.store.SetVerified(ctx, target, f.Action == "verify")
+		app.dir.putCrab(*target)
+		msg = "@" + target.UserName + " is verified."
+		if f.Action == "unverify" {
+			msg = "@" + target.UserName + " is no longer verified."
+		}
 	case "make_moderator", "remove_moderator":
 		if !mod.IsAdmin() {
 			entry.Action = "attempted_" + f.Action

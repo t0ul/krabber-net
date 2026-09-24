@@ -27,7 +27,8 @@
         <div class="d-flex align-items-center mb-2">
             <a href="/crabs/{{ .Author }}" class="mr-2">{{ template "avatar" .AuthorAvatar }}</a>
             <div class="mini-molt-credentials-text flex-grow-1">
-                <a href="/crabs/{{ .Author }}" class="mini-molt-display-name d-block">{{ or .AuthorName .Author }}</a>
+                <a href="/crabs/{{ .Author }}" class="mini-molt-display-name">{{ or .AuthorName .Author }}</a>
+                {{ if .AuthorVerified }}{{ template "verified" 17 }}{{ end }}<br>
                 <span class="mini-molt-username">@{{ .Author }}</span>
                 {{ if .NSFW }}{{ template "nsfw-badge" }}{{ end }}
             </div>

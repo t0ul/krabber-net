@@ -2009,6 +2009,72 @@ func TestStats(t *testing.T) {
 	}
 }
 
+func TestVerifiedBadge(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	for _, name := range []string{"boss", "mod", "karen"} {
+		hash, _ := auth.HashPassword("secret-" + name)
+		c, err := h.store.CreateCrab(ctx, name, name+"@krabber.test", hash)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := h.store.ActivateCrab(ctx, c.ID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	crab := func(name string) *store.Crab {
+		c, err := h.store.CrabByUsername(ctx, name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return c
+	}
+	if err := h.store.SetRole(ctx, crab("boss"), store.RoleAdmin); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.store.SetRole(ctx, crab("mod"), store.RoleModerator); err != nil {
+		t.Fatal(err)
+	}
+	karen := crab("karen")
+	if _, err := h.store.CreateMolt(ctx, karen, "I'm a computer"); err != nil {
+		t.Fatal(err)
+	}
+	const badge = `aria-label="Verified"`
+
+	h.login("mod@krabber.test", "secret-mod")
+	tok := h.csrf("/crabmin/crabs/karen")
+	if _, body, _ := h.get("/crabmin/crabs/karen"); strings.Contains(body, `value="verify"`) {
+		t.Error("moderators shouldn't get the Verify button")
+	}
+	h.post("/crabmin/crabs/"+karen.ID, url.Values{"csrf_token": {tok}, "action": {"verify"}})
+	if crab("karen").Verified {
+		t.Fatal("a moderator verified a crab")
+	}
+
+	h.client = h.newClient()
+	h.login("boss@krabber.test", "secret-boss")
+	tok = h.csrf("/crabmin/crabs/karen")
+	if status, _, _ := h.post("/crabmin/crabs/"+karen.ID, url.Values{"csrf_token": {tok}, "action": {"verify"}}); status != http.StatusSeeOther {
+		t.Fatalf("verify: %d", status)
+	}
+	if !crab("karen").Verified {
+		t.Fatal("not verified")
+	}
+	for _, path := range []string{"/crabs/karen", "/sea", "/crabs"} {
+		if _, body, _ := h.get(path); !strings.Contains(body, badge) {
+			t.Errorf("%s has no badge", path)
+		}
+	}
+	_, body, _ := h.get("/crabmin/log")
+	if !strings.Contains(body, "tried to verify") || !strings.Contains(body, "verified") {
+		t.Error("verification attempts and actions should be logged")
+	}
+	h.post("/crabmin/crabs/"+karen.ID, url.Values{"csrf_token": {tok}, "action": {"unverify"}})
+	if _, body, _ := h.get("/crabs/karen"); strings.Contains(body, badge) {
+		t.Error("badge still on the profile after unverify")
+	}
+}
+
 func TestCommas(t *testing.T) {
 	for n, want := range map[int]string{0: "0", 999: "999", 1000: "1,000", 1234567: "1,234,567", -4200: "-4,200"} {
 		if got := commas(n); got != want {

@@ -3,6 +3,7 @@
 // DYNAMO_ENDPOINT for DynamoDB Local); prod uses the caller's AWS profile:
 //
 //	AWS_PROFILE=krabber-admin TABLE_NAME=krabber-prod go run ./cmd/crabctl role <username> admin
+//	AWS_PROFILE=krabber-admin TABLE_NAME=krabber-prod go run ./cmd/crabctl verify <username> on
 package main
 
 import (
@@ -16,17 +17,17 @@ import (
 	"github.com/t0ul/krabber-net/internal/store"
 )
 
-const usage = `usage: crabctl role <username> <admin|moderator|none>`
+const usage = `usage: crabctl role <username> <admin|moderator|none>
+       crabctl verify <username> <on|off>`
 
 func main() {
-	if len(os.Args) != 4 || os.Args[1] != "role" {
+	if len(os.Args) != 4 {
 		log.Fatal(usage)
 	}
-	name, role := os.Args[2], os.Args[3]
-	switch role {
-	case store.RoleAdmin, store.RoleModerator:
-	case "none":
-		role = ""
+	cmd, name, value := os.Args[1], os.Args[2], os.Args[3]
+	switch {
+	case cmd == "role" && (value == store.RoleAdmin || value == store.RoleModerator || value == "none"):
+	case cmd == "verify" && (value == "on" || value == "off"):
 	default:
 		log.Fatal(usage)
 	}
@@ -47,18 +48,27 @@ func main() {
 	if err != nil {
 		log.Fatalf("find %q in %q: %v", name, table, err) //nolint:gosec // the operator's own arguments, printed to their terminal
 	}
-	if err := s.SetRole(ctx, c, role); err != nil {
+	entry := store.ModAction{Moderator: "crabctl", CrabID: c.ID, Crab: c.UserName}
+	switch cmd {
+	case "role":
+		role := value
+		if role == "none" {
+			role = ""
+		}
+		err = s.SetRole(ctx, c, role)
+		entry.Action, entry.Note = "set_role", value
+	case "verify":
+		err = s.SetVerified(ctx, c, value == "on")
+		entry.Action = "verify"
+		if value == "off" {
+			entry.Action = "unverify"
+		}
+	}
+	if err != nil {
 		log.Fatal(err)
 	}
-	if err := s.LogModAction(ctx, store.ModAction{Moderator: "crabctl", Action: "set_role", CrabID: c.ID, Crab: c.UserName, Note: valueOr(role, "none")}); err != nil {
-		log.Printf("warning: role set but not logged: %v", err)
+	if err := s.LogModAction(ctx, entry); err != nil {
+		log.Printf("warning: done but not logged: %v", err)
 	}
-	fmt.Printf("@%s (%s) in %s: role %s\n", c.UserName, c.ID, table, valueOr(role, "none"))
-}
-
-func valueOr(v, fallback string) string {
-	if v == "" {
-		return fallback
-	}
-	return v
+	fmt.Printf("@%s (%s) in %s: %s %s\n", c.UserName, c.ID, table, cmd, value)
 }

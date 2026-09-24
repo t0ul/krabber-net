@@ -1108,6 +1108,25 @@ func TestNSFW(t *testing.T) {
 	}
 }
 
+func TestVerified(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+	karen := mustCrab(t, s, "karen")
+	if err := s.SetVerified(ctx, karen, true); err != nil {
+		t.Fatal(err)
+	}
+	crabs, _, err := s.ListCrabs(ctx, 10)
+	if err != nil || len(crabs) != 1 || !crabs[0].Verified {
+		t.Fatalf("listed: %+v %v", crabs, err)
+	}
+	if err := s.SetVerified(ctx, karen, false); err != nil {
+		t.Fatal(err)
+	}
+	if fresh, _ := s.CrabByID(ctx, karen.ID); fresh.Verified {
+		t.Fatal("still verified")
+	}
+}
+
 func TestLinkCards(t *testing.T) {
 	s := newTestStore(t)
 	ctx := context.Background()

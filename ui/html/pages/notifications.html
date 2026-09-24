@@ -33,7 +33,7 @@
                 <span class="text-muted small ml-auto">{{ template "time" .CreatedAt }}</span>
             </div>
             <div>
-                <a href="/crabs/{{ .Actor }}" class="text-light font-weight-bold">@{{ .Actor }}</a>
+                <a href="/crabs/{{ .Actor }}" class="text-light font-weight-bold">@{{ .Actor }}</a>{{ if .ActorVerified }} {{ template "verified" 15 }}{{ end }}
                 {{ if eq .Type "like" }}liked your molt
                 {{ else if eq .Type "remolt" }}remolted your molt
                 {{ else if eq .Type "reply" }}replied to your molt

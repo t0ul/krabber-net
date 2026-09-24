@@ -136,6 +136,8 @@ var modActions = map[string][2]string{ // action: {done, tried to}
 	"clear_bio":          {"cleared the bio of", "clear the bio of"},
 	"clear_location":     {"cleared the location of", "clear the location of"},
 	"clear_website":      {"cleared the website of", "clear the website of"},
+	"verify":             {"verified", "verify"},
+	"unverify":           {"removed the verified badge from", "remove the verified badge from"},
 	"make_moderator":     {"made a moderator:", "make a moderator:"},
 	"remove_moderator":   {"removed the moderator role from", "remove the moderator role from"},
 	"remove_molt":        {"removed a molt by", "remove a molt by"},
@@ -345,7 +347,7 @@ func (app *App) withDisplay(r *http.Request, molts []store.Molt) {
 	for i := range molts {
 		m := &molts[i]
 		if c, ok := byID[m.AuthorID]; ok {
-			m.Author, m.AuthorName, m.AuthorAvatar = c.UserName, c.Name(), c.Avatar
+			m.Author, m.AuthorName, m.AuthorAvatar, m.AuthorVerified = c.UserName, c.Name(), c.Avatar, c.Verified
 		}
 		if c, ok := byID[m.RemoltedByID]; ok {
 			m.RemoltedBy, m.RemoltedByName = c.UserName, c.Name()

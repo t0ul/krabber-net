@@ -83,7 +83,7 @@
     </div>
     <div class="col">
         <div class="profile-box-names mt-2">
-            <h2 class="king-display-name">{{ $c.Name }}</h2>
+            <h2 class="king-display-name">{{ $c.Name }}{{ if $c.Verified }} {{ template "verified" 30 }}{{ end }}</h2>
             <p class="text-muted mb-1">@{{ $c.UserName }} <span class="follow-count px-1 ml-1">{{ .Note }}</span></p>
         </div>
     </div>

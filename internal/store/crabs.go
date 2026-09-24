@@ -36,6 +36,7 @@ type Crab struct {
 	Deleted   bool   `dynamodbav:"deleted"`
 	DeletedAt int64  `dynamodbav:"deleted_at,omitempty"` // Unix seconds
 	Role      string `dynamodbav:"role,omitempty"`       // RoleAdmin, RoleModerator or empty
+	Verified  bool   `dynamodbav:"verified,omitempty"`   // set by an admin; shows the badge
 
 	Profile
 
@@ -223,8 +224,9 @@ func (s *Store) ListCrabs(ctx context.Context, limit int) ([]Crab, map[string]bo
 	p := dynamodb.NewScanPaginator(s.db, &dynamodb.ScanInput{
 		TableName:            s.tableName(),
 		IndexName:            aws.String(gsiCrabByID),
-		ProjectionExpression: aws.String("#id, #un, #frc, #fgc, #mc, #act, #ban, #del, #ca, #dn, #bio, #av"),
+		ProjectionExpression: aws.String("#id, #un, #frc, #fgc, #mc, #act, #ban, #del, #ca, #dn, #bio, #av, #ver"),
 		ExpressionAttributeNames: map[string]string{
+			"#ver": "verified",
 			"#dn":  "display_name",
 			"#bio": "bio",
 			"#ca":  "created_at",
@@ -371,6 +373,25 @@ func (s *Store) SetBanned(ctx context.Context, c *Crab, banned bool, reason stri
 	if err != nil {
 		return fmt.Errorf("set banned: %w", err)
 	}
+	return nil
+}
+
+// SetVerified gives a crab the verified badge, or takes it away.
+func (s *Store) SetVerified(ctx context.Context, c *Crab, on bool) error {
+	in := &dynamodb.UpdateItemInput{
+		TableName:           s.tableName(),
+		Key:                 keyOf(c.PK, c.SK),
+		UpdateExpression:    aws.String("REMOVE verified"),
+		ConditionExpression: aws.String("attribute_exists(PK)"),
+	}
+	if on {
+		in.UpdateExpression = aws.String("SET verified = :t")
+		in.ExpressionAttributeValues = map[string]types.AttributeValue{":t": boolean(true)}
+	}
+	if _, err := s.db.UpdateItem(ctx, in); err != nil {
+		return fmt.Errorf("set verified: %w", err)
+	}
+	c.Verified = on
 	return nil
 }
 

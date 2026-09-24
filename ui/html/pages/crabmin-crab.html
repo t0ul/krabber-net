@@ -9,7 +9,7 @@
         <div class="d-flex align-items-center">
             {{ template "avatar" $c.Avatar }}
             <div class="ml-3">
-                <div class="font-weight-bold">{{ $c.Name }} <span class="text-muted font-weight-normal">@{{ $c.UserName }}</span></div>
+                <div class="font-weight-bold">{{ $c.Name }}{{ if $c.Verified }} {{ template "verified" 15 }}{{ end }} <span class="text-muted font-weight-normal">@{{ $c.UserName }}</span></div>
                 <div class="small text-muted">
                     Joined {{ monthYear $c.CreatedAt }} · {{ $c.MoltCount }} molts · {{ $c.FollowerCount }} followers
                     {{ with $c.Role }} · <span class="kb-role">{{ . }}</span>{{ end }}
@@ -65,6 +65,11 @@
             {{ if $c.Location }}<button type="submit" name="action" value="clear_location" class="btn btn-sm btn-outline-secondary rounded-pill mr-2 mb-2">Clear location</button>{{ end }}
             {{ if $c.Website }}<button type="submit" name="action" value="clear_website" class="btn btn-sm btn-outline-secondary rounded-pill mr-2 mb-2">Clear website</button>{{ end }}
             {{ if $.IsAdmin }}
+                {{ if $c.Verified }}
+                <button type="submit" name="action" value="unverify" class="btn btn-sm btn-outline-secondary rounded-pill mr-2 mb-2">Unverify</button>
+                {{ else }}
+                <button type="submit" name="action" value="verify" class="btn btn-sm btn-outline-light rounded-pill mr-2 mb-2">Verify</button>
+                {{ end }}
                 {{ if eq $c.Role "moderator" }}
                 <button type="submit" name="action" value="remove_moderator" class="btn btn-sm btn-outline-warning rounded-pill mr-2 mb-2">Remove moderator</button>
                 {{ else }}

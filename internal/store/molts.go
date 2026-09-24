@@ -77,6 +77,7 @@ type Molt struct {
 	RemoltedByID   string        `dynamodbav:"-"`
 	AuthorName     string        `dynamodbav:"-"` // display names, looked up by ID
 	AuthorAvatar   string        `dynamodbav:"-"` // generated-crab code, from the directory
+	AuthorVerified bool          `dynamodbav:"-"`
 	RemoltedByName string        `dynamodbav:"-"`
 	ReplyToName    string        `dynamodbav:"-"`
 	Veiled         bool          `dynamodbav:"-"` // NSFW and the viewer hasn't opted in, so the text waits behind a click

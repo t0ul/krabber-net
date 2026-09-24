@@ -96,7 +96,7 @@ func (app *App) notifications(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		if a, ok := byID[n.ActorID]; ok {
-			n.ActorAvatar = a.Avatar
+			n.ActorAvatar, n.ActorVerified = a.Avatar, a.Verified
 		}
 		data.Notifications = append(data.Notifications, n)
 	}

@@ -35,7 +35,7 @@
                 {{ end }}
             </div>
         </div>
-        <h1 class="h4 mt-3 mb-0">{{ $p.Name }}</h1>
+        <h1 class="h4 mt-3 mb-0">{{ $p.Name }}{{ if $p.Verified }} {{ template "verified" 18 }}{{ end }}</h1>
         <p class="text-muted mb-1">@{{ $p.UserName }}
             {{ if .FollowsYou }}<small class="follows-you">Follows you</small>{{ end }}
         </p>
