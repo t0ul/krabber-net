@@ -1686,3 +1686,100 @@ func TestGeneratedAvatars(t *testing.T) {
 		t.Fatalf("fourth reroll: %d %s", status, body)
 	}
 }
+
+func TestNSFW(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	h.signupAndActivate("karen", "karen@krabber.test", "computer-wife!")
+	h.signupAndActivate("sandy", "sandy@krabber.test", "karate-chop!")
+	hash, _ := auth.HashPassword("secret-mrkrabs")
+	boss, err := h.store.CreateCrab(ctx, "mrkrabs", "mrkrabs@krabber.test", hash)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := h.store.ActivateCrab(ctx, boss.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.store.SetRole(ctx, boss, store.RoleModerator); err != nil {
+		t.Fatal(err)
+	}
+	const veil = "This molt is marked NSFW"
+
+	h.login("karen@krabber.test", "computer-wife!")
+	if _, body, _ := h.get("/trench"); !strings.Contains(body, `name="nsfw" value="true"`) {
+		t.Fatal("compose has no NSFW switch")
+	}
+	tok := h.csrf("/trench")
+	if status, _, _ := h.post("/molt/create", url.Values{"csrf_token": {tok}, "content": {"the secret formula"}, "nsfw": {"true"}}); status != http.StatusSeeOther {
+		t.Fatalf("create: %d", status)
+	}
+	molts, _ := h.store.MoltsByOwner(ctx, currentID(t, h, "karen"), 1)
+	id := molts[0].ID
+	if !molts[0].NSFW {
+		t.Fatal("the switch didn't label the molt")
+	}
+	_, body, _ := h.get("/molt/view/" + id)
+	if !strings.Contains(body, `class="nsfw-badge"`) || strings.Contains(body, veil) || !strings.Contains(body, "Remove NSFW label") {
+		t.Error("the author should see the badge, the text, and Remove NSFW label")
+	}
+	h.post("/molt/reply/"+id, url.Values{"csrf_token": {tok}, "content": {"more formula"}, "nsfw": {"true"}})
+	if replies, _ := h.store.Replies(ctx, id, 5); len(replies) != 1 || !replies[0].NSFW {
+		t.Fatalf("reply label: %+v", replies)
+	}
+
+	h.client = h.newClient()
+	for _, path := range []string{"/sea", "/molt/view/" + id} {
+		if _, body, _ := h.get(path); !strings.Contains(body, veil) || !strings.Contains(body, `class="kb-nsfw`) {
+			t.Errorf("signed out, %s isn't veiled", path)
+		}
+	}
+
+	h.login("sandy@krabber.test", "karate-chop!")
+	if _, body, _ := h.get("/sea"); !strings.Contains(body, veil) || strings.Contains(body, "Label NSFW") {
+		t.Error("sandy should see the veil and no label action on karen's molt")
+	}
+	tok = h.csrf("/settings")
+	if status, _, _ := h.post("/molt/nsfw/"+id, url.Values{"csrf_token": {tok}}); status != http.StatusNotFound {
+		t.Errorf("unlabelling someone else's molt: %d", status)
+	}
+	if status, _, _ := h.post("/settings/nsfw", url.Values{"csrf_token": {tok}, "show_nsfw": {"true"}}); status != http.StatusSeeOther {
+		t.Fatalf("preference: %d", status)
+	}
+	if _, body, _ := h.get("/sea"); strings.Contains(body, veil) || !strings.Contains(body, "the secret formula") {
+		t.Error("opted in, the molt is still veiled")
+	}
+	if _, body, _ := h.get("/settings"); !strings.Contains(body, `id="show-nsfw" name="show_nsfw" value="true" checked`) {
+		t.Error("settings doesn't show the preference")
+	}
+	h.post("/settings/nsfw", url.Values{"csrf_token": {tok}})
+	if _, body, _ := h.get("/sea"); !strings.Contains(body, veil) {
+		t.Error("opted out again, the molt isn't veiled")
+	}
+
+	h.client = h.newClient()
+	h.login("karen@krabber.test", "computer-wife!")
+	tok = h.csrf("/trench")
+	status, _, hdr := h.post("/molt/nsfw/"+id, url.Values{"csrf_token": {tok}}, "HX-Request", "true")
+	if status != http.StatusOK || hdr.Get("HX-Refresh") != "true" {
+		t.Fatalf("remove label: %d %v", status, hdr)
+	}
+	if m, _ := h.store.MoltByID(ctx, id); m.NSFW {
+		t.Fatal("label still on")
+	}
+
+	h.client = h.newClient()
+	h.login("mrkrabs@krabber.test", "secret-mrkrabs")
+	tok = h.csrf("/crabmin/molts/" + id)
+	if status, _, _ := h.post("/crabmin/molts/"+id, url.Values{"csrf_token": {tok}, "action": {"nsfw"}}); status != http.StatusSeeOther {
+		t.Fatalf("mark nsfw: %d", status)
+	}
+	if m, _ := h.store.MoltByID(ctx, id); !m.NSFW {
+		t.Fatal("moderator label not stored")
+	}
+	if _, body, _ := h.get("/crabmin/molts/" + id); !strings.Contains(body, "Mark SFW") {
+		t.Error("crabmin should offer Mark SFW")
+	}
+	if _, body, _ := h.get("/crabmin/log"); !strings.Contains(body, "marked NSFW a molt by") {
+		t.Error("label not logged")
+	}
+}

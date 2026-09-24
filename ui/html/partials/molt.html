@@ -7,6 +7,11 @@
 
 {{define "avatar"}}<img class="kb-avatar profile-picture" src="{{ avatarSrc . }}" width="43" height="43" loading="lazy" alt="">{{end}}
 
+{{define "nsfw-badge"}}<span class="text-muted">·</span> <span class="nsfw-badge">NSFW</span>{{end}}
+
+{{/* The click target in front of a veiled molt's text. */}}
+{{define "nsfw-veil"}}<summary class="kb-nsfw-summary">This molt is marked NSFW. <span class="text-primary">Show it</span></summary>{{end}}
+
 {{define "molt"}}{{ $m := .M }}
 <div class="regular-molt mini-molt border-dark py-2 d-flex flex-row absolute-container border-bottom px-3" id="{{ $m.DOMID }}" data-molt-id="{{ $m.ID }}">
     <div class="mini-molt-profile-box{{ if .Pinned }} mt-4{{ end }}">
@@ -30,11 +35,19 @@
                 <a class="mini-molt-display-name zindex-front" href="/crabs/{{ $m.Author }}">{{ or $m.AuthorName $m.Author }}</a>
                 <span class="mini-molt-username zindex-front">@{{ $m.Author }}</span>
                 <a class="mini-molt-timestamp zindex-front" href="/molt/view/{{ $m.ID }}">· {{ template "time" $m.CreatedAt }}</a>
+                {{ if $m.NSFW }}{{ template "nsfw-badge" }}{{ end }}
             </div>
             {{ template "molt-menu" . }}
         </div>
         <div class="mini-molt-content">
+            {{ if $m.Veiled }}
+            <details class="kb-nsfw zindex-front mb-2">
+                {{ template "nsfw-veil" }}
+                <p class="mt-2 mb-0"><span class="molt-text clickable" data-href="/molt/view/{{ $m.ID }}">{{ or $m.ContentHTML $m.Content }}</span></p>
+            </details>
+            {{ else }}
             <p class="mb-2"><span class="zindex-front molt-text clickable" data-href="/molt/view/{{ $m.ID }}">{{ or $m.ContentHTML $m.Content }}</span></p>
+            {{ end }}
         </div>
         {{ if $m.QuoteOf }}{{ template "quoted-molt" $m.Quoted }}{{ end }}
         {{ template "molt-actions" . }}
@@ -55,9 +68,17 @@
                 <a class="mini-molt-display-name zindex-front" href="/crabs/{{ .Author }}">{{ or .AuthorName .Author }}</a>
                 <span class="mini-molt-username">@{{ .Author }}</span>
                 <span class="mini-molt-timestamp">· {{ template "time" .CreatedAt }}</span>
+                {{ if .NSFW }}{{ template "nsfw-badge" }}{{ end }}
             </div>
         </div>
+        {{ if .Veiled }}
+        <details class="kb-nsfw zindex-front">
+            {{ template "nsfw-veil" }}
+            <p class="mt-2 mb-0 molt-text">{{ or .ContentHTML .Content }}</p>
+        </details>
+        {{ else }}
         <div class="mini-molt-content"><p class="mb-0 molt-text">{{ or .ContentHTML .Content }}</p></div>
+        {{ end }}
         <a class="absolute-fill" href="/molt/view/{{ .ID }}" aria-label="Open the quoted molt"></a>
     </div>
     {{ else }}
@@ -103,6 +124,14 @@
             </button>
         </form>
         {{ end }}{{ end }}
+        <form hx-post="/molt/nsfw/{{ $m.ID }}" hx-swap="none" hx-confirm="{{ if $m.NSFW }}Are you sure you want to remove the NSFW label?{{ else }}Are you sure you want to label this Molt NSFW?{{ end }}">
+            <input type='hidden' name='csrf_token' value='{{ $d.CSRFToken }}'>
+            {{ if not $m.NSFW }}<input type="hidden" name="nsfw" value="true">{{ end }}
+            <button type="submit" class="kb-menu-item">
+                <svg width="19" height="19"><use href="/static/img/sprites.svg?version=1704178675#{{ if $m.NSFW }}eye{{ else }}eye-close{{ end }}"></use></svg>
+                {{ if $m.NSFW }}Remove NSFW label{{ else }}Label NSFW{{ end }}
+            </button>
+        </form>
         <form hx-post="/molt/delete/{{ $m.ID }}{{ if .Thread }}?from=thread{{ end }}" hx-swap="none" hx-confirm="Delete this molt? This can't be undone.">
             <input type='hidden' name='csrf_token' value='{{ $d.CSRFToken }}'>
             <button type="submit" class="kb-menu-item kb-menu-danger">

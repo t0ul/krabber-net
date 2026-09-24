@@ -56,7 +56,7 @@ func (app *App) quoteCreatePost(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	m, err := app.store.Quote(r.Context(), currentCrab(r), quoted, f.Content)
+	m, err := app.store.Quote(r.Context(), currentCrab(r), quoted, f.Content, store.WithNSFW(f.NSFW))
 	switch {
 	case errors.Is(err, store.ErrNotFound), errors.Is(err, store.ErrNotAllowed):
 		app.notFound(w, r)

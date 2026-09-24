@@ -24,7 +24,7 @@ type moltPointer struct {
 // Reply stores a reply to parent. A reply is a molt in its author's partition
 // (so it's likeable, remoltable and deleted with the account) that stays out
 // of the Sea and trenches.
-func (s *Store) Reply(ctx context.Context, author *Crab, parent *Molt, content string) (*Molt, error) {
+func (s *Store) Reply(ctx context.Context, author *Crab, parent *Molt, content string, opts ...MoltOption) (*Molt, error) {
 	if parent.Remolt || parent.Deleted || parent.Removed {
 		return nil, ErrNotAllowed
 	}
@@ -48,6 +48,7 @@ func (s *Store) Reply(ctx context.Context, author *Crab, parent *Molt, content s
 		ReplyToAuthor:   parent.Author,
 		ReplyToAuthorID: parent.AuthorID,
 	}
+	applyOptions(m, opts)
 	item, err := marshal(m)
 	if err != nil {
 		return nil, err

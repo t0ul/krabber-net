@@ -11,11 +11,12 @@ import (
 // Quote stores a molt that comments on quoted. A quote is an ordinary molt
 // (it goes to the Sea and trenches) that also points at the quoted molt,
 // whose quote_count it bumps.
-func (s *Store) Quote(ctx context.Context, author *Crab, quoted *Molt, content string) (*Molt, error) {
+func (s *Store) Quote(ctx context.Context, author *Crab, quoted *Molt, content string, opts ...MoltOption) (*Molt, error) {
 	if quoted.Remolt || quoted.Deleted || quoted.Removed {
 		return nil, ErrNotAllowed
 	}
 	m := s.newMolt(author, author.ID, author.UserName, content)
+	applyOptions(m, opts)
 	m.QuoteOf = quoted.ID
 	m.QuoteOfPK, m.QuoteOfSK = quoted.PK, quoted.SK
 	item, err := marshal(m)

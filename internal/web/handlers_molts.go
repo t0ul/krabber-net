@@ -56,6 +56,7 @@ func (app *App) renderMolts(w http.ResponseWriter, r *http.Request, page string,
 
 type moltForm struct {
 	Content             string `form:"content"`
+	NSFW                bool   `form:"nsfw"`
 	validator.Validator `form:"-"`
 }
 
@@ -86,7 +87,7 @@ func (app *App) moltCreatePost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Molts must be 1–280 characters.", http.StatusUnprocessableEntity)
 		return
 	}
-	m, err := app.store.CreateMolt(r.Context(), currentCrab(r), f.Content)
+	m, err := app.store.CreateMolt(r.Context(), currentCrab(r), f.Content, store.WithNSFW(f.NSFW))
 	if err != nil {
 		app.serverError(w, r, err)
 		return
@@ -281,6 +282,41 @@ func (app *App) moltDeletePost(w http.ResponseWriter, r *http.Request) {
 	redirect(w, r, "/trench")
 }
 
+// moltNSFWPost lets the author add or remove the NSFW label on their own molt.
+// The page reloads so every copy of the molt shows the change.
+func (app *App) moltNSFWPost(w http.ResponseWriter, r *http.Request) {
+	var f struct {
+		NSFW bool `form:"nsfw"`
+	}
+	if err := app.decodePostForm(w, r, &f); err != nil {
+		app.clientError(w, http.StatusBadRequest)
+		return
+	}
+	m, ok := app.moltFromPath(w, r)
+	if !ok {
+		return
+	}
+	if m.AuthorID != currentCrab(r).ID {
+		app.notFound(w, r)
+		return
+	}
+	switch err := app.store.SetMoltNSFW(r.Context(), m, f.NSFW); {
+	case errors.Is(err, store.ErrNotFound):
+		app.notFound(w, r)
+		return
+	case err != nil:
+		app.serverError(w, r, err)
+		return
+	}
+	app.dir.invalidate()
+	if isHTMX(r) {
+		w.Header().Set("HX-Refresh", "true")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	http.Redirect(w, r, "/molt/view/"+m.ID, http.StatusSeeOther)
+}
+
 // moltFromPath loads the molt named in the URL, following a remolt to its
 // original.
 func (app *App) moltFromPath(w http.ResponseWriter, r *http.Request) (*store.Molt, bool) {
@@ -435,7 +471,7 @@ func (app *App) replyCreatePost(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	reply, err := app.store.Reply(r.Context(), currentCrab(r), parent, f.Content)
+	reply, err := app.store.Reply(r.Context(), currentCrab(r), parent, f.Content, store.WithNSFW(f.NSFW))
 	switch {
 	case errors.Is(err, store.ErrNotFound), errors.Is(err, store.ErrNotAllowed):
 		app.notFound(w, r)

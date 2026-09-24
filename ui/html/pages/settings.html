@@ -56,6 +56,17 @@
         </div>
     </form>
 
+    <form class="px-3 py-3 border-bottom border-dark kb-settings" method="POST" action="/settings/nsfw">
+        <input type='hidden' name='csrf_token' value='{{ .CSRFToken }}'>
+        <h2 class="h6 font-weight-bold mb-3">Content</h2>
+        <div class="custom-control custom-switch mb-2">
+            <input type="checkbox" class="custom-control-input" id="show-nsfw" name="show_nsfw" value="true"{{ if .ShowNSFW }} checked{{ end }}>
+            <label class="custom-control-label" for="show-nsfw">Display NSFW content</label>
+        </div>
+        <small class="form-text text-muted mb-3">Molts labelled NSFW show without a click. Only turn this on if you're 18 or older.</small>
+        <button type="submit" class="btn btn-outline-light rounded-pill">Save</button>
+    </form>
+
     <form class="px-3 py-3 border-bottom border-dark kb-settings" method="POST" action="/settings/password" novalidate>
         <input type='hidden' name='csrf_token' value='{{ .CSRFToken }}'>
         <h2 class="h6 font-weight-bold mb-3">Change password</h2>

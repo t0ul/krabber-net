@@ -41,6 +41,8 @@ type Crab struct {
 
 	Avatar string `dynamodbav:"avatar,omitempty"` // seven-digit generated-crab code
 
+	ShowNSFW bool `dynamodbav:"show_nsfw,omitempty"` // show NSFW molts without a click
+
 	// The molt shown at the top of the crab's profile, if any.
 	PinnedMoltID string `dynamodbav:"pinned_molt_id,omitempty"`
 	PinnedMoltPK string `dynamodbav:"pinned_molt_pk,omitempty"`
@@ -356,6 +358,25 @@ func (s *Store) SetBanned(ctx context.Context, c *Crab, banned bool, reason stri
 	if err != nil {
 		return fmt.Errorf("set banned: %w", err)
 	}
+	return nil
+}
+
+// SetShowNSFW sets whether the crab sees NSFW molts without a click.
+func (s *Store) SetShowNSFW(ctx context.Context, c *Crab, on bool) error {
+	in := &dynamodb.UpdateItemInput{
+		TableName:           s.tableName(),
+		Key:                 keyOf(c.PK, c.SK),
+		UpdateExpression:    aws.String("REMOVE show_nsfw"),
+		ConditionExpression: aws.String("attribute_exists(PK)"),
+	}
+	if on {
+		in.UpdateExpression = aws.String("SET show_nsfw = :t")
+		in.ExpressionAttributeValues = map[string]types.AttributeValue{":t": boolean(true)}
+	}
+	if _, err := s.db.UpdateItem(ctx, in); err != nil {
+		return fmt.Errorf("set show nsfw: %w", err)
+	}
+	c.ShowNSFW = on
 	return nil
 }
 

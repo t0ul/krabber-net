@@ -9,6 +9,7 @@
         <div class="d-flex small">
             <a href="/crabmin/crabs/{{ $m.Author }}" class="font-weight-bold">@{{ $m.Author }}</a>
             <span class="ml-2 text-muted">{{ template "time" $m.CreatedAt }}</span>
+            {{ if $m.NSFW }}<span class="ml-2 nsfw-badge">NSFW</span>{{ end }}
             {{ if not $m.Removed }}<a class="ml-auto" href="/molt/view/{{ $m.ID }}">Public page</a>{{ end }}
         </div>
         {{ if $m.Removed }}<div class="alert alert-danger mt-3 mb-0 small">Removed by a moderator. Only moderators can see it.</div>{{ end }}
@@ -22,6 +23,11 @@
         <button type="submit" name="action" value="restore" class="btn btn-sm btn-outline-light rounded-pill">Restore molt</button>
         {{ else }}
         <button type="submit" name="action" value="remove" class="btn btn-sm btn-danger rounded-pill">Remove molt</button>
+        {{ end }}
+        {{ if $m.NSFW }}
+        <button type="submit" name="action" value="sfw" class="btn btn-sm btn-outline-light rounded-pill ml-2">Mark SFW</button>
+        {{ else }}
+        <button type="submit" name="action" value="nsfw" class="btn btn-sm btn-outline-light rounded-pill ml-2">Mark NSFW</button>
         {{ end }}
         {{ with .Report }}{{ if .OpenReports }}
         <button type="submit" name="action" value="dismiss" class="btn btn-sm btn-outline-light rounded-pill ml-2">Dismiss reports</button>

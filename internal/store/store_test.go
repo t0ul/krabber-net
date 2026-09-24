@@ -1057,6 +1057,56 @@ func TestAvatars(t *testing.T) {
 	}
 }
 
+func TestNSFW(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+	karen := mustCrab(t, s, "karen")
+	m, err := s.CreateMolt(ctx, karen, "spicy", WithNSFW(true))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := s.MoltByID(ctx, m.ID); got == nil || !got.NSFW {
+		t.Fatalf("label not stored: %+v", got)
+	}
+	reply, err := s.Reply(ctx, karen, m, "also spicy", WithNSFW(true))
+	if err != nil || !reply.NSFW {
+		t.Fatalf("reply: %+v %v", reply, err)
+	}
+	quote, err := s.Quote(ctx, karen, m, "mild")
+	if err != nil || quote.NSFW {
+		t.Fatalf("quote: %+v %v", quote, err)
+	}
+
+	if err := s.SetMoltNSFW(ctx, m, false); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := s.MoltByID(ctx, m.ID); got.NSFW {
+		t.Fatal("label not removed")
+	}
+	if err := s.SetMoltNSFW(ctx, m, true); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.DeleteMolt(ctx, karen, m); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetMoltNSFW(ctx, m, false); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("labelling a deleted molt: %v", err)
+	}
+
+	if err := s.SetShowNSFW(ctx, karen, true); err != nil {
+		t.Fatal(err)
+	}
+	if fresh, _ := s.CrabByID(ctx, karen.ID); !fresh.ShowNSFW {
+		t.Fatal("preference not stored")
+	}
+	if err := s.SetShowNSFW(ctx, karen, false); err != nil {
+		t.Fatal(err)
+	}
+	if fresh, _ := s.CrabByID(ctx, karen.ID); fresh.ShowNSFW {
+		t.Fatal("preference not cleared")
+	}
+}
+
 func TestPages(t *testing.T) {
 	s := newTestStore(t)
 	ctx := context.Background()

@@ -245,7 +245,7 @@ func (app *App) crabminMoltPost(w http.ResponseWriter, r *http.Request) {
 		app.clientError(w, http.StatusBadRequest)
 		return
 	}
-	if f.Action != "remove" && f.Action != "restore" && f.Action != "dismiss" {
+	if !slices.Contains([]string{"remove", "restore", "dismiss", "nsfw", "sfw"}, f.Action) {
 		app.clientError(w, http.StatusBadRequest)
 		return
 	}
@@ -304,6 +304,10 @@ func (app *App) crabminMoltPost(w http.ResponseWriter, r *http.Request) {
 	case "dismiss":
 		err = app.store.ResolveReports(r.Context(), m.ID, mod.UserName, "dismissed")
 		msg = "Reports on @" + m.Author + "'s molt dismissed."
+	case "nsfw", "sfw":
+		err = app.store.SetMoltNSFW(r.Context(), m, f.Action == "nsfw")
+		app.dir.invalidate()
+		msg = "Molt marked " + strings.ToUpper(f.Action) + "."
 	}
 	if err != nil {
 		app.serverError(w, r, err)

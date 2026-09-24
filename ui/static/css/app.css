@@ -318,6 +318,35 @@
   object-fit: cover;
 }
 
+.kb-nsfw {
+  border: 1px solid var(--nsfw-faded-less, #2f3336);
+  background: var(--nsfw-faded, rgba(230, 57, 70, 0.08));
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+
+.kb-nsfw-summary {
+  cursor: pointer;
+  list-style: none;
+  color: var(--light-faded, #8899a6);
+}
+
+.kb-nsfw-summary::-webkit-details-marker {
+  display: none;
+}
+
+.kb-nsfw[open] .kb-nsfw-summary {
+  display: none;
+}
+
+.kb-nsfw[open] > p {
+  margin-top: 0 !important;
+}
+
+.molt-nsfw-toggle .custom-control-label {
+  cursor: pointer;
+}
+
 .kb-profile-stats a:hover {
   text-decoration: none;
 }

@@ -7,6 +7,14 @@
 
 {{define "counter"}}<span class="mini-character-counter text-muted my-auto mr-3 d-none">280</span>{{end}}
 
+{{/* Crabber's NSFW switch; takes the input's ID. */}}
+{{define "nsfw-toggle"}}
+<div class="custom-control custom-switch molt-nsfw-toggle mr-auto">
+    <input type="checkbox" class="custom-control-input" id="{{ . }}" name="nsfw" value="true">
+    <label class="custom-control-label text-muted" for="{{ . }}">NSFW</label>
+</div>
+{{end}}
+
 {{define "compose"}}
 <div class="mini-compose-box border-bottom border-dark px-3 py-2 d-flex flex-row focused">
     <div class="mini-molt-profile-box">
@@ -19,6 +27,7 @@
                 <textarea name="content" rows="3" class="my-2 w-100" placeholder="How are you feeling?" aria-label="Molt text" required></textarea>
             </div>
             <div class="mini-molt-actions d-flex flex-row justify-content-end w-100 compose-button-row">
+                {{ template "nsfw-toggle" "nsfw-compose" }}
                 {{ template "counter" }}
                 <button type="submit" class="btn btn-primary rounded-pill"><strong>Molt</strong></button>
             </div>
@@ -44,6 +53,7 @@
                         <textarea name="content" rows="5" class="my-2 w-100" placeholder="How are you feeling?" aria-label="Molt text" required></textarea>
                     </div>
                     <div class="mini-molt-actions d-flex flex-row justify-content-end w-100 compose-button-row">
+                        {{ template "nsfw-toggle" "nsfw-compose-modal" }}
                         {{ template "counter" }}
                         <button type="submit" class="btn btn-primary rounded-pill"><strong>Molt</strong></button>
                     </div>
@@ -70,6 +80,7 @@
     </div>
     {{ template "quoted-molt" .Molt }}
     <div class="mini-molt-actions d-flex flex-row justify-content-end w-100 compose-button-row">
+        {{ template "nsfw-toggle" "nsfw-quote" }}
         {{ template "counter" }}
         <button type="submit" class="btn btn-primary rounded-pill"><strong>Quote</strong></button>
     </div>

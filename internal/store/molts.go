@@ -41,6 +41,7 @@ type Molt struct {
 	Deleted   bool      `dynamodbav:"deleted"`
 	Removed   bool      `dynamodbav:"removed,omitempty"` // by a moderator; keeps its index keys so it can be restored
 	Edited    bool      `dynamodbav:"edited,omitempty"`
+	NSFW      bool      `dynamodbav:"nsfw,omitempty"` // set by the author or a moderator; hidden until the viewer reveals it or opts in
 
 	Remolt     bool   `dynamodbav:"remolt"`
 	RemoltOf   string `dynamodbav:"remolt_of,omitempty"`
@@ -78,6 +79,19 @@ type Molt struct {
 	AuthorAvatar   string        `dynamodbav:"-"` // generated-crab code, from the directory
 	RemoltedByName string        `dynamodbav:"-"`
 	ReplyToName    string        `dynamodbav:"-"`
+	Veiled         bool          `dynamodbav:"-"` // NSFW and the viewer hasn't opted in, so the text waits behind a click
+}
+
+// MoltOption sets something extra on a molt, reply or quote as it's written.
+type MoltOption func(*Molt)
+
+// WithNSFW labels the new molt NSFW.
+func WithNSFW(on bool) MoltOption { return func(m *Molt) { m.NSFW = on } }
+
+func applyOptions(m *Molt, opts []MoltOption) {
+	for _, o := range opts {
+		o(m)
+	}
 }
 
 // DOMID is unique per list entry, even when an original and its remolt are
@@ -122,8 +136,9 @@ func (s *Store) newMolt(owner *Crab, authorID, author, content string) *Molt {
 }
 
 // CreateMolt stores a new molt and marks it pending for trench fan-out.
-func (s *Store) CreateMolt(ctx context.Context, author *Crab, content string) (*Molt, error) {
+func (s *Store) CreateMolt(ctx context.Context, author *Crab, content string, opts ...MoltOption) (*Molt, error) {
 	m := s.newMolt(author, author.ID, author.UserName, content)
+	applyOptions(m, opts)
 	item, err := marshal(m)
 	if err != nil {
 		return nil, err
@@ -335,6 +350,30 @@ func (s *Store) SetMoltRemoved(ctx context.Context, m *Molt, removed bool) error
 	case err != nil:
 		return fmt.Errorf("set molt removed: %w", err)
 	}
+	return nil
+}
+
+// SetMoltNSFW adds or removes a molt's NSFW label.
+func (s *Store) SetMoltNSFW(ctx context.Context, m *Molt, on bool) error {
+	in := &dynamodb.UpdateItemInput{
+		TableName:                 s.tableName(),
+		Key:                       keyOf(m.PK, m.SK),
+		UpdateExpression:          aws.String("SET nsfw = :t"),
+		ConditionExpression:       aws.String("attribute_exists(PK) AND deleted = :f"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{":t": boolean(true), ":f": boolean(false)},
+	}
+	if !on {
+		in.UpdateExpression = aws.String("REMOVE nsfw")
+		delete(in.ExpressionAttributeValues, ":t")
+	}
+	_, err := s.db.UpdateItem(ctx, in)
+	switch {
+	case conditionFailed(err):
+		return ErrNotFound
+	case err != nil:
+		return fmt.Errorf("set molt nsfw: %w", err)
+	}
+	m.NSFW = on
 	return nil
 }
 

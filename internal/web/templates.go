@@ -28,6 +28,7 @@ type templateData struct {
 	CrabID           string
 	CrabName         string
 	Avatar           string // current crab's generated-crab code
+	ShowNSFW         bool
 	CSRFToken        string
 	TurnstileSiteKey string
 	Form             any
@@ -120,6 +121,8 @@ var modActions = map[string][2]string{ // action: {done, tried to}
 	"remove_moderator":   {"removed the moderator role from", "remove the moderator role from"},
 	"remove_molt":        {"removed a molt by", "remove a molt by"},
 	"restore_molt":       {"restored a molt by", "restore a molt by"},
+	"nsfw_molt":          {"marked NSFW a molt by", "mark NSFW a molt by"},
+	"sfw_molt":           {"removed the NSFW label from a molt by", "remove the NSFW label from a molt by"},
 	"set_role":           {"set the role of", "set the role of"},
 	"dismiss_reports":    {"dismissed reports on a molt by", "dismiss reports on a molt by"},
 }
@@ -280,6 +283,7 @@ func (app *App) newTemplateData(r *http.Request) templateData {
 		d.CrabID = c.ID
 		d.CrabName = c.UserName
 		d.Avatar = c.Avatar
+		d.ShowNSFW = c.ShowNSFW
 		d.IsAdmin = c.IsAdmin()
 		d.IsModerator = c.IsModerator()
 		n, err := app.store.UnreadNotifications(r.Context(), c.ID)
@@ -308,8 +312,13 @@ func (app *App) withDisplay(r *http.Request, molts []store.Molt) {
 		n, ok := names[name]
 		return n, ok
 	}
+	viewer, showNSFW := "", false
+	if c := currentCrab(r); c != nil {
+		viewer, showNSFW = c.ID, c.ShowNSFW
+	}
 	for i := range molts {
 		molts[i].ContentHTML = richtext.HTML(molts[i].Content, known)
+		molts[i].Veiled = molts[i].NSFW && !showNSFW && molts[i].AuthorID != viewer
 	}
 	for i := range molts {
 		m := &molts[i]

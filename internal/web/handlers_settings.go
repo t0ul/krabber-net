@@ -115,6 +115,27 @@ func (app *App) settingsProfilePost(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/settings", http.StatusSeeOther)
 }
 
+func (app *App) settingsNSFWPost(w http.ResponseWriter, r *http.Request) {
+	var f struct {
+		ShowNSFW bool `form:"show_nsfw"`
+	}
+	if err := app.decodePostForm(w, r, &f); err != nil {
+		app.clientError(w, http.StatusBadRequest)
+		return
+	}
+	c := *currentCrab(r)
+	if err := app.store.SetShowNSFW(r.Context(), &c, f.ShowNSFW); err != nil {
+		app.serverError(w, r, err)
+		return
+	}
+	msg := "NSFW molts stay hidden until you click them."
+	if f.ShowNSFW {
+		msg = "NSFW molts now show without a click."
+	}
+	app.sessions.Put(r.Context(), sessionFlash, msg)
+	http.Redirect(w, r, "/settings", http.StatusSeeOther)
+}
+
 func (app *App) settingsPasswordPost(w http.ResponseWriter, r *http.Request) {
 	var f passwordForm
 	if err := app.decodePostForm(w, r, &f); err != nil {

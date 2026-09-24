@@ -29,10 +29,18 @@
             <div class="mini-molt-credentials-text flex-grow-1">
                 <a href="/crabs/{{ .Author }}" class="mini-molt-display-name d-block">{{ or .AuthorName .Author }}</a>
                 <span class="mini-molt-username">@{{ .Author }}</span>
+                {{ if .NSFW }}{{ template "nsfw-badge" }}{{ end }}
             </div>
             {{ template "molt-menu" (dict "M" . "D" $d "Thread" true) }}
         </div>
+        {{ if .Veiled }}
+        <details class="kb-nsfw mb-2">
+            {{ template "nsfw-veil" }}
+            <p class="large-molt-text mt-2 mb-0 molt-text">{{ or .ContentHTML .Content }}</p>
+        </details>
+        {{ else }}
         <p class="large-molt-text mb-2 molt-text">{{ or .ContentHTML .Content }}</p>
+        {{ end }}
         {{ if .QuoteOf }}{{ template "quoted-molt" .Quoted }}{{ end }}
         <div class="text-muted small pb-2 border-bottom border-dark">{{ template "time" .CreatedAt }}{{ if .Edited }} &mdash; This molt has been edited{{ end }}</div>
         {{ if or .RemoltCount .QuoteCount .LikeCount }}
@@ -50,6 +58,7 @@
         <input type='hidden' name='csrf_token' value='{{ $d.CSRFToken }}'>
         <textarea class="form-control mb-2" name="content" rows="2" placeholder="Molt your reply" aria-label="Reply to @{{ .Author }}" required></textarea>
         <div class="d-flex flex-row justify-content-end">
+            {{ template "nsfw-toggle" "nsfw-reply" }}
             {{ template "counter" }}
             <button type="submit" class="btn btn-sm btn-primary rounded-pill">Reply</button>
         </div>
