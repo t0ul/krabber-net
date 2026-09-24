@@ -55,4 +55,27 @@ func TestPath(t *testing.T) {
 	if Path("0000000") != "/avatar/0000000.svg" || Path("nope") != "" {
 		t.Fatal("path")
 	}
+	if BannerPath("0000000") != "/banner/0000000.svg" || BannerPath("nope") != "" {
+		t.Fatal("banner path")
+	}
+}
+
+func TestBanner(t *testing.T) {
+	seen := map[string]bool{}
+	for _, code := range []string{"0000000", "3725194", "1111111", "2550432", "0000004", "0000005"} {
+		svg, ok := Banner(code)
+		if !ok || !strings.HasPrefix(svg, "<svg ") || !strings.Contains(svg, `viewBox="0 0 360 120"`) {
+			t.Fatalf("banner %s: ok=%v", code, ok)
+		}
+		if strings.Contains(svg, code) {
+			t.Fatal("banner included the raw code")
+		}
+		seen[svg] = true
+	}
+	if len(seen) < 5 {
+		t.Fatalf("banners too similar: %d distinct", len(seen))
+	}
+	if _, ok := Banner("not-a-crab"); ok {
+		t.Fatal("banner accepted junk")
+	}
 }

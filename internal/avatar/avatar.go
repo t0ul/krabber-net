@@ -81,10 +81,18 @@ func Random() (string, error) {
 	return Encode(t), nil
 }
 
-// Path is the public URL for a valid code, or empty.
+// Path is the public URL for a valid crab, or empty.
 func Path(code string) string {
 	if !Valid(code) {
 		return ""
 	}
 	return "/avatar/" + code + ".svg"
+}
+
+// BannerPath is the public URL for that crab's stretch of ocean, or empty.
+func BannerPath(code string) string {
+	if !Valid(code) {
+		return ""
+	}
+	return "/banner/" + code + ".svg"
 }

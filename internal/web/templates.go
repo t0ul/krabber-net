@@ -197,6 +197,7 @@ var templateFuncs = template.FuncMap{
 	"asset":          asset,
 	"editable":       editable,
 	"avatarSrc":      avatarSrc,
+	"bannerSrc":      bannerSrc,
 }
 
 func avatarSrc(code string) string {
@@ -204,6 +205,13 @@ func avatarSrc(code string) string {
 		return p
 	}
 	return asset("img/crab_illustration.jpg")
+}
+
+func bannerSrc(code string) string {
+	if p := avatar.BannerPath(code); p != "" {
+		return p
+	}
+	return asset("img/banner.png")
 }
 
 // editable reports whether a molt is still inside its edit window. Templates

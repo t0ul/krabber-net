@@ -43,12 +43,15 @@
     <form class="px-3 py-3 border-bottom border-dark kb-settings" method="POST" action="/settings/avatar">
         <input type='hidden' name='csrf_token' value='{{ .CSRFToken }}'>
         <h2 class="h6 font-weight-bold mb-3">Your crab</h2>
+        <div class="kb-settings-banner">
+            <img src="{{ bannerSrc .Avatar }}" width="360" height="120" alt="">
+        </div>
         <div class="d-flex align-items-center">
             <img class="kb-avatar kb-avatar-lg" src="{{ avatarSrc .Avatar }}" width="96" height="96" alt="">
             <div class="ml-3">
                 {{ with .Form.AvatarError }}<div class="error small mb-2">{{ . }}</div>{{ end }}
                 <button type="submit" class="btn btn-outline-light rounded-pill">Reroll my crab</button>
-                <small class="form-text text-muted">A new look, three times a day. The old combination goes back in the pot.</small>
+                <small class="form-text text-muted">A new look and a new stretch of ocean, three times a day. The old combination goes back in the pot.</small>
             </div>
         </div>
     </form>

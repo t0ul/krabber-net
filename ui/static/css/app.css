@@ -239,8 +239,27 @@
 }
 
 .kb-settings .kb-avatar-lg {
-  margin-top: 0;
+  margin-top: -36px;
   border-width: 2px;
+}
+
+.kb-settings-banner {
+  height: 0;
+  padding-top: 28%;
+  overflow: hidden;
+  position: relative;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  background: #12355b;
+}
+
+.kb-settings-banner img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .kb-nav-avatar {
@@ -274,8 +293,21 @@
 }
 
 .kb-profile-banner {
-  height: 140px;
-  background: url("../img/banner.png") center / cover no-repeat;
+  height: 0;
+  padding-top: 33.333%;
+  overflow: hidden;
+  position: relative;
+  background: #1b4b7a;
+  border-bottom: 1px solid #2f3336;
+}
+
+.kb-profile-banner img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .kb-profile-stats a:hover {

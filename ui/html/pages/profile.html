@@ -3,7 +3,9 @@
 {{define "page"}}
 {{ template "shell-top" . }}
     {{ $p := .Profile }}
-    <div class="kb-profile-banner"></div>
+    <div class="kb-profile-banner">
+        <img class="profile-banner" src="{{ bannerSrc $p.Avatar }}" width="360" height="120" alt="">
+    </div>
     <div class="px-3 pb-3 border-bottom border-dark kb-profile-header">
         <div class="d-flex justify-content-between align-items-end">
             <img class="kb-avatar kb-avatar-lg" src="{{ avatarSrc $p.Avatar }}" width="96" height="96" alt="">

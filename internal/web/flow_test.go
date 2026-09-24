@@ -1650,8 +1650,18 @@ func TestGeneratedAvatars(t *testing.T) {
 	if status != http.StatusOK || !strings.Contains(svg, "<svg") || hdr.Get("Content-Type") != "image/svg+xml; charset=utf-8" {
 		t.Fatalf("svg: %d %s", status, hdr.Get("Content-Type"))
 	}
+	status, banner, hdr := h.get("/banner/" + code + ".svg")
+	if status != http.StatusOK || !strings.Contains(banner, `viewBox="0 0 360 120"`) || hdr.Get("Content-Type") != "image/svg+xml; charset=utf-8" {
+		t.Fatalf("banner: %d %s", status, hdr.Get("Content-Type"))
+	}
+	if _, body, _ := h.get("/crabs/karen"); !strings.Contains(body, "/banner/"+code+".svg") {
+		t.Fatal("profile missing banner")
+	}
 	if status, _, _ := h.get("/avatar/not-a-crab.svg"); status != http.StatusNotFound {
 		t.Errorf("junk code: %d", status)
+	}
+	if status, _, _ := h.get("/banner/not-a-crab.svg"); status != http.StatusNotFound {
+		t.Errorf("junk banner: %d", status)
 	}
 
 	tok := h.csrf("/settings")

@@ -88,6 +88,7 @@ func (app *App) Routes() http.Handler {
 	root := http.NewServeMux()
 	root.Handle("GET /static/", staticFiles())
 	root.HandleFunc("GET /avatar/{code}", app.avatarSVG)
+	root.HandleFunc("GET /banner/{code}", app.bannerSVG)
 	root.HandleFunc("GET /healthz", app.healthz)
 	root.HandleFunc("GET /robots.txt", robots)
 	root.HandleFunc("GET /favicon.ico", favicon)

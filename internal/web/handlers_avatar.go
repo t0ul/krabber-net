@@ -11,8 +11,16 @@ import (
 const avatarRerollLimit = 3
 
 func (app *App) avatarSVG(w http.ResponseWriter, r *http.Request) {
+	app.writeGeneratedSVG(w, r, avatar.SVG)
+}
+
+func (app *App) bannerSVG(w http.ResponseWriter, r *http.Request) {
+	app.writeGeneratedSVG(w, r, avatar.Banner)
+}
+
+func (app *App) writeGeneratedSVG(w http.ResponseWriter, r *http.Request, render func(string) (string, bool)) {
 	code := strings.TrimSuffix(r.PathValue("code"), ".svg")
-	svg, ok := avatar.SVG(code)
+	svg, ok := render(code)
 	if !ok {
 		http.NotFound(w, r)
 		return
