@@ -36,7 +36,16 @@
             </div>
         </div>
 
-        <button type="submit" class="btn btn-primary rounded-pill">Save profile</button>
+        <label class="mt-2">Fun facts <span class="text-muted font-weight-normal">(optional, shown under "Full bio" on your profile)</span></label>
+        {{ template "fun-input" (dict "Name" "fun_age" "Label" "Age" "Value" $p.Age "Max" 32 "Hint" "e.g. 42" "Err" $p.FieldErrors.fun_age) }}
+        {{ template "fun-input" (dict "Name" "fun_pronouns" "Label" "Pronouns" "Value" $p.Pronouns "Max" 64 "Hint" "e.g. they/them" "Err" $p.FieldErrors.fun_pronouns) }}
+        {{ template "fun-input" (dict "Name" "fun_quote" "Label" "Quote" "Value" $p.Quote "Max" 256 "Hint" "e.g. The world is your lobster." "Err" $p.FieldErrors.fun_quote) }}
+        {{ template "fun-input" (dict "Name" "fun_jam" "Label" "My jam" "Value" $p.Jam "Max" 256 "Hint" "e.g. Frank Sinatra - My Way" "Err" $p.FieldErrors.fun_jam) }}
+        {{ template "fun-input" (dict "Name" "fun_obsession" "Label" "Latest obsession" "Value" $p.Obsession "Max" 256 "Hint" "e.g. playing with my Tamagotchi" "Err" $p.FieldErrors.fun_obsession) }}
+        {{ template "fun-input" (dict "Name" "fun_remember" "Label" "Remember when" "Value" $p.Remember "Max" 256 "Hint" "e.g. profile pictures were square?" "Err" $p.FieldErrors.fun_remember) }}
+        {{ template "fun-input" (dict "Name" "fun_emoji" "Label" "Favorite emoji" "Value" $p.Emoji "Max" 32 "Hint" "e.g. 🦀 or ;)" "Err" $p.FieldErrors.fun_emoji) }}
+
+        <button type="submit" class="btn btn-primary rounded-pill mt-2">Save profile</button>
         <a class="ml-3" href="/crabs/{{ .CrabName }}">View profile</a>
     </form>
 
@@ -132,4 +141,12 @@
         <button type="submit" class="btn btn-outline-danger rounded-pill">Delete my account</button>
     </form>
 {{ template "shell-bottom" . }}
+{{end}}
+
+{{define "fun-input"}}
+{{ with .Err }}<div class="error small">{{ . }}</div>{{ end }}
+<div class="mb-2 input-group">
+    <div class="input-group-prepend"><label class="input-group-text kb-fun-label" for="{{ .Name }}">{{ .Label }}</label></div>
+    <input type="text" name="{{ .Name }}" id="{{ .Name }}" class="form-control" maxlength="{{ .Max }}" value="{{ .Value }}" placeholder="{{ .Hint }}">
+</div>
 {{end}}

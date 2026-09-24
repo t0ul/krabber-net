@@ -551,6 +551,64 @@ func TestSettings(t *testing.T) {
 	}
 }
 
+func TestFunFacts(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	h.signupAndActivate("gary", "gary@krabber.test", "meow-meow-meow")
+	h.login("gary@krabber.test", "meow-meow-meow")
+	if _, body, _ := h.get("/crabs/gary"); !strings.Contains(body, "Full bio") || !strings.Contains(body, "filled out their bio") {
+		t.Fatal("an empty full bio should say so")
+	}
+
+	tok := h.csrf("/settings")
+	status, body, _ := h.post("/settings/profile", url.Values{"csrf_token": {tok}, "fun_emoji": {strings.Repeat("🐌", 33)}})
+	if status != http.StatusUnprocessableEntity || !strings.Contains(body, "Keep it under 32 characters") {
+		t.Fatalf("long emoji: %d", status)
+	}
+	status, _, _ = h.post("/settings/profile", url.Values{"csrf_token": {tok},
+		"display_name": {"Gary"}, "fun_pronouns": {"  he/him "}, "fun_jam": {"Meow\nMeow"}, "fun_emoji": {"🐌"}})
+	if status != http.StatusSeeOther {
+		t.Fatalf("save: %d", status)
+	}
+	gary, _ := h.store.CrabByUsername(ctx, "gary")
+	if gary.Pronouns != "he/him" || gary.Jam != "MeowMeow" || gary.Emoji != "🐌" || gary.DisplayName != "Gary" {
+		t.Fatalf("stored %+v", gary.Profile)
+	}
+	_, body, _ = h.get("/crabs/gary")
+	for _, want := range []string{"<th>Pronouns</th><td>he/him</td>", "<th>My jam</th><td>MeowMeow</td>", "<th>Favorite emoji</th><td>🐌</td>"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("profile missing %s", want)
+		}
+	}
+	if strings.Contains(body, "<th>Age</th>") {
+		t.Error("empty fun facts should be left out")
+	}
+	// A failed password change keeps the fun facts in the re-shown profile form.
+	_, body, _ = h.post("/settings/password", url.Values{"csrf_token": {tok}, "current_password": {"nope"}, "new_password": {"a-new-one-1"}, "confirm_password": {"a-new-one-1"}})
+	if !strings.Contains(body, `value="he/him"`) {
+		t.Error("the profile form lost the fun facts")
+	}
+
+	hash, _ := auth.HashPassword("secret-boss")
+	boss, _ := h.store.CreateCrab(ctx, "boss", "boss@krabber.test", hash)
+	if err := h.store.ActivateCrab(ctx, boss.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.store.SetRole(ctx, boss, store.RoleModerator); err != nil {
+		t.Fatal(err)
+	}
+	h.client = h.newClient()
+	h.login("boss@krabber.test", "secret-boss")
+	tok = h.csrf("/crabmin/crabs/gary")
+	h.post("/crabmin/crabs/"+gary.ID, url.Values{"csrf_token": {tok}, "action": {"clear_fun_facts"}})
+	if c, _ := h.store.CrabByUsername(ctx, "gary"); !c.Empty() || c.DisplayName != "Gary" {
+		t.Fatalf("after clearing: %+v", c.Profile)
+	}
+	if _, body, _ := h.get("/crabmin/log"); !strings.Contains(body, "cleared the fun facts of") {
+		t.Error("clearing not logged")
+	}
+}
+
 func TestDeleteAccountFlow(t *testing.T) {
 	h := newHarness(t)
 	ctx := context.Background()

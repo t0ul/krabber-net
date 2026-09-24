@@ -56,6 +56,28 @@
             <a class="ml-3 text-light" href="/crabs/{{ $p.UserName }}/following"><strong>{{ $p.FollowingCount }}</strong> <span class="text-muted">following</span></a>
             <a class="ml-3 text-light" href="/crabs/{{ $p.UserName }}/followers"><strong>{{ $p.FollowerCount }}</strong> <span class="text-muted">followers</span></a>
         </div>
+        <details class="kb-full-bio mt-3">
+            <summary>
+                <svg class="kb-full-bio-chevron" width="20" height="20"><use href="{{ asset "img/sprites.svg" }}#chevron-right"></use></svg>
+                Full bio
+            </summary>
+            <h5 class="mt-2">Fun facts</h5>
+            <div class="rounded neue-card p-3">
+                {{ with $p.FunFacts }}{{ if .Empty }}
+                <p class="text-muted mb-0">This crab hasn't filled out their bio 😦</p>
+                {{ else }}
+                <table class="kb-fun-facts">
+                    {{ with .Age }}<tr><th>Age</th><td>{{ . }}</td></tr>{{ end }}
+                    {{ with .Pronouns }}<tr><th>Pronouns</th><td>{{ . }}</td></tr>{{ end }}
+                    {{ with .Quote }}<tr><th>Quote</th><td>{{ . }}</td></tr>{{ end }}
+                    {{ with .Jam }}<tr><th>My jam</th><td>{{ . }}</td></tr>{{ end }}
+                    {{ with .Obsession }}<tr><th>Latest obsession</th><td>{{ . }}</td></tr>{{ end }}
+                    {{ with .Remember }}<tr><th>Remember when</th><td>{{ . }}</td></tr>{{ end }}
+                    {{ with .Emoji }}<tr><th>Favorite emoji</th><td>{{ . }}</td></tr>{{ end }}
+                </table>
+                {{ end }}{{ end }}
+            </div>
+        </details>
     </div>
     {{ if not .IsBlocking }}
     <nav class="kb-tabs d-flex border-bottom border-dark" aria-label="Profile">

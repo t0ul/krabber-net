@@ -39,7 +39,7 @@ func (app *App) settingsAvatarPost(w http.ResponseWriter, r *http.Request) {
 	}
 	if n >= avatarRerollLimit {
 		forms := settingsForms{
-			Profile:     profileForm{DisplayName: c.DisplayName, Bio: c.Bio, Location: c.Location, Website: c.Website},
+			Profile:     profileFormFor(c.Profile),
 			AvatarError: "That's enough rerolls for today. Come back tomorrow.",
 		}
 		app.renderSettings(w, r, http.StatusTooManyRequests, forms)

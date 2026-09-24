@@ -67,7 +67,22 @@ type Profile struct {
 	Bio         string `dynamodbav:"bio,omitempty"`
 	Location    string `dynamodbav:"location,omitempty"`
 	Website     string `dynamodbav:"website,omitempty"`
+	FunFacts
 }
+
+// FunFacts are the extra fields of Crabber's "Full bio".
+type FunFacts struct {
+	Age       string `dynamodbav:"fun_age,omitempty"`
+	Pronouns  string `dynamodbav:"fun_pronouns,omitempty"`
+	Quote     string `dynamodbav:"fun_quote,omitempty"`
+	Jam       string `dynamodbav:"fun_jam,omitempty"`
+	Obsession string `dynamodbav:"fun_obsession,omitempty"`
+	Remember  string `dynamodbav:"fun_remember,omitempty"`
+	Emoji     string `dynamodbav:"fun_emoji,omitempty"`
+}
+
+// Empty reports whether no fun fact is filled in.
+func (f FunFacts) Empty() bool { return f == FunFacts{} }
 
 // ContentFilters are what a crab chose to see less of.
 type ContentFilters struct {
@@ -88,6 +103,10 @@ const (
 	MaxBio         = 512
 	MaxLocation    = 128
 	MaxWebsite     = 512
+	MaxAge         = 32
+	MaxPronouns    = 64
+	MaxFunFact     = 256 // quote, jam, obsession, remember
+	MaxEmoji       = 32
 )
 
 // Name is the display name, or the username when none is set.
@@ -291,6 +310,13 @@ func (s *Store) UpdateProfile(ctx context.Context, c *Crab, p Profile) error {
 		{"bio", p.Bio},
 		{"location", p.Location},
 		{"website", p.Website},
+		{"fun_age", p.Age},
+		{"fun_pronouns", p.Pronouns},
+		{"fun_quote", p.Quote},
+		{"fun_jam", p.Jam},
+		{"fun_obsession", p.Obsession},
+		{"fun_remember", p.Remember},
+		{"fun_emoji", p.Emoji},
 	}
 	var set, remove []string
 	names := map[string]string{}

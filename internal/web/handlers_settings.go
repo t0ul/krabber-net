@@ -1,6 +1,7 @@
 package web
 
 import (
+	"fmt"
 	"net/http"
 	"net/url"
 	"sort"
@@ -24,7 +25,51 @@ type profileForm struct {
 	Bio                 string `form:"bio"`
 	Location            string `form:"location"`
 	Website             string `form:"website"`
+	Age                 string `form:"fun_age"`
+	Pronouns            string `form:"fun_pronouns"`
+	Quote               string `form:"fun_quote"`
+	Jam                 string `form:"fun_jam"`
+	Obsession           string `form:"fun_obsession"`
+	Remember            string `form:"fun_remember"`
+	Emoji               string `form:"fun_emoji"`
 	validator.Validator `form:"-"`
+}
+
+func profileFormFor(p store.Profile) profileForm {
+	return profileForm{
+		DisplayName: p.DisplayName, Bio: p.Bio, Location: p.Location, Website: p.Website,
+		Age: p.Age, Pronouns: p.Pronouns, Quote: p.Quote, Jam: p.Jam,
+		Obsession: p.Obsession, Remember: p.Remember, Emoji: p.Emoji,
+	}
+}
+
+func (f *profileForm) profile() store.Profile {
+	return store.Profile{
+		DisplayName: f.DisplayName, Bio: f.Bio, Location: f.Location, Website: f.Website,
+		FunFacts: store.FunFacts{
+			Age: f.Age, Pronouns: f.Pronouns, Quote: f.Quote, Jam: f.Jam,
+			Obsession: f.Obsession, Remember: f.Remember, Emoji: f.Emoji,
+		},
+	}
+}
+
+type funFactField struct {
+	value *string
+	key   string
+	max   int
+}
+
+// funFactFields are the fun-fact inputs with their limits, in Crabber's order.
+func (f *profileForm) funFactFields() []funFactField {
+	return []funFactField{
+		{&f.Age, "fun_age", store.MaxAge},
+		{&f.Pronouns, "fun_pronouns", store.MaxPronouns},
+		{&f.Quote, "fun_quote", store.MaxFunFact},
+		{&f.Jam, "fun_jam", store.MaxFunFact},
+		{&f.Obsession, "fun_obsession", store.MaxFunFact},
+		{&f.Remember, "fun_remember", store.MaxFunFact},
+		{&f.Emoji, "fun_emoji", store.MaxEmoji},
+	}
 }
 
 type passwordForm struct {
@@ -47,13 +92,7 @@ type settingsForms struct {
 }
 
 func (app *App) settings(w http.ResponseWriter, r *http.Request) {
-	c := currentCrab(r)
-	app.renderSettings(w, r, http.StatusOK, settingsForms{Profile: profileForm{
-		DisplayName: c.DisplayName,
-		Bio:         c.Bio,
-		Location:    c.Location,
-		Website:     c.Website,
-	}})
+	app.renderSettings(w, r, http.StatusOK, settingsForms{Profile: profileFormFor(currentCrab(r).Profile)})
 }
 
 func (app *App) renderSettings(w http.ResponseWriter, r *http.Request, status int, f settingsForms) {
@@ -87,6 +126,10 @@ func (app *App) settingsProfilePost(w http.ResponseWriter, r *http.Request) {
 	f.CheckField(validator.MaxChars(f.Bio, store.MaxBio), "bio", "Keep it under 512 characters")
 	f.CheckField(validator.MaxChars(f.Location, store.MaxLocation), "location", "Keep it under 128 characters")
 	f.CheckField(validator.MaxChars(f.Website, store.MaxWebsite), "website", "Keep it under 512 characters")
+	for _, ff := range f.funFactFields() {
+		*ff.value = singleLine(*ff.value)
+		f.CheckField(validator.MaxChars(*ff.value, ff.max), ff.key, fmt.Sprintf("Keep it under %d characters", ff.max))
+	}
 	if f.Website != "" {
 		if site, ok := normalizeWebsite(f.Website); ok {
 			f.Website = site
@@ -100,17 +143,11 @@ func (app *App) settingsProfilePost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	c := *currentCrab(r)
-	err := app.store.UpdateProfile(r.Context(), &c, store.Profile{
-		DisplayName: f.DisplayName,
-		Bio:         f.Bio,
-		Location:    f.Location,
-		Website:     f.Website,
-	})
-	if err != nil {
+	if err := app.store.UpdateProfile(r.Context(), &c, f.profile()); err != nil {
 		app.serverError(w, r, err)
 		return
 	}
-	c.DisplayName, c.Bio, c.Location, c.Website = f.DisplayName, f.Bio, f.Location, f.Website
+	c.Profile = f.profile()
 	app.dir.putCrab(c)
 	app.sessions.Put(r.Context(), sessionFlash, "Profile saved.")
 	http.Redirect(w, r, "/settings", http.StatusSeeOther)
@@ -165,7 +202,7 @@ func (app *App) settingsPasswordPost(w http.ResponseWriter, r *http.Request) {
 	c := currentCrab(r)
 	forms := func() settingsForms {
 		return settingsForms{
-			Profile:  profileForm{DisplayName: c.DisplayName, Bio: c.Bio, Location: c.Location, Website: c.Website},
+			Profile:  profileFormFor(c.Profile),
 			Password: f,
 		}
 	}
@@ -224,7 +261,7 @@ func (app *App) settingsDeletePost(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		f.AddFieldError("password", passwordMessage(status))
 		app.renderSettings(w, r, status, settingsForms{
-			Profile: profileForm{DisplayName: c.DisplayName, Bio: c.Bio, Location: c.Location, Website: c.Website},
+			Profile: profileFormFor(c.Profile),
 			Delete:  f,
 		})
 		return

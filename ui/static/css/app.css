@@ -431,6 +431,43 @@
   vertical-align: -2px;
 }
 
+.kb-full-bio > summary {
+  list-style: none;
+  cursor: pointer;
+  color: var(--light);
+}
+
+.kb-full-bio > summary::-webkit-details-marker {
+  display: none;
+}
+
+.kb-full-bio-chevron {
+  fill: currentColor;
+  vertical-align: -5px;
+  transition: transform 0.15s;
+}
+
+.kb-full-bio[open] .kb-full-bio-chevron {
+  transform: rotate(90deg);
+}
+
+.kb-fun-facts th {
+  padding: 2px 16px 2px 0;
+  white-space: nowrap;
+  vertical-align: top;
+  color: var(--light-faded, #8899a6);
+  font-weight: 600;
+}
+
+.kb-fun-facts td {
+  padding: 2px 0;
+  overflow-wrap: anywhere;
+}
+
+.kb-fun-label {
+  min-width: 9.5rem;
+}
+
 .kb-profile-stats a:hover {
   text-decoration: none;
 }

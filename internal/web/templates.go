@@ -136,6 +136,7 @@ var modActions = map[string][2]string{ // action: {done, tried to}
 	"clear_bio":          {"cleared the bio of", "clear the bio of"},
 	"clear_location":     {"cleared the location of", "clear the location of"},
 	"clear_website":      {"cleared the website of", "clear the website of"},
+	"clear_fun_facts":    {"cleared the fun facts of", "clear the fun facts of"},
 	"verify":             {"verified", "verify"},
 	"unverify":           {"removed the verified badge from", "remove the verified badge from"},
 	"make_moderator":     {"made a moderator:", "make a moderator:"},

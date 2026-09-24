@@ -211,6 +211,13 @@ func (app *App) crabminCrabPost(w http.ResponseWriter, r *http.Request) {
 		err = app.store.UpdateProfile(ctx, target, p)
 		app.dir.invalidate()
 		msg = "Cleared @" + target.UserName + "'s " + strings.ReplaceAll(field, "_", " ") + "."
+	case "clear_fun_facts":
+		p := target.Profile
+		f := p.FunFacts
+		entry.Note = store.Snippet(strings.Join([]string{f.Age, f.Pronouns, f.Quote, f.Jam, f.Obsession, f.Remember, f.Emoji}, " | "))
+		p.FunFacts = store.FunFacts{}
+		err = app.store.UpdateProfile(ctx, target, p)
+		msg = "Cleared @" + target.UserName + "'s fun facts."
 	case "verify", "unverify":
 		if !mod.IsAdmin() {
 			entry.Action = "attempted_" + f.Action
