@@ -52,7 +52,7 @@ func (app *App) Routes() http.Handler {
 	mux.HandleFunc("POST /unblock/{id}", app.requireAuthentication(app.unblockPost))
 	mux.HandleFunc("POST /settings/profile", app.requireAuthentication(app.settingsProfilePost))
 	mux.HandleFunc("POST /settings/avatar", app.requireAuthentication(app.settingsAvatarPost))
-	mux.HandleFunc("POST /settings/nsfw", app.requireAuthentication(app.settingsNSFWPost))
+	mux.HandleFunc("POST /settings/content", app.requireAuthentication(app.settingsContentPost))
 	mux.HandleFunc("POST /settings/password", app.requireAuthentication(app.settingsPasswordPost))
 	mux.HandleFunc("POST /settings/delete", app.requireAuthentication(app.settingsDeletePost))
 	mux.HandleFunc("GET /crabs", app.requireAuthentication(app.allCrabs))

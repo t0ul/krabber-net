@@ -1093,17 +1093,18 @@ func TestNSFW(t *testing.T) {
 		t.Fatalf("labelling a deleted molt: %v", err)
 	}
 
-	if err := s.SetShowNSFW(ctx, karen, true); err != nil {
+	want := ContentFilters{ShowNSFW: true, MutedWords: []string{"chum", "plankton"}}
+	if err := s.SetContentFilters(ctx, karen, want); err != nil {
 		t.Fatal(err)
 	}
-	if fresh, _ := s.CrabByID(ctx, karen.ID); !fresh.ShowNSFW {
-		t.Fatal("preference not stored")
+	if fresh, _ := s.CrabByID(ctx, karen.ID); !fresh.ShowNSFW || !slices.Equal(fresh.MutedWords, want.MutedWords) {
+		t.Fatalf("filters not stored: %+v", fresh.ContentFilters)
 	}
-	if err := s.SetShowNSFW(ctx, karen, false); err != nil {
+	if err := s.SetContentFilters(ctx, karen, ContentFilters{}); err != nil {
 		t.Fatal(err)
 	}
-	if fresh, _ := s.CrabByID(ctx, karen.ID); fresh.ShowNSFW {
-		t.Fatal("preference not cleared")
+	if fresh, _ := s.CrabByID(ctx, karen.ID); fresh.ShowNSFW || len(fresh.MutedWords) != 0 {
+		t.Fatalf("filters not cleared: %+v", fresh.ContentFilters)
 	}
 }
 

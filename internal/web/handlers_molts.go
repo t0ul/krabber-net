@@ -37,7 +37,7 @@ func (app *App) setPage(w http.ResponseWriter, r *http.Request, data *templateDa
 		app.serverError(w, r, err)
 		return false
 	}
-	data.Molts = p.Molts
+	data.Molts = withoutMuted(r, p.Molts)
 	if p.Next != "" {
 		data.LoadMore = loadMoreURL(r, p.Next)
 	}
@@ -431,6 +431,7 @@ func (app *App) moltView(w http.ResponseWriter, r *http.Request) {
 		app.serverError(w, r, err)
 		return
 	}
+	data.Replies = withoutMuted(r, data.Replies)
 	app.render(w, r, http.StatusOK, "view.html", data)
 }
 

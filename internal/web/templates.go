@@ -29,6 +29,7 @@ type templateData struct {
 	CrabName         string
 	Avatar           string // current crab's generated-crab code
 	ShowNSFW         bool
+	MutedWords       []string
 	CSRFToken        string
 	TurnstileSiteKey string
 	Form             any
@@ -193,6 +194,7 @@ var templateFuncs = template.FuncMap{
 	"monthYear":      monthYear,
 	"websiteLabel":   websiteLabel,
 	"hasPrefix":      strings.HasPrefix,
+	"join":           strings.Join,
 	"modActionLabel": modActionLabel,
 	"reportLabel":    store.ReportLabel,
 	"reportReasons":  func() []store.ReportReason { return store.ReportReasons },
@@ -283,7 +285,7 @@ func (app *App) newTemplateData(r *http.Request) templateData {
 		d.CrabID = c.ID
 		d.CrabName = c.UserName
 		d.Avatar = c.Avatar
-		d.ShowNSFW = c.ShowNSFW
+		d.ShowNSFW, d.MutedWords = c.ShowNSFW, c.MutedWords
 		d.IsAdmin = c.IsAdmin()
 		d.IsModerator = c.IsModerator()
 		n, err := app.store.UnreadNotifications(r.Context(), c.ID)

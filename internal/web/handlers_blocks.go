@@ -3,6 +3,7 @@ package web
 import (
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/t0ul/krabber-net/internal/store"
 )
@@ -25,6 +26,32 @@ func (app *App) visibleMolts(r *http.Request, molts []store.Molt) []store.Molt {
 		}
 	}
 	return out
+}
+
+// withoutMuted drops molts containing one of the viewer's muted words (not
+// their own). Remolts are resolved first, so they match on the original's text.
+func withoutMuted(r *http.Request, molts []store.Molt) []store.Molt {
+	c := currentCrab(r)
+	if c == nil || len(c.MutedWords) == 0 {
+		return molts
+	}
+	out := make([]store.Molt, 0, len(molts))
+	for _, m := range molts {
+		if m.AuthorID == c.ID || !mutes(c.MutedWords, m.Content) {
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
+func mutes(words []string, text string) bool {
+	text = strings.ToLower(text)
+	for _, w := range words {
+		if strings.Contains(text, w) {
+			return true
+		}
+	}
+	return false
 }
 
 // visibleCrabs drops rows for hidden crabs.

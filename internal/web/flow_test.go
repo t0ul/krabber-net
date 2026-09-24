@@ -3,6 +3,7 @@ package web
 import (
 	"context"
 	"errors"
+	"fmt"
 	"html"
 	"io"
 	"log/slog"
@@ -12,6 +13,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -1742,7 +1744,7 @@ func TestNSFW(t *testing.T) {
 	if status, _, _ := h.post("/molt/nsfw/"+id, url.Values{"csrf_token": {tok}}); status != http.StatusNotFound {
 		t.Errorf("unlabelling someone else's molt: %d", status)
 	}
-	if status, _, _ := h.post("/settings/nsfw", url.Values{"csrf_token": {tok}, "show_nsfw": {"true"}}); status != http.StatusSeeOther {
+	if status, _, _ := h.post("/settings/content", url.Values{"csrf_token": {tok}, "show_nsfw": {"true"}}); status != http.StatusSeeOther {
 		t.Fatalf("preference: %d", status)
 	}
 	if _, body, _ := h.get("/sea"); strings.Contains(body, veil) || !strings.Contains(body, "the secret formula") {
@@ -1751,7 +1753,7 @@ func TestNSFW(t *testing.T) {
 	if _, body, _ := h.get("/settings"); !strings.Contains(body, `id="show-nsfw" name="show_nsfw" value="true" checked`) {
 		t.Error("settings doesn't show the preference")
 	}
-	h.post("/settings/nsfw", url.Values{"csrf_token": {tok}})
+	h.post("/settings/content", url.Values{"csrf_token": {tok}})
 	if _, body, _ := h.get("/sea"); !strings.Contains(body, veil) {
 		t.Error("opted out again, the molt isn't veiled")
 	}
@@ -1781,5 +1783,82 @@ func TestNSFW(t *testing.T) {
 	}
 	if _, body, _ := h.get("/crabmin/log"); !strings.Contains(body, "marked NSFW a molt by") {
 		t.Error("label not logged")
+	}
+}
+
+func TestMutedWords(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	h.signupAndActivate("karen", "karen@krabber.test", "computer-wife!")
+	h.signupAndActivate("sandy", "sandy@krabber.test", "karate-chop!")
+	karen, _ := h.store.CrabByUsername(ctx, "karen")
+	sandy, _ := h.store.CrabByUsername(ctx, "sandy")
+	chum, err := h.store.CreateMolt(ctx, karen, "Fresh CHUM at the Chum Bucket")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := h.store.CreateMolt(ctx, karen, "Krabby Patties are overrated"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := h.store.CreateMolt(ctx, sandy, "I brought chum for lunch"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := h.store.Remolt(ctx, sandy, chum); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := h.store.Reply(ctx, sandy, chum, "more chum please"); err != nil {
+		t.Fatal(err)
+	}
+
+	h.login("sandy@krabber.test", "karate-chop!")
+	tok := h.csrf("/settings")
+	if status, _, _ := h.post("/settings/content", url.Values{"csrf_token": {tok}, "muted_words": {" Chum ,, chum, secret formula "}}); status != http.StatusSeeOther {
+		t.Fatalf("save: %d", status)
+	}
+	if c, _ := h.store.CrabByID(ctx, sandy.ID); !slices.Equal(c.MutedWords, []string{"chum", "secret formula"}) {
+		t.Fatalf("stored %q", c.MutedWords)
+	}
+	if _, body, _ := h.get("/settings"); !strings.Contains(body, ">chum, secret formula</textarea>") {
+		t.Error("settings doesn't show the muted words")
+	}
+	_, body, _ := h.get("/sea")
+	if strings.Contains(body, "Chum Bucket") || !strings.Contains(body, "overrated") {
+		t.Error("the Sea should drop karen's chum molt (and its remolt) but keep the others")
+	}
+	if !strings.Contains(body, "I brought chum for lunch") {
+		t.Error("sandy's own molt should never be muted")
+	}
+	if _, body, _ := h.get("/crabs/karen"); strings.Contains(body, "Chum Bucket") {
+		t.Error("profile list shows a muted molt")
+	}
+	if _, body, _ := h.get("/search?q=bucket"); strings.Contains(body, "Chum Bucket") {
+		t.Error("search shows a muted molt")
+	}
+	if status, body, _ := h.get("/molt/view/" + chum.ID); status != http.StatusOK || !strings.Contains(body, "Chum Bucket") || !strings.Contains(body, "more chum please") {
+		t.Error("opening the molt itself should still work, and sandy's reply stays")
+	}
+
+	h.client = h.newClient()
+	h.login("karen@krabber.test", "computer-wife!")
+	if _, body, _ := h.get("/sea"); !strings.Contains(body, "Chum Bucket") {
+		t.Error("other crabs' mutes leaked into karen's Sea")
+	}
+}
+
+func TestParseMutedWords(t *testing.T) {
+	got := parseMutedWords("Chum, ,chum,  Secret   Formula ,\tplankton\n," + strings.Repeat("x", 65))
+	if want := []string{"chum", "secret formula", "plankton"}; !slices.Equal(got, want) {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+	many := strings.Repeat("a,b,", 100)
+	if n := len(parseMutedWords(many)); n != 2 {
+		t.Fatalf("repeats: %d", n)
+	}
+	var sb strings.Builder
+	for i := range 300 {
+		fmt.Fprintf(&sb, "w%d,", i)
+	}
+	if n := len(parseMutedWords(sb.String())); n != 100 {
+		t.Fatalf("cap: %d", n)
 	}
 }

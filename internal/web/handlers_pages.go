@@ -266,7 +266,7 @@ func (app *App) searchPage(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		data.CrabRows = app.visibleCrabs(r, rows)
-		data.Molts = molts
+		data.Molts = withoutMuted(r, molts)
 		data.EmptyMessage = "No molts match “" + q + "”."
 	}
 	app.render(w, r, http.StatusOK, "results.html", data)

@@ -56,9 +56,14 @@
         </div>
     </form>
 
-    <form class="px-3 py-3 border-bottom border-dark kb-settings" method="POST" action="/settings/nsfw">
+    <form class="px-3 py-3 border-bottom border-dark kb-settings" method="POST" action="/settings/content">
         <input type='hidden' name='csrf_token' value='{{ .CSRFToken }}'>
         <h2 class="h6 font-weight-bold mb-3">Content</h2>
+        <div class="form-group">
+            <label for="muted-words">Muted words (comma separated)</label>
+            <textarea name="muted_words" id="muted-words" class="form-control" rows="2" maxlength="2048" placeholder="chum, formula">{{ join .MutedWords ", " }}</textarea>
+            <small class="form-text text-muted">Molts containing any of these stay out of your feeds, lists and search. Your own molts always show.</small>
+        </div>
         <div class="custom-control custom-switch mb-2">
             <input type="checkbox" class="custom-control-input" id="show-nsfw" name="show_nsfw" value="true"{{ if .ShowNSFW }} checked{{ end }}>
             <label class="custom-control-label" for="show-nsfw">Display NSFW content</label>

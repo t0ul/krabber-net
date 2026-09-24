@@ -41,7 +41,7 @@ type Crab struct {
 
 	Avatar string `dynamodbav:"avatar,omitempty"` // seven-digit generated-crab code
 
-	ShowNSFW bool `dynamodbav:"show_nsfw,omitempty"` // show NSFW molts without a click
+	ContentFilters
 
 	// The molt shown at the top of the crab's profile, if any.
 	PinnedMoltID string `dynamodbav:"pinned_molt_id,omitempty"`
@@ -67,6 +67,19 @@ type Profile struct {
 	Location    string `dynamodbav:"location,omitempty"`
 	Website     string `dynamodbav:"website,omitempty"`
 }
+
+// ContentFilters are what a crab chose to see less of.
+type ContentFilters struct {
+	ShowNSFW   bool     `dynamodbav:"show_nsfw,omitempty"`   // show NSFW molts without a click
+	MutedWords []string `dynamodbav:"muted_words,omitempty"` // lowercase; molts containing any are left out of lists
+}
+
+// Muted word limits, in characters for the lengths.
+const (
+	MaxMutedWords    = 100
+	MaxMutedWordLen  = 64
+	MaxMutedWordsLen = 2048
+)
 
 // Profile field limits, in characters (the same as Crabber's).
 const (
@@ -361,22 +374,44 @@ func (s *Store) SetBanned(ctx context.Context, c *Crab, banned bool, reason stri
 	return nil
 }
 
-// SetShowNSFW sets whether the crab sees NSFW molts without a click.
-func (s *Store) SetShowNSFW(ctx context.Context, c *Crab, on bool) error {
+// SetContentFilters saves the crab's NSFW preference and muted words.
+func (s *Store) SetContentFilters(ctx context.Context, c *Crab, f ContentFilters) error {
+	var set, remove []string
+	values := map[string]types.AttributeValue{}
+	if f.ShowNSFW {
+		set, values[":t"] = append(set, "show_nsfw = :t"), boolean(true)
+	} else {
+		remove = append(remove, "show_nsfw")
+	}
+	if len(f.MutedWords) > 0 {
+		words, err := attributevalue.Marshal(f.MutedWords)
+		if err != nil {
+			return err
+		}
+		set, values[":w"] = append(set, "muted_words = :w"), words
+	} else {
+		remove = append(remove, "muted_words")
+	}
+	expr := ""
+	if len(set) > 0 {
+		expr = "SET " + strings.Join(set, ", ")
+	}
+	if len(remove) > 0 {
+		expr += " REMOVE " + strings.Join(remove, ", ")
+	}
 	in := &dynamodb.UpdateItemInput{
 		TableName:           s.tableName(),
 		Key:                 keyOf(c.PK, c.SK),
-		UpdateExpression:    aws.String("REMOVE show_nsfw"),
+		UpdateExpression:    aws.String(strings.TrimSpace(expr)),
 		ConditionExpression: aws.String("attribute_exists(PK)"),
 	}
-	if on {
-		in.UpdateExpression = aws.String("SET show_nsfw = :t")
-		in.ExpressionAttributeValues = map[string]types.AttributeValue{":t": boolean(true)}
+	if len(values) > 0 {
+		in.ExpressionAttributeValues = values
 	}
 	if _, err := s.db.UpdateItem(ctx, in); err != nil {
-		return fmt.Errorf("set show nsfw: %w", err)
+		return fmt.Errorf("set content filters: %w", err)
 	}
-	c.ShowNSFW = on
+	c.ContentFilters = f
 	return nil
 }
 

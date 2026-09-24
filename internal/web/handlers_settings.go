@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/t0ul/krabber-net/internal/auth"
 	"github.com/t0ul/krabber-net/internal/store"
@@ -115,25 +116,44 @@ func (app *App) settingsProfilePost(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/settings", http.StatusSeeOther)
 }
 
-func (app *App) settingsNSFWPost(w http.ResponseWriter, r *http.Request) {
+func (app *App) settingsContentPost(w http.ResponseWriter, r *http.Request) {
 	var f struct {
-		ShowNSFW bool `form:"show_nsfw"`
+		ShowNSFW   bool   `form:"show_nsfw"`
+		MutedWords string `form:"muted_words"`
 	}
 	if err := app.decodePostForm(w, r, &f); err != nil {
 		app.clientError(w, http.StatusBadRequest)
 		return
 	}
 	c := *currentCrab(r)
-	if err := app.store.SetShowNSFW(r.Context(), &c, f.ShowNSFW); err != nil {
+	filters := store.ContentFilters{ShowNSFW: f.ShowNSFW, MutedWords: parseMutedWords(f.MutedWords)}
+	if err := app.store.SetContentFilters(r.Context(), &c, filters); err != nil {
 		app.serverError(w, r, err)
 		return
 	}
-	msg := "NSFW molts stay hidden until you click them."
-	if f.ShowNSFW {
-		msg = "NSFW molts now show without a click."
-	}
-	app.sessions.Put(r.Context(), sessionFlash, msg)
+	app.sessions.Put(r.Context(), sessionFlash, "Changes saved.")
 	http.Redirect(w, r, "/settings", http.StatusSeeOther)
+}
+
+// parseMutedWords splits a comma-separated list into lowercase words and
+// phrases, dropping blanks and repeats. Anything past the limits is left off.
+func parseMutedWords(raw string) []string {
+	var words []string
+	seen := map[string]bool{}
+	total := 0
+	for part := range strings.SplitSeq(raw, ",") {
+		w := strings.ToLower(strings.Join(strings.Fields(singleLine(part)), " "))
+		if w == "" || seen[w] || utf8.RuneCountInString(w) > store.MaxMutedWordLen {
+			continue
+		}
+		total += len(w) + 1
+		if total > store.MaxMutedWordsLen || len(words) == store.MaxMutedWords {
+			break
+		}
+		seen[w] = true
+		words = append(words, w)
+	}
+	return words
 }
 
 func (app *App) settingsPasswordPost(w http.ResponseWriter, r *http.Request) {
