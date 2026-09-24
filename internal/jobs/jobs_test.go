@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/segmentio/ksuid"
 
+	"github.com/t0ul/krabber-net/internal/linkcard"
 	"github.com/t0ul/krabber-net/internal/platform"
 	"github.com/t0ul/krabber-net/internal/store"
 )
@@ -104,5 +105,48 @@ func TestFanoutAndSweep(t *testing.T) {
 	}
 	if pending, _ := s.PendingFanouts(ctx, time.Now().Add(time.Minute), 10); len(pending) != 0 {
 		t.Fatalf("still pending: %+v", pending)
+	}
+}
+
+type fakeFetcher struct{ calls map[string]int }
+
+func (f *fakeFetcher) Fetch(_ context.Context, url string) (linkcard.Card, error) {
+	f.calls[url]++
+	if url == "https://good.test/" {
+		return linkcard.Card{URL: url, Title: "Good", Description: "A page", Host: "good.test"}, nil
+	}
+	return linkcard.Card{}, linkcard.ErrNoCard
+}
+
+func TestLinkCards(t *testing.T) {
+	s := newStore(t)
+	ctx := context.Background()
+	r := New(s, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	f := &fakeFetcher{calls: map[string]int{}}
+	r.fetcher = f
+
+	r.fetchCard(ctx, "https://good.test/")
+	r.fetchCard(ctx, "https://bad.test/")
+	cards, err := s.LinkCards(ctx, []string{"https://good.test/", "https://bad.test/"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c := cards["https://good.test/"]; c.Title != "Good" || c.Host != "good.test" || c.Failed {
+		t.Errorf("good: %+v", c)
+	}
+	if c := cards["https://bad.test/"]; !c.Failed {
+		t.Errorf("bad: %+v", c)
+	}
+	r.fetchCard(ctx, "https://good.test/")
+	r.fetchCard(ctx, "https://bad.test/")
+	if f.calls["https://good.test/"] != 1 || f.calls["https://bad.test/"] != 1 {
+		t.Errorf("cached cards were fetched again: %v", f.calls)
+	}
+
+	// Queueing the same URL twice keeps one entry.
+	r.EnqueueCard("https://queued.test/")
+	r.EnqueueCard("https://queued.test/")
+	if len(r.cards) != 1 {
+		t.Errorf("queue length %d", len(r.cards))
 	}
 }

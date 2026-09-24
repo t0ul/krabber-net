@@ -347,6 +347,49 @@
   cursor: pointer;
 }
 
+/* Crabber's card is sized around an image; Krabber's cards are text only. */
+.link-card {
+  height: auto;
+  color: var(--light);
+}
+
+.link-card:hover {
+  text-decoration: none;
+  color: var(--light);
+}
+
+.link-card .card-content {
+  padding: 0.6rem 0.9rem;
+  gap: 2px;
+  min-width: 0;
+}
+
+.link-card .card-title,
+.link-card .card-address {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.link-card .card-description {
+  -webkit-mask-image: none;
+  mask-image: none;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 0.9em;
+}
+
+.link-card .card-address {
+  font-size: 0.85em;
+}
+
+.link-card .card-address svg {
+  fill: currentColor;
+  vertical-align: -2px;
+}
+
 .kb-profile-stats a:hover {
   text-decoration: none;
 }

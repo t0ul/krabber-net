@@ -74,6 +74,7 @@ func run(log *slog.Logger) error {
 		Mailer:   mailer,
 		Fanout:   runner,
 		Notifier: runner,
+		Cards:    runner,
 	})
 	if err != nil {
 		return err

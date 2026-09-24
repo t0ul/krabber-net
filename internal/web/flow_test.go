@@ -78,7 +78,26 @@ type harness struct {
 	srv    *httptest.Server
 	store  *store.Store
 	mail   *capturedMail
+	cards  *cardRecorder
 	client *http.Client
+}
+
+// cardRecorder keeps the link cards asked for, instead of fetching them.
+type cardRecorder struct {
+	mu   sync.Mutex
+	urls []string
+}
+
+func (c *cardRecorder) EnqueueCard(u string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.urls = append(c.urls, u)
+}
+
+func (c *cardRecorder) asked(u string) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return slices.Contains(c.urls, u)
 }
 
 func newHarness(t *testing.T) *harness {
@@ -109,6 +128,7 @@ func newHarness(t *testing.T) *harness {
 
 	log := slog.New(slog.NewTextHandler(testLog{t}, nil))
 	captured := &capturedMail{}
+	cards := &cardRecorder{}
 	app, err := New(Deps{
 		Config:   &config.Config{Env: "prod", BaseURL: base, TableName: table, OriginVerifySecrets: []string{originSecret}},
 		Log:      log,
@@ -116,13 +136,14 @@ func newHarness(t *testing.T) *harness {
 		Mailer:   mail.New(captured, st, 100, log),
 		Fanout:   realQueue{t: t, s: st},
 		Notifier: realQueue{t: t, s: st},
+		Cards:    cards,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	srv.Config.Handler = app.Routes()
 
-	h := &harness{t: t, srv: srv, store: st, mail: captured}
+	h := &harness{t: t, srv: srv, store: st, mail: captured, cards: cards}
 	h.client = h.newClient()
 	return h
 }
@@ -1842,6 +1863,48 @@ func TestMutedWords(t *testing.T) {
 	h.login("karen@krabber.test", "computer-wife!")
 	if _, body, _ := h.get("/sea"); !strings.Contains(body, "Chum Bucket") {
 		t.Error("other crabs' mutes leaked into karen's Sea")
+	}
+}
+
+func TestLinkCards(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	h.signupAndActivate("karen", "karen@krabber.test", "computer-wife!")
+	h.login("karen@krabber.test", "computer-wife!")
+	if err := h.store.PutLinkCard(ctx, store.LinkCard{URL: "https://krabber.net/", Title: "Krabber <3", Description: "Molts from the deep", Host: "krabber.net"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.store.PutLinkCard(ctx, store.LinkCard{URL: "https://dead.test/", Failed: true}); err != nil {
+		t.Fatal(err)
+	}
+
+	tok := h.csrf("/trench")
+	for _, text := range []string{"come see https://Krabber.net!", "new page https://fresh.test/a#frag", "gone https://dead.test", "insecure http://plain.test"} {
+		if status, _, _ := h.post("/molt/create", url.Values{"csrf_token": {tok}, "content": {text}}); status != http.StatusSeeOther {
+			t.Fatalf("create %q: %d", text, status)
+		}
+	}
+	if !h.cards.asked("https://fresh.test/a") {
+		t.Errorf("posting didn't ask for the new card: %v", h.cards.urls)
+	}
+	if h.cards.asked("http://plain.test") || h.cards.asked("http://plain.test/") {
+		t.Error("asked for a card over plain http")
+	}
+
+	_, body, _ := h.get("/sea")
+	for _, want := range []string{
+		`<a class="link-card zindex-front rounded-media mb-2" href="https://krabber.net/"`,
+		`<span class="card-title">Krabber &lt;3</span>`,
+		`Molts from the deep`,
+		`href="https://Krabber.net" class="mention zindex-front" target="_blank" rel="nofollow ugc noopener noreferrer">Krabber.net</a>!`,
+		`href="http://plain.test" class="mention`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("Sea missing %s", want)
+		}
+	}
+	if n := strings.Count(body, `class="link-card`); n != 1 {
+		t.Errorf("%d cards on the Sea, want 1 (failed and unfetched pages have none)", n)
 	}
 }
 

@@ -2,6 +2,7 @@ package richtext
 
 import (
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -30,5 +31,40 @@ func TestHTML(t *testing.T) {
 	}
 	if got := string(HTML("plain 'text'", known)); got != "plain &#39;text&#39;" {
 		t.Errorf("plain = %s", got)
+	}
+}
+
+func TestLinks(t *testing.T) {
+	none := func(string) (string, bool) { return "", false }
+	got := string(HTML(`see https://krabber.net/crabs/bob?a=1&b="2". and (https://en.wikipedia.org/wiki/Crab_(disambiguation)) ok`, none))
+	want := `see <a href="https://krabber.net/crabs/bob?a=1&amp;b=" class="mention zindex-front" target="_blank" rel="nofollow ugc noopener noreferrer">krabber.net/crabs/bob?a=1&amp;b=</a>&#34;2&#34;. and (https://en.wikipedia.org/wiki/Crab_(disambiguation)) ok`
+	if got != want {
+		t.Errorf("HTML =\n%s\nwant\n%s", got, want)
+	}
+	long := string(HTML("https://example.com/a/very/long/path/that/keeps/going/on", none))
+	if want := `>example.com/a/very/long/path/that/…</a>`; !strings.HasSuffix(long, want) {
+		t.Errorf("long link = %s", long)
+	}
+	for _, s := range []string{"javascript:alert(1)", "not a link: example.com", "xhttps://evil.test", "ftp://files.test"} {
+		if got := string(HTML(s, none)); strings.Contains(got, "<a ") {
+			t.Errorf("%q linked: %s", s, got)
+		}
+	}
+
+	cases := map[string]string{
+		"first https://a.test/x, then https://b.test": "https://a.test/x",
+		"HTTPS://Loud.test!":                          "HTTPS://Loud.test",
+		"(see https://wrapped.test/)":                 "https://wrapped.test/",
+		"docs at https://w.test/Crab_(food) today":    "https://w.test/Crab_(food)",
+		"no links, @crab %tag":                        "",
+		"https://x.test/@bob %tag":                    "https://x.test/@bob",
+	}
+	for in, want := range cases {
+		if got := FirstURL(in); got != want {
+			t.Errorf("FirstURL(%q) = %q, want %q", in, got, want)
+		}
+	}
+	if got := Mentions("https://x.test/@bob"); len(got) != 0 {
+		t.Errorf("mention inside a link: %q", got)
 	}
 }

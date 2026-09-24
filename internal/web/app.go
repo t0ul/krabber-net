@@ -26,6 +26,11 @@ type Notifier interface {
 	Notify(n store.Notification)
 }
 
+// CardQueue asks the background worker for a link card.
+type CardQueue interface {
+	EnqueueCard(url string)
+}
+
 // App holds the website's dependencies.
 type App struct {
 	cfg       *config.Config
@@ -37,6 +42,7 @@ type App struct {
 	forms     *form.Decoder
 	fanout    FanoutQueue
 	notifier  Notifier
+	cards     CardQueue
 	turnstile *turnstile
 	dir       *directory
 }
@@ -49,6 +55,7 @@ type Deps struct {
 	Mailer   *mail.Mailer
 	Fanout   FanoutQueue
 	Notifier Notifier
+	Cards    CardQueue
 }
 
 // New builds the App, parsing templates and configuring sessions.
@@ -87,6 +94,7 @@ func New(d Deps) (*App, error) {
 		forms:     form.NewDecoder(),
 		fanout:    d.Fanout,
 		notifier:  d.Notifier,
+		cards:     d.Cards,
 		turnstile: newTurnstile(d.Config.TurnstileSecret),
 		dir:       &directory{},
 	}, nil

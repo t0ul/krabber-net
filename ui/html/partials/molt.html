@@ -9,6 +9,20 @@
 
 {{define "nsfw-badge"}}<span class="text-muted">·</span> <span class="nsfw-badge">NSFW</span>{{end}}
 
+{{/* Text-only preview of a molt's first link; takes the card. */}}
+{{define "link-card"}}
+<a class="link-card zindex-front rounded-media mb-2" href="{{ .URL }}" target="_blank" rel="nofollow ugc noopener noreferrer">
+    <span class="card-content">
+        <span class="card-title">{{ .Title }}</span>
+        {{ with .Description }}<span class="card-description text-muted">{{ . }}</span>{{ end }}
+        <span class="card-address text-muted">
+            <svg class="mini-molt-action-icon" width="14" height="14"><use href="/static/img/sprites.svg?version=1704178675#link"></use></svg>
+            {{ .Host }}
+        </span>
+    </span>
+</a>
+{{end}}
+
 {{/* The click target in front of a veiled molt's text. */}}
 {{define "nsfw-veil"}}<summary class="kb-nsfw-summary">This molt is marked NSFW. <span class="text-primary">Show it</span></summary>{{end}}
 
@@ -43,10 +57,12 @@
             {{ if $m.Veiled }}
             <details class="kb-nsfw zindex-front mb-2">
                 {{ template "nsfw-veil" }}
-                <p class="mt-2 mb-0"><span class="molt-text clickable" data-href="/molt/view/{{ $m.ID }}">{{ or $m.ContentHTML $m.Content }}</span></p>
+                <p class="mt-2 mb-2"><span class="molt-text clickable" data-href="/molt/view/{{ $m.ID }}">{{ or $m.ContentHTML $m.Content }}</span></p>
+                {{ with $m.Card }}{{ template "link-card" . }}{{ end }}
             </details>
             {{ else }}
             <p class="mb-2"><span class="zindex-front molt-text clickable" data-href="/molt/view/{{ $m.ID }}">{{ or $m.ContentHTML $m.Content }}</span></p>
+            {{ with $m.Card }}{{ template "link-card" . }}{{ end }}
             {{ end }}
         </div>
         {{ if $m.QuoteOf }}{{ template "quoted-molt" $m.Quoted }}{{ end }}

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/t0ul/krabber-net/internal/avatar"
+	"github.com/t0ul/krabber-net/internal/linkcard"
 	"github.com/t0ul/krabber-net/internal/richtext"
 	"github.com/t0ul/krabber-net/internal/store"
 	"github.com/t0ul/krabber-net/ui"
@@ -352,6 +353,7 @@ func (app *App) withLikes(r *http.Request, molts []store.Molt) ([]store.Molt, er
 	if err := app.withQuoted(r, molts); err != nil {
 		return nil, err
 	}
+	app.withCards(r, molts)
 	c := currentCrab(r)
 	if c == nil || len(molts) == 0 {
 		return molts, nil
@@ -369,6 +371,46 @@ func (app *App) withLikes(r *http.Request, molts []store.Molt) ([]store.Molt, er
 		molts[i].Liked, molts[i].RemoltedAs, molts[i].Bookmarked = mk.Liked, mk.RemoltedAs, mk.Bookmarked
 	}
 	return molts, nil
+}
+
+// cardURL is the address a molt's card is cached under: its first link, when
+// that's a plain HTTPS address.
+func cardURL(content string) string {
+	u, _ := linkcard.Normalize(richtext.FirstURL(content))
+	return u
+}
+
+// withCards attaches the cached card for each molt's first link, and asks for
+// the ones not fetched yet. Cards are extras: a failed lookup only logs.
+func (app *App) withCards(r *http.Request, molts []store.Molt) {
+	urls := make([]string, len(molts))
+	for i := range molts {
+		urls[i] = cardURL(molts[i].Content)
+	}
+	cards, err := app.store.LinkCards(r.Context(), urls)
+	if err != nil {
+		app.log.Warn("link cards", "err", err)
+		return
+	}
+	for i, u := range urls {
+		if u == "" {
+			continue
+		}
+		c, ok := cards[u]
+		switch {
+		case !ok:
+			app.enqueueCard(u)
+		case !c.Failed:
+			molts[i].Card = &c
+		}
+	}
+}
+
+// enqueueCard asks for the card of a molt's first link, if it has one.
+func (app *App) enqueueCard(u string) {
+	if u != "" && app.cards != nil {
+		app.cards.EnqueueCard(u)
+	}
 }
 
 // withQuoted attaches the quoted molt to each quote. A quoted molt that was

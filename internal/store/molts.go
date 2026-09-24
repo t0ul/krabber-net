@@ -80,6 +80,7 @@ type Molt struct {
 	RemoltedByName string        `dynamodbav:"-"`
 	ReplyToName    string        `dynamodbav:"-"`
 	Veiled         bool          `dynamodbav:"-"` // NSFW and the viewer hasn't opted in, so the text waits behind a click
+	Card           *LinkCard     `dynamodbav:"-"` // the first link's card, once fetched
 }
 
 // MoltOption sets something extra on a molt, reply or quote as it's written.

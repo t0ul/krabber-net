@@ -111,6 +111,7 @@ func (app *App) publish(r *http.Request, m *store.Molt, skipMention string) {
 		app.log.Warn("write own trench", "err", err, "molt", m.ID)
 	}
 	app.fanout.Enqueue(m)
+	app.enqueueCard(cardURL(m.Content))
 	app.dir.addMolt(*m)
 	app.notifyMentions(r, m, skipMention)
 	app.displayOne(r, m)
@@ -483,6 +484,7 @@ func (app *App) replyCreatePost(w http.ResponseWriter, r *http.Request) {
 	}
 	app.notify(r, parent.AuthorID, store.NotifyReply, reply.ID, f.Content)
 	app.notifyMentions(r, reply, parent.AuthorID)
+	app.enqueueCard(cardURL(reply.Content))
 
 	if !isHTMX(r) {
 		http.Redirect(w, r, "/molt/view/"+parent.ID, http.StatusSeeOther)

@@ -59,6 +59,7 @@ func (app *App) editPost(w http.ResponseWriter, r *http.Request) {
 	}
 	app.dir.replaceMolt(*edited)
 	app.notifyMentions(r, edited, "", m.Mentions...)
+	app.enqueueCard(cardURL(edited.Content))
 	redirect(w, r, "/molt/view/"+m.ID)
 }
 

@@ -36,10 +36,12 @@
         {{ if .Veiled }}
         <details class="kb-nsfw mb-2">
             {{ template "nsfw-veil" }}
-            <p class="large-molt-text mt-2 mb-0 molt-text">{{ or .ContentHTML .Content }}</p>
+            <p class="large-molt-text mt-2 mb-2 molt-text">{{ or .ContentHTML .Content }}</p>
+            {{ with .Card }}{{ template "link-card" . }}{{ end }}
         </details>
         {{ else }}
         <p class="large-molt-text mb-2 molt-text">{{ or .ContentHTML .Content }}</p>
+        {{ with .Card }}{{ template "link-card" . }}{{ end }}
         {{ end }}
         {{ if .QuoteOf }}{{ template "quoted-molt" .Quoted }}{{ end }}
         <div class="text-muted small pb-2 border-bottom border-dark">{{ template "time" .CreatedAt }}{{ if .Edited }} &mdash; This molt has been edited{{ end }}</div>

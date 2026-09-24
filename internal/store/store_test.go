@@ -1108,6 +1108,36 @@ func TestNSFW(t *testing.T) {
 	}
 }
 
+func TestLinkCards(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+	good := LinkCard{URL: "https://krabber.net/", Title: "Krabber", Description: "Molts", Host: "krabber.net"}
+	if err := s.PutLinkCard(ctx, good); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.PutLinkCard(ctx, LinkCard{URL: "https://broken.test/", Title: "kept?", Failed: true}); err != nil {
+		t.Fatal(err)
+	}
+	cards, err := s.LinkCards(ctx, []string{"https://krabber.net/", "https://broken.test/", "https://krabber.net/", "https://new.test/", ""})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c := cards["https://krabber.net/"]; c.Title != "Krabber" || c.Host != "krabber.net" || c.Failed {
+		t.Errorf("good card: %+v", c)
+	}
+	if c, ok := cards["https://broken.test/"]; !ok || !c.Failed || c.Title != "" {
+		t.Errorf("failed card: %+v %v", c, ok)
+	}
+	if _, ok := cards["https://new.test/"]; ok || len(cards) != 2 {
+		t.Errorf("cards: %+v", cards)
+	}
+
+	s.now = func() time.Time { return time.Now().Add(31 * 24 * time.Hour) }
+	if cards, _ := s.LinkCards(ctx, []string{"https://krabber.net/"}); len(cards) != 0 {
+		t.Error("an expired card was returned")
+	}
+}
+
 func TestPages(t *testing.T) {
 	s := newTestStore(t)
 	ctx := context.Background()

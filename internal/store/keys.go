@@ -1,6 +1,8 @@
 package store
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"strings"
 	"time"
@@ -39,6 +41,7 @@ import (
 //	Moderation log    ML#<yyyy-mm>           ML#<ksuid>
 //	Report queue      R#<moltID>             R#                   GSI8 Q#report / <ksuid> (while open)
 //	Report            R#<moltID>             R#by#<reporterID>
+//	Link card         LC#<sha256 hex of URL> LC#                  (expires: 30 days, or 1 day after a failed fetch)
 //
 // Molt and other generated IDs are KSUIDs, so sorting by SK sorts by time.
 // Replies use their own SK prefix so a crab's molts and replies are each one
@@ -114,6 +117,11 @@ func modLogSK(id string) string                  { return "ML#" + id }
 func reportPK(moltID string) string              { return "R#" + moltID }
 func reportSummarySK() string                    { return "R#" }
 func reportRowSK(reporterID string) string       { return "R#by#" + reporterID }
+func linkCardSK() string                         { return "LC#" }
+func linkCardPK(url string) string {
+	sum := sha256.Sum256([]byte(url))
+	return "LC#" + hex.EncodeToString(sum[:])
+}
 
 // NormalizeEmail lowercases and trims an email address so that one mailbox
 // maps to exactly one account.

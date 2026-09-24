@@ -1,5 +1,5 @@
-// Package richtext finds @mentions and %crabtags in molt text and renders it
-// as HTML with them linked, following Crabber's patterns: a mention or tag
+// Package richtext finds @mentions, %crabtags and web links in molt text and
+// renders it as HTML with them linked, following Crabber's patterns: each
 // starts the text or follows whitespace.
 package richtext
 
@@ -17,12 +17,57 @@ const (
 	MaxTagLength = 64
 	// MaxPerMolt caps how many distinct tags, and how many mentions, a molt records.
 	MaxPerMolt = 10
+	// maxLinkText is how much of a link's address is shown before "…".
+	maxLinkText = 35
 )
 
 var (
-	token = regexp.MustCompile(`(?:^|\s)(?:@([A-Za-z0-9_]{1,32})\b|%([\p{L}\p{N}_]+))`)
+	token = regexp.MustCompile(`(?:^|\s)(?:@([A-Za-z0-9_]{1,32})\b|%([\p{L}\p{N}_]+)|((?i:https?)://[^\s<>"]+))`)
 	tagRe = regexp.MustCompile(`^[\p{L}\p{N}_]+$`)
 )
+
+// linkEnd trims punctuation that usually ends the sentence, not the link,
+// from the link at s[start:end], and returns the new end.
+func linkEnd(s string, start, end int) int {
+	for end > start {
+		switch c := s[end-1]; c {
+		case '.', ',', ';', ':', '!', '?', '\'':
+			end--
+		case ')':
+			if strings.Count(s[start:end], "(") >= strings.Count(s[start:end], ")") {
+				return end
+			}
+			end--
+		default:
+			return end
+		}
+	}
+	return end
+}
+
+// FirstURL returns the first web link in s, or "".
+func FirstURL(s string) string {
+	for _, m := range token.FindAllStringSubmatchIndex(s, -1) {
+		if m[6] >= 0 {
+			if end := linkEnd(s, m[6], m[7]); end > m[6] {
+				return s[m[6]:end]
+			}
+		}
+	}
+	return ""
+}
+
+// linkText is how a link reads in a molt: without the scheme, shortened.
+func linkText(u string) string {
+	if i := strings.Index(u, "://"); i >= 0 {
+		u = u[i+3:]
+	}
+	if utf8.RuneCountInString(u) <= maxLinkText {
+		return u
+	}
+	r := []rune(u)
+	return string(r[:maxLinkText-1]) + "…"
+}
 
 // Tags returns the distinct crabtags in s, lowercased, in order of appearance.
 func Tags(s string) []string {
@@ -59,8 +104,8 @@ func collect(s string, group int, ok func(string) bool) []string {
 	return out
 }
 
-// HTML escapes s and links its crabtags, and the mentions that known
-// resolves to a crab (it returns the crab's username as stored).
+// HTML escapes s and links its crabtags, web links, and the mentions that
+// known resolves to a crab (it returns the crab's username as stored).
 func HTML(s string, known func(lowerName string) (string, bool)) template.HTML {
 	var b strings.Builder
 	last := 0
@@ -88,6 +133,17 @@ func HTML(s string, known func(lowerName string) (string, bool)) template.HTML {
 			b.WriteString(html.EscapeString(s[pct:m[5]]))
 			b.WriteString(`</a>`)
 			last = m[5]
+		case m[6] >= 0:
+			end := linkEnd(s, m[6], m[7])
+			u, err := url.Parse(s[m[6]:end])
+			if err != nil || u.Host == "" {
+				continue
+			}
+			b.WriteString(html.EscapeString(s[last:m[6]]))
+			b.WriteString(`<a href="` + html.EscapeString(s[m[6]:end]) + `" class="mention zindex-front" target="_blank" rel="nofollow ugc noopener noreferrer">`)
+			b.WriteString(html.EscapeString(linkText(s[m[6]:end])))
+			b.WriteString(`</a>`)
+			last = end
 		}
 	}
 	b.WriteString(html.EscapeString(s[last:]))
