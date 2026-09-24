@@ -1,0 +1,98 @@
+{{define "title"}}Stats{{end}}
+
+{{define "page"}}
+{{ template "shell-top" . }}
+    {{ template "heading" "Stats" }}
+    {{ $d := . }}
+    {{ with .Stats }}
+    <div id="stats-body" class="p-4">
+        <div class="stat-group absolute-container">
+            <h1 class="user-count text-center">{{ commas .Crabs }}</h1>
+            <h2 class="text-center">active crab{{ if ne .Crabs 1 }}s{{ end }}</h2>
+            {{ template "stats-badge" "big-badge" }}
+            {{ template "stats-badge" "big-badge-back" }}
+        </div>
+
+        <div class="mt-5 p-3 rounded-media neue-card neue-card-media">
+            <div class="d-flex flex-wrap justify-content-center">
+                {{ template "stat" (dict "Number" (commas .Molts) "Label" "molts sent") }}
+                {{ template "stat" (dict "Number" (commas .Follows) "Label" "follows") }}
+                {{ template "stat" (dict "Number" (print (commas .WeekMolts) (or (and .WeekMore "+") "")) "Label" "molts this week") }}
+            </div>
+        </div>
+
+        {{ with .King }}
+        {{ template "stats-heading" (dict "Title" "Crab King" "Why" "The most followed crab") }}
+        {{ template "stats-crab" (dict "C" . "Crown" true "Note" (print .FollowerCount " follower" (or (and (ne .FollowerCount 1) "s") ""))) }}
+        {{ end }}
+
+        {{ with .Baby }}
+        {{ template "stats-heading" (dict "Title" "Baby Crab" "Why" "Our newest member. Go say hello!") }}
+        {{ template "stats-crab" (dict "C" . "Badge" "clock-f" "Note" (print "a member for " $d.Stats.BabyDays " day" (or (and (ne $d.Stats.BabyDays 1) "s") ""))) }}
+        {{ end }}
+
+        {{ template "stats-heading" (dict "Title" "Best Molt" "Why" "The most liked molt this week") }}
+        <div class="neue-card neue-card-media p-1">
+            {{ with .Best }}{{ template "molt" (dict "M" . "D" $d) }}{{ else }}<div class="p-5 text-muted text-center">Nothing here.</div>{{ end }}
+        </div>
+
+        {{ template "stats-heading" (dict "Title" "Talked About" "Why" "The molt with the most replies this week") }}
+        <div class="neue-card neue-card-media p-1">
+            {{ with .Talked }}{{ template "molt" (dict "M" . "D" $d) }}{{ else }}<div class="p-5 text-muted text-center">Nothing here.</div>{{ end }}
+        </div>
+
+        {{ template "stats-heading" (dict "Title" "Trendy" "Why" "The crabtag the most crabs used this week") }}
+        {{ with .Trendy }}<div class="trendy-tag"><h2 class="text-center"><a class="text-primary" href="/crabtag/{{ . }}">%{{ . }}</a></h2></div>{{ end }}
+        <div class="trendy-tag-molts neue-card neue-card-media p-1">
+            {{ range .TrendyMolts }}{{ template "molt" (dict "M" . "D" $d) }}{{ else }}<div class="p-5 text-muted text-center">Nothing here.</div>{{ end }}
+        </div>
+
+        <div class="w-100 p-5 my-5 text-muted text-molt text-center">thanks for using krabber &lt;3</div>
+    </div>
+    {{ end }}
+{{ template "shell-bottom" . }}
+{{end}}
+
+{{define "stat"}}
+<div class="mini-molt stat mini-bio rounded-media m-2 absolute-container">
+    <div class="mini-molt-profile-box zindex-front d-flex justify-content-center">
+        <h1 class="stat-num">{{ .Number }}</h1>
+    </div>
+    <div class="mini-molt-text-box w-100 h-100 p-2 d-flex justify-content-center">
+        <strong class="text-muted">{{ .Label }}</strong>
+    </div>
+</div>
+{{end}}
+
+{{define "stats-heading"}}
+<div class="crab-king mt-5 w-100">
+    <div class="crown-name absolute-container">
+        <h1 class="text-center">{{ .Title }}</h1>
+        <div class="horizontal-line"></div>
+    </div>
+    <p class="text-center text-muted stat-explanation">{{ .Why }}</p>
+</div>
+{{end}}
+
+{{define "stats-crab"}}{{ $c := .C }}
+<div class="king-profile neue-card neue-card-media p-4 row flex-row absolute-container mx-0">
+    <div class="col-auto">
+        {{ if .Crown }}<img class="profile-crown" src="{{ asset "img/crown.svg" }}" alt="golden crown">{{ end }}
+        {{ with .Badge }}<div class="avatar-badge"><svg class="avatar-badge-icon" width="20" height="20"><use href="{{ asset "img/sprites.svg" }}#{{ . }}"></use></svg></div>{{ end }}
+        <img class="rounded-circle profile-picture" src="{{ avatarSrc $c.Avatar }}" width="100" height="100" alt="">
+    </div>
+    <div class="col">
+        <div class="profile-box-names mt-2">
+            <h2 class="king-display-name">{{ $c.Name }}</h2>
+            <p class="text-muted mb-1">@{{ $c.UserName }} <span class="follow-count px-1 ml-1">{{ .Note }}</span></p>
+        </div>
+    </div>
+    <a href="/crabs/{{ $c.UserName }}" class="absolute-fill" aria-label="@{{ $c.UserName }}"></a>
+</div>
+{{end}}
+
+{{define "stats-badge"}}
+<svg class="{{ . }}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 729 729.593" aria-hidden="true">
+    <path d="M744.877,446.688L708.725,482.87l13.238,49.447a66.032,66.032,0,0,1-46.678,80.849L625.923,626.4l-13.239,49.447a65.968,65.968,0,0,1-80.817,46.66l-49.362-13.238-36.152,36.182a65.935,65.935,0,0,1-93.3,0L316.9,709.273l-49.362,13.238a65.968,65.968,0,0,1-80.817-46.66L173.484,626.4l-49.362-13.238a66.032,66.032,0,0,1-46.679-80.849L90.682,482.87,54.53,446.688a66.065,66.065,0,0,1,0-93.376L90.682,317.13,77.443,267.683a66.032,66.032,0,0,1,46.679-80.849L173.484,173.6l13.238-49.447A65.968,65.968,0,0,1,267.539,77.49L316.9,90.727l36.152-36.181a65.935,65.935,0,0,1,93.3,0l36.152,36.182L531.867,77.49a65.968,65.968,0,0,1,80.817,46.659L625.923,173.6l49.362,13.238a66.032,66.032,0,0,1,46.678,80.849L708.725,317.13l36.152,36.182A66.065,66.065,0,0,1,744.877,446.688Z" transform="translate(-35.219 -35.219)"/>
+</svg>
+{{end}}

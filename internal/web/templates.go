@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"net/http"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -70,6 +71,8 @@ type templateData struct {
 	ListTitle   string
 	ListBack    string
 
+	Stats *statsPage
+
 	Error        errorPage // error.html
 	ContactEmail string    // terms and privacy pages
 }
@@ -110,6 +113,20 @@ func ago(t time.Time) string {
 }
 
 func monthYear(t time.Time) string { return t.UTC().Format("January 2006") }
+
+// commas writes n with thousands separators, like Crabber's commafy.
+func commas(n int) string {
+	s := strconv.Itoa(n)
+	neg := strings.HasPrefix(s, "-")
+	s = strings.TrimPrefix(s, "-")
+	for i := len(s) - 3; i > 0; i -= 3 {
+		s = s[:i] + "," + s[i:]
+	}
+	if neg {
+		s = "-" + s
+	}
+	return s
+}
 
 var modActions = map[string][2]string{ // action: {done, tried to}
 	"ban":                {"banned", "ban"},
@@ -196,6 +213,7 @@ var templateFuncs = template.FuncMap{
 	"websiteLabel":   websiteLabel,
 	"hasPrefix":      strings.HasPrefix,
 	"join":           strings.Join,
+	"commas":         commas,
 	"modActionLabel": modActionLabel,
 	"reportLabel":    store.ReportLabel,
 	"reportReasons":  func() []store.ReportReason { return store.ReportReasons },

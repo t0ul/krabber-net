@@ -35,6 +35,10 @@
         <svg class="btn-icon d-lg-none" width="28" height="28"><use href="/static/img/sprites.svg?version=1704178675#write"></use></svg>
         <strong class="d-none d-lg-inline-block">Molt</strong>
     </a>
+    <a href="/stats" class="btn rounded-pill mx-auto mx-lg-0 mt-2 extra-navs"{{ if eq $p "/stats" }} id="nav-active" aria-current="page"{{ end }}>
+        <svg class="btn-icon text-muted" width="28" height="28"><use href="{{ asset "img/sprites.svg" }}#{{ if eq $p "/stats" }}dashboard-f{{ else }}dashboard{{ end }}"></use></svg>
+        <strong class="d-none d-lg-inline-block ml-2">Stats</strong>
+    </a>
     {{ if .IsModerator }}
     <a href="/crabmin" class="btn rounded-pill mx-auto mx-lg-0 mt-2 extra-navs"{{ if hasPrefix $p "/crabmin" }} id="nav-active" aria-current="page"{{ end }}>
         <svg class="btn-icon text-muted" width="28" height="28"><use href="{{ asset "img/sprites.svg" }}#lifebuoy"></use></svg>

@@ -1079,7 +1079,7 @@ func TestNavLayout(t *testing.T) {
 	_, body, _ := h.get("/trench")
 	nav := body[strings.Index(body, `id="nav-panel"`):strings.Index(body, `id="add-panel"`)]
 	last := -1
-	for _, want := range []string{`href="/trench"`, `href="/sea"`, `href="/notifications"`, `href="/bookmarks"`, `href="/crabs/karen"`, `id="molt-btn"`, `href="/settings"`, `action="/crab/logout"`} {
+	for _, want := range []string{`href="/trench"`, `href="/sea"`, `href="/notifications"`, `href="/bookmarks"`, `href="/crabs/karen"`, `id="molt-btn"`, `href="/stats"`, `href="/settings"`, `action="/crab/logout"`} {
 		i := strings.Index(nav, want)
 		if i <= last {
 			t.Fatalf("nav: %s is missing or out of order", want)
@@ -1928,6 +1928,91 @@ func TestYouTube(t *testing.T) {
 		}
 		if strings.Contains(body, "<iframe") {
 			t.Errorf("%s loads the player before a click", path)
+		}
+	}
+}
+
+func TestStats(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	h.signupAndActivate("karen", "karen@krabber.test", "computer-wife!")
+	h.signupAndActivate("sandy", "sandy@krabber.test", "karate-chop!")
+	h.signupAndActivate("gary", "gary@krabber.test", "meow-meow-meow")
+	karen, _ := h.store.CrabByUsername(ctx, "karen")
+	sandy, _ := h.store.CrabByUsername(ctx, "sandy")
+	gary, _ := h.store.CrabByUsername(ctx, "gary")
+	for _, fan := range []*store.Crab{sandy, gary} {
+		if err := h.store.Follow(ctx, fan, karen); err != nil {
+			t.Fatal(err)
+		}
+	}
+	liked, err := h.store.CreateMolt(ctx, karen, "Computer, %science is the answer")
+	if err != nil {
+		t.Fatal(err)
+	}
+	chatty, err := h.store.CreateMolt(ctx, sandy, "Who wants to talk %science?")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []*store.Crab{sandy, gary} {
+		if _, err := h.store.ToggleLike(ctx, c, liked); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, c := range []*store.Crab{karen, gary} {
+		if _, err := h.store.Reply(ctx, c, chatty, "me!"); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	status, body, _ := h.get("/stats")
+	if status != http.StatusOK {
+		t.Fatalf("stats: %d", status)
+	}
+	section := func(title string) string {
+		i := strings.Index(body, ">"+title+"</h1>")
+		if i < 0 {
+			t.Fatalf("no %s section", title)
+		}
+		rest := body[i:]
+		if j := strings.Index(rest[1:], `class="crab-king`); j >= 0 {
+			rest = rest[:j+1]
+		}
+		return rest
+	}
+	if !strings.Contains(body, `<h1 class="user-count text-center">3</h1>`) {
+		t.Error("active crab count")
+	}
+	if s := section("Crab King"); !strings.Contains(s, "@karen") || !strings.Contains(s, "2 followers") {
+		t.Error("Crab King should be karen with 2 followers")
+	}
+	if s := section("Baby Crab"); !strings.Contains(s, "@gary") {
+		t.Error("Baby Crab should be the newest crab, gary")
+	}
+	if s := section("Best Molt"); !strings.Contains(s, "</a> is the answer") {
+		t.Error("Best Molt should be karen's liked molt")
+	}
+	if s := section("Talked About"); !strings.Contains(s, "Who wants to talk") {
+		t.Error("Talked About should be sandy's molt with two replies")
+	}
+	if s := section("Trendy"); !strings.Contains(s, `href="/crabtag/science">%science</a>`) {
+		t.Error("Trendy should be the science crabtag")
+	}
+
+	// A crab who blocked karen doesn't see her crowned.
+	h.login("sandy@krabber.test", "karate-chop!")
+	tok := h.csrf("/stats")
+	h.post("/block/"+karen.ID, url.Values{"csrf_token": {tok}})
+	_, body, _ = h.get("/stats")
+	if stats := body[strings.Index(body, `id="stats-body"`):]; strings.Contains(stats, "@karen") || strings.Contains(stats, "</a> is the answer") {
+		t.Error("stats show a blocked crab")
+	}
+}
+
+func TestCommas(t *testing.T) {
+	for n, want := range map[int]string{0: "0", 999: "999", 1000: "1,000", 1234567: "1,234,567", -4200: "-4,200"} {
+		if got := commas(n); got != want {
+			t.Errorf("commas(%d) = %q, want %q", n, got, want)
 		}
 	}
 }

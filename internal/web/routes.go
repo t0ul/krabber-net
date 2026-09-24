@@ -18,6 +18,7 @@ func (app *App) Routes() http.Handler {
 	mux.HandleFunc("GET /molt/likes/view/{id}", app.moltLikesView)
 	mux.HandleFunc("GET /molt/view/{id}/quotes", app.moltQuotesView)
 	mux.HandleFunc("GET /crabtag/{tag}", app.crabtagPage)
+	mux.HandleFunc("GET /stats", app.statsPage)
 	mux.HandleFunc("GET /terms", app.termsPage)
 	mux.HandleFunc("GET /privacy", app.privacyPage)
 	mux.HandleFunc("/", app.notFound)
