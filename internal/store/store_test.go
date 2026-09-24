@@ -1108,6 +1108,52 @@ func TestNSFW(t *testing.T) {
 	}
 }
 
+func TestChangeUsername(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+	karen := mustCrab(t, s, "karen")
+	mustCrab(t, s, "sandy")
+
+	if err := s.ChangeUsername(ctx, karen, "sandy"); !errors.Is(err, ErrDuplicateUsername) {
+		t.Fatalf("taking a used name: %v", err)
+	}
+	if err := s.ChangeUsername(ctx, karen, "Computer"); err != nil {
+		t.Fatal(err)
+	}
+	if karen.UserName != "Computer" {
+		t.Fatalf("in memory: %q", karen.UserName)
+	}
+	for _, name := range []string{"computer", "karen"} {
+		c, err := s.CrabByUsername(ctx, name)
+		if err != nil || c.ID != karen.ID || c.UserName != "Computer" {
+			t.Fatalf("%s: %+v %v", name, c, err)
+		}
+	}
+	if err := s.ChangeUsername(ctx, karen, "computer_wife"); !errors.Is(err, ErrTooSoon) {
+		t.Fatalf("second rename: %v", err)
+	}
+	if _, err := s.CreateCrab(ctx, "karen", "other@krabber.test", []byte("h")); !errors.Is(err, ErrDuplicateUsername) {
+		t.Fatalf("signing up with a held name: %v", err)
+	}
+
+	// Once the hold and the limit run out, the old name is free and a
+	// case-only change keeps the same marker.
+	later := time.Now().Add(31 * 24 * time.Hour)
+	s.now = func() time.Time { return later }
+	if _, err := s.CrabByUsername(ctx, "karen"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("held name after the hold: %v", err)
+	}
+	if _, err := s.CreateCrab(ctx, "karen", "new-karen@krabber.test", []byte("h")); err != nil {
+		t.Fatalf("claiming a released name: %v", err)
+	}
+	if err := s.ChangeUsername(ctx, karen, "computer"); err != nil {
+		t.Fatalf("case change: %v", err)
+	}
+	if c, err := s.CrabByUsername(ctx, "COMPUTER"); err != nil || c.UserName != "computer" {
+		t.Fatalf("after case change: %+v %v", c, err)
+	}
+}
+
 func TestVerified(t *testing.T) {
 	s := newTestStore(t)
 	ctx := context.Background()

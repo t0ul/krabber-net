@@ -349,8 +349,12 @@ func TestFeedsProfileSearchAndLiveCounts(t *testing.T) {
 		t.Fatalf("login: %d", status)
 	}
 
+	// Other capitalization goes to the profile's own address.
+	if status, _, hdr := h.get("/krabs/SANDY"); status != http.StatusMovedPermanently || hdr.Get("Location") != "/krabs/sandy" {
+		t.Fatalf("/krabs/SANDY: %d %q", status, hdr.Get("Location"))
+	}
 	// Follow from the profile page; the button flips to "Following".
-	status, body, _ := h.get("/krabs/SANDY")
+	status, body, _ := h.get("/krabs/sandy")
 	if status != http.StatusOK || !strings.Contains(body, "@sandy") || !strings.Contains(body, ">Follow<") {
 		t.Fatalf("profile before follow: %d", status)
 	}
@@ -2130,6 +2134,65 @@ func TestVerifiedBadge(t *testing.T) {
 	h.post("/krabmin/krabs/"+karen.ID, url.Values{"csrf_token": {tok}, "action": {"unverify"}})
 	if _, body, _ := h.get("/krabs/karen"); strings.Contains(body, badge) {
 		t.Error("badge still on the profile after unverify")
+	}
+}
+
+func TestChangeUsername(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	h.signupAndActivate("karen", "karen@krabber.test", "computer-wife!")
+	h.signupAndActivate("sandy", "sandy@krabber.test", "karate-chop!")
+	karen, _ := h.store.CrabByUsername(ctx, "karen")
+	sandy, _ := h.store.CrabByUsername(ctx, "sandy")
+	if _, err := h.store.CreateMolt(ctx, karen, "Hi, I'm @karen"); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.store.Follow(ctx, sandy, karen); err != nil {
+		t.Fatal(err)
+	}
+
+	h.login("karen@krabber.test", "computer-wife!")
+	tok := h.csrf("/settings")
+	for name, want := range map[string]string{"sandy": "That name is taken", "no spaces": "Use 3–20 letters", "karen": "already your username"} {
+		if status, body, _ := h.post("/settings/username", url.Values{"csrf_token": {tok}, "username": {name}}); status != http.StatusUnprocessableEntity || !strings.Contains(body, want) {
+			t.Errorf("rename to %q: %d, want %q", name, status, want)
+		}
+	}
+	status, body, _ := h.post("/settings/username", url.Values{"csrf_token": {tok}, "username": {"@Computer"}})
+	if status != http.StatusSeeOther {
+		t.Fatalf("rename: %d %s", status, body)
+	}
+	if _, body, _ := h.get("/settings"); !strings.Contains(body, "You&#39;re now @Computer.") || !strings.Contains(body, "change it again on") {
+		t.Error("settings should confirm the rename and show when the next one is allowed")
+	}
+	if status, _, _ := h.post("/settings/username", url.Values{"csrf_token": {tok}, "username": {"computer2"}}); status != http.StatusTooManyRequests {
+		t.Errorf("second rename: %d", status)
+	}
+
+	noFollow := h.newClient()
+	noFollow.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	for old, want := range map[string]string{"/krabs/karen": "/krabs/Computer", "/krabs/karen/followers": "/krabs/Computer/followers", "/krabs/computer": "/krabs/Computer"} {
+		res, err := noFollow.Get(h.srv.URL + old)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = res.Body.Close()
+		if res.StatusCode != http.StatusMovedPermanently || res.Header.Get("Location") != want {
+			t.Errorf("%s: %d → %q, want %q", old, res.StatusCode, res.Header.Get("Location"), want)
+		}
+	}
+
+	_, body, _ = h.get("/sea")
+	if !strings.Contains(body, `href="/krabs/Computer"`) || strings.Contains(body, `href="/krabs/karen"`) {
+		t.Error("molts should link to the new name")
+	}
+	if !strings.Contains(body, "Hi, I&#39;m @karen") {
+		t.Error("old mentions stay as written")
+	}
+	h.client = h.newClient()
+	h.login("sandy@krabber.test", "karate-chop!")
+	if _, body, _ := h.get("/krabs/sandy/following"); !strings.Contains(body, `data-name="Computer"`) || strings.Contains(body, `data-name="karen"`) {
+		t.Error("sandy's following list should show the new name")
 	}
 }
 

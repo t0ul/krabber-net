@@ -49,6 +49,22 @@
         <a class="ml-3" href="/krabs/{{ .CrabName }}">View profile</a>
     </form>
 
+    {{ $u := .Form.Username }}
+    <form class="px-3 py-3 border-bottom border-dark kb-settings" method="POST" action="/settings/username" novalidate>
+        <input type='hidden' name='csrf_token' value='{{ .CSRFToken }}'>
+        <h2 class="h6 font-weight-bold mb-3">Username</h2>
+        {{ with $u.FieldErrors.username }}<div class="error small">{{ . }}</div>{{ end }}
+        <div class="input-group mb-2">
+            <div class="input-group-prepend"><span class="input-group-text">@</span></div>
+            <input type="text" name="username" id="username" class="form-control" aria-label="New username" value="{{ or $u.Name .CrabName }}" pattern="[A-Za-z0-9_]{3,20}" maxlength="20" autocomplete="username"{{ if .Form.NextRename }} disabled{{ end }}>
+        </div>
+        <small class="form-text text-muted mb-3">
+            {{ with .Form.NextRename }}You changed it recently; you can change it again on {{ . }}.
+            {{ else }}You can change it once every 30 days. Links to @{{ .CrabName }} keep working for 30 days, then anyone can take the name. Your molts, followers and likes come with you.{{ end }}
+        </small>
+        <button type="submit" class="btn btn-outline-light rounded-pill"{{ if .Form.NextRename }} disabled{{ end }}>Change username</button>
+    </form>
+
     <form class="px-3 py-3 border-bottom border-dark kb-settings" method="POST" action="/settings/avatar">
         <input type='hidden' name='csrf_token' value='{{ .CSRFToken }}'>
         <h2 class="h6 font-weight-bold mb-3">Your krab</h2>

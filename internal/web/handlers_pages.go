@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io/fs"
 	"net/http"
+	"net/url"
 	"sort"
 	"strings"
 	"unicode/utf8"
@@ -96,7 +97,7 @@ func (app *App) notifications(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		if a, ok := byID[n.ActorID]; ok {
-			n.ActorAvatar, n.ActorVerified = a.Avatar, a.Verified
+			n.Actor, n.ActorAvatar, n.ActorVerified = a.UserName, a.Avatar, a.Verified
 		}
 		data.Notifications = append(data.Notifications, n)
 	}
@@ -321,11 +322,24 @@ func (app *App) crabFromPath(w http.ResponseWriter, r *http.Request) (*store.Cra
 // crabFromName loads the crab named in the URL; crabs who blocked the viewer
 // don't exist as far as the viewer can tell.
 func (app *App) crabFromName(w http.ResponseWriter, r *http.Request) (*store.Crab, bool) {
-	c, err := app.store.CrabByUsername(r.Context(), r.PathValue("name"))
+	name := r.PathValue("name")
+	c, err := app.store.CrabByUsername(r.Context(), name)
 	if err == nil && blocksOf(r).BlockedBy[c.ID] {
 		err = store.ErrNotFound
 	}
-	return app.checkCrab(w, r, c, err)
+	c, ok := app.checkCrab(w, r, c, err)
+	if ok && c.UserName != name && r.Method == http.MethodGet {
+		// An old name (held after a rename) or other capitalization goes to
+		// the crab's current address.
+		rest := strings.TrimPrefix(r.URL.Path, "/krabs/"+name)
+		target := "/krabs/" + url.PathEscape(c.UserName) + rest
+		if r.URL.RawQuery != "" {
+			target += "?" + r.URL.RawQuery
+		}
+		http.Redirect(w, r, target, http.StatusMovedPermanently) //nolint:gosec // target always starts with /krabs/, so it stays on this site
+		return nil, false
+	}
+	return c, ok
 }
 
 func (app *App) checkCrab(w http.ResponseWriter, r *http.Request, c *store.Crab, err error) (*store.Crab, bool) {

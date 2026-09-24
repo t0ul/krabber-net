@@ -1,6 +1,7 @@
 package web
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -84,11 +85,20 @@ type deleteForm struct {
 	validator.Validator `form:"-"`
 }
 
+type usernameForm struct {
+	Name                string `form:"username"`
+	validator.Validator `form:"-"`
+}
+
 type settingsForms struct {
 	Profile     profileForm
+	Username    usernameForm
 	Password    passwordForm
 	Delete      deleteForm
 	AvatarError string
+	// NextRename is when the crab may change their username again, as a
+	// date; empty when they may now.
+	NextRename string
 }
 
 func (app *App) settings(w http.ResponseWriter, r *http.Request) {
@@ -97,13 +107,16 @@ func (app *App) settings(w http.ResponseWriter, r *http.Request) {
 
 func (app *App) renderSettings(w http.ResponseWriter, r *http.Request, status int, f settingsForms) {
 	f.Password.Current, f.Password.New, f.Password.Confirm, f.Delete.Password = "", "", "", ""
+	if next := app.store.NextUsernameChange(currentCrab(r)); !next.IsZero() {
+		f.NextRename = next.UTC().Format("January 2, 2006")
+	}
 	data := app.newTemplateData(r)
 	data.Form = f
 	_, byID, _ := app.snapshot(r)
 	for id, name := range blocksOf(r).Blocking {
 		av := ""
 		if c, ok := byID[id]; ok {
-			av = c.Avatar
+			name, av = c.UserName, c.Avatar
 		}
 		data.Blocked = append(data.Blocked, store.Crab{ID: id, UserName: name, Avatar: av})
 	}
@@ -150,6 +163,46 @@ func (app *App) settingsProfilePost(w http.ResponseWriter, r *http.Request) {
 	c.Profile = f.profile()
 	app.dir.putCrab(c)
 	app.sessions.Put(r.Context(), sessionFlash, "Profile saved.")
+	http.Redirect(w, r, "/settings", http.StatusSeeOther)
+}
+
+func (app *App) settingsUsernamePost(w http.ResponseWriter, r *http.Request) {
+	var f usernameForm
+	if err := app.decodePostForm(w, r, &f); err != nil {
+		app.clientError(w, http.StatusBadRequest)
+		return
+	}
+	c := *currentCrab(r)
+	f.Name = strings.TrimPrefix(strings.TrimSpace(f.Name), "@")
+	f.CheckField(validator.Matches(f.Name, validator.UsernameRX), "username", "Use 3–20 letters, numbers or underscores")
+	f.CheckField(f.Name != c.UserName, "username", "That's already your username")
+	rerender := func(status int) {
+		app.renderSettings(w, r, status, settingsForms{Profile: profileFormFor(c.Profile), Username: f})
+	}
+	if !f.Valid() {
+		rerender(http.StatusUnprocessableEntity)
+		return
+	}
+	old := c.UserName
+	switch err := app.store.ChangeUsername(r.Context(), &c, f.Name); {
+	case errors.Is(err, store.ErrDuplicateUsername):
+		f.AddFieldError("username", "That name is taken")
+		rerender(http.StatusUnprocessableEntity)
+		return
+	case errors.Is(err, store.ErrTooSoon):
+		f.AddFieldError("username", "You can only change your username once every 30 days")
+		rerender(http.StatusTooManyRequests)
+		return
+	case err != nil:
+		app.serverError(w, r, err)
+		return
+	}
+	app.dir.putCrab(c)
+	msg := "You're now @" + c.UserName + "."
+	if !strings.EqualFold(old, c.UserName) {
+		msg += " Links to @" + old + " keep working for 30 days."
+	}
+	app.sessions.Put(r.Context(), sessionFlash, msg)
 	http.Redirect(w, r, "/settings", http.StatusSeeOther)
 }
 

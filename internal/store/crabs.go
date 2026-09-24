@@ -44,6 +44,8 @@ type Crab struct {
 
 	ContentFilters
 
+	UsernameChangedAt int64 `dynamodbav:"username_changed_at,omitempty"` // Unix seconds of the last rename
+
 	// The molt shown at the top of the crab's profile, if any.
 	PinnedMoltID string `dynamodbav:"pinned_molt_id,omitempty"`
 	PinnedMoltPK string `dynamodbav:"pinned_molt_pk,omitempty"`
@@ -121,6 +123,92 @@ type usernameMarker struct {
 	PK     string `dynamodbav:"PK"`
 	SK     string `dynamodbav:"SK"`
 	CrabID string `dynamodbav:"crab_id"`
+	// ExpiresAt is set on a name its crab changed away from: it keeps pointing
+	// at them, and stays taken, until then.
+	ExpiresAt int64 `dynamodbav:"expires_at,omitempty"`
+}
+
+// Username change limits.
+const (
+	UsernameChangeEvery = 30 * 24 * time.Hour // how often a crab can rename
+	usernameHold        = 30 * 24 * time.Hour // how long an old name keeps redirecting
+)
+
+// ErrTooSoon is returned for a rename within UsernameChangeEvery of the last.
+var ErrTooSoon = errors.New("store: too soon")
+
+// putUsername claims a username marker. A marker whose hold has run out
+// counts as free even before TTL deletes it; reclaimMine also lets crabID
+// take back its own held name.
+func (s *Store) putUsername(item map[string]types.AttributeValue, crabID string, reclaimMine bool) types.TransactWriteItem {
+	cond := "attribute_not_exists(PK) OR (attribute_exists(expires_at) AND expires_at < :now)"
+	values := map[string]types.AttributeValue{":now": num(s.now().Unix())}
+	if reclaimMine {
+		cond += " OR crab_id = :me"
+		values[":me"] = str(crabID)
+	}
+	return types.TransactWriteItem{Put: &types.Put{
+		TableName:                 s.tableName(),
+		Item:                      item,
+		ConditionExpression:       aws.String(cond),
+		ExpressionAttributeValues: values,
+	}}
+}
+
+// NextUsernameChange is when c may rename again; zero if they may now.
+func (s *Store) NextUsernameChange(c *Crab) time.Time {
+	if c.UsernameChangedAt == 0 {
+		return time.Time{}
+	}
+	next := time.Unix(c.UsernameChangedAt, 0).Add(UsernameChangeEvery)
+	if !next.After(s.now()) {
+		return time.Time{}
+	}
+	return next
+}
+
+// ChangeUsername renames c in one transaction: the crab item, a marker for
+// the new name, and a hold on the old marker so /krabs/<old> keeps finding
+// c (and nobody else can take it) for usernameHold. Molts show names by
+// crab ID, so nothing else changes. A change of case keeps the same marker.
+func (s *Store) ChangeUsername(ctx context.Context, c *Crab, newName string) error {
+	if !s.NextUsernameChange(c).IsZero() {
+		return ErrTooSoon
+	}
+	now := s.now()
+	items := []types.TransactWriteItem{{Update: &types.Update{
+		TableName:           s.tableName(),
+		Key:                 keyOf(c.PK, c.SK),
+		UpdateExpression:    aws.String("SET user_name = :n, username_changed_at = :t"),
+		ConditionExpression: aws.String("attribute_exists(PK) AND user_name = :old"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":n": str(newName), ":t": num(now.Unix()), ":old": str(c.UserName),
+		},
+	}}}
+	if usernamePK(newName) != usernamePK(c.UserName) {
+		item, err := marshal(usernameMarker{PK: usernamePK(newName), SK: usernameSK(), CrabID: c.ID})
+		if err != nil {
+			return err
+		}
+		items = append(items, s.putUsername(item, c.ID, true), types.TransactWriteItem{Update: &types.Update{
+			TableName:                 s.tableName(),
+			Key:                       keyOf(usernamePK(c.UserName), usernameSK()),
+			UpdateExpression:          aws.String("SET expires_at = :hold"),
+			ConditionExpression:       aws.String("crab_id = :me"),
+			ExpressionAttributeValues: map[string]types.AttributeValue{":hold": num(now.Add(usernameHold).Unix()), ":me": str(c.ID)},
+		}})
+	}
+	err := s.transact(ctx, items...)
+	switch {
+	case cancelledAt(err, 0):
+		return ErrNotFound
+	case cancelledAt(err, 1):
+		return ErrDuplicateUsername
+	case err != nil:
+		return fmt.Errorf("change username: %w", err)
+	}
+	c.UserName, c.UsernameChangedAt = newName, now.Unix()
+	return nil
 }
 
 // Roles. Admins can do everything moderators can, plus act on moderators and
@@ -172,7 +260,7 @@ func (s *Store) CreateCrab(ctx context.Context, username, email string, password
 		if err != nil {
 			return nil, err
 		}
-		err = s.transact(ctx, s.putNew(crabItem), s.putNew(nameItem), s.putNew(avItem))
+		err = s.transact(ctx, s.putNew(crabItem), s.putUsername(nameItem, id, false), s.putNew(avItem))
 		switch {
 		case cancelledAt(err, 0):
 			return nil, ErrDuplicateEmail
@@ -213,6 +301,9 @@ func (s *Store) CrabByUsername(ctx context.Context, name string) (*Crab, error) 
 			return nil, ErrNotFound
 		}
 		return nil, fmt.Errorf("crab by username: %w", err)
+	}
+	if m.ExpiresAt != 0 && m.ExpiresAt < s.now().Unix() {
+		return nil, ErrNotFound
 	}
 	return s.CrabByID(ctx, m.CrabID)
 }
