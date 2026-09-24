@@ -1,16 +1,16 @@
-{{define "title"}}Crabmin{{end}}
+{{define "title"}}Krabmin{{end}}
 
 {{define "page"}}
 {{ template "shell-top" . }}
-    {{ template "heading" "Crabmin" }}
-    {{ template "crabmin-tabs" . }}
-    <form class="px-3 py-3 border-bottom border-dark d-flex" method="GET" action="/crabmin">
+    {{ template "heading" "Krabmin" }}
+    {{ template "krabmin-tabs" . }}
+    <form class="px-3 py-3 border-bottom border-dark d-flex" method="GET" action="/krabmin">
         <input type="search" name="q" class="form-control mr-2" placeholder="Username or molt ID" aria-label="Username or molt ID" required>
         <button type="submit" class="btn btn-primary rounded-pill">Open</button>
     </form>
     <div class="px-3 pt-3 pb-1 d-flex">
         <h2 class="h6 font-weight-bold">Recent actions</h2>
-        <a class="ml-auto small" href="/crabmin/log">Full log</a>
+        <a class="ml-auto small" href="/krabmin/log">Full log</a>
     </div>
     {{ template "mod-log" .ModLog }}
 {{ template "shell-bottom" . }}

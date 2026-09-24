@@ -8,7 +8,7 @@
 {{define "avatar"}}<img class="kb-avatar profile-picture" src="{{ avatarSrc . }}" width="43" height="43" loading="lazy" alt="">{{end}}
 
 {{/* Crabber's verified badge; takes the size in pixels. */}}
-{{define "verified"}}<svg class="verified" xmlns="http://www.w3.org/2000/svg" width="{{ . }}" height="{{ . }}" viewBox="0 0 769 769.093" role="img" aria-label="Verified"><title>This crab is verified</title><path fill-rule="evenodd" d="M740.52,506.066l-24.759,24.762v35.018a149.991,149.991,0,0,1-149.982,150H530.765l-24.759,24.762a149.968,149.968,0,0,1-212.106,0l-24.759-24.762H234.127a149.991,149.991,0,0,1-149.981-150V530.828L59.387,506.066a150.013,150.013,0,0,1,0-212.132l24.759-24.762V234.154a149.991,149.991,0,0,1,149.982-150h35.014L293.9,59.392a149.969,149.969,0,0,1,212.106,0l24.759,24.762h35.014a149.991,149.991,0,0,1,149.982,150v35.018l24.759,24.762A150.014,150.014,0,0,1,740.52,506.066Zm-156.647-208.8,0.453,0.258L404.637,577.4a43.935,43.935,0,0,1-77.58,5.17L220.6,478.663a43.939,43.939,0,1,1,49.857-72l0.679-.713,85.052,82.508L507.106,254.516A43.939,43.939,0,0,1,583.873,297.268Z" transform="translate(-15.469 -15.469)"/></svg>{{end}}
+{{define "verified"}}<svg class="verified" xmlns="http://www.w3.org/2000/svg" width="{{ . }}" height="{{ . }}" viewBox="0 0 769 769.093" role="img" aria-label="Verified"><title>This krab is verified</title><path fill-rule="evenodd" d="M740.52,506.066l-24.759,24.762v35.018a149.991,149.991,0,0,1-149.982,150H530.765l-24.759,24.762a149.968,149.968,0,0,1-212.106,0l-24.759-24.762H234.127a149.991,149.991,0,0,1-149.981-150V530.828L59.387,506.066a150.013,150.013,0,0,1,0-212.132l24.759-24.762V234.154a149.991,149.991,0,0,1,149.982-150h35.014L293.9,59.392a149.969,149.969,0,0,1,212.106,0l24.759,24.762h35.014a149.991,149.991,0,0,1,149.982,150v35.018l24.759,24.762A150.014,150.014,0,0,1,740.52,506.066Zm-156.647-208.8,0.453,0.258L404.637,577.4a43.935,43.935,0,0,1-77.58,5.17L220.6,478.663a43.939,43.939,0,1,1,49.857-72l0.679-.713,85.052,82.508L507.106,254.516A43.939,43.939,0,0,1,583.873,297.268Z" transform="translate(-15.469 -15.469)"/></svg>{{end}}
 
 {{define "nsfw-badge"}}<span class="text-muted">·</span> <span class="nsfw-badge">NSFW</span>{{end}}
 
@@ -44,7 +44,7 @@
 {{define "molt"}}{{ $m := .M }}
 <div class="regular-molt mini-molt border-dark py-2 d-flex flex-row absolute-container border-bottom px-3" id="{{ $m.DOMID }}" data-molt-id="{{ $m.ID }}">
     <div class="mini-molt-profile-box{{ if .Pinned }} mt-4{{ end }}">
-        <a class="zindex-front" href="/crabs/{{ $m.Author }}">{{ template "avatar" $m.AuthorAvatar }}</a>
+        <a class="zindex-front" href="/krabs/{{ $m.Author }}">{{ template "avatar" $m.AuthorAvatar }}</a>
     </div>
     <div class="mini-molt-text-box w-100 h-100 px-2">
         {{ if .Pinned }}
@@ -56,12 +56,12 @@
         {{ if $m.Remolt }}
         <small class="mini-molt-remolt text-muted zindex-front">
             <svg class="mini-molt-action-icon remolt-icon" width="12" height="12"><use href="/static/img/sprites.svg?version=1704178675#repeat"></use></svg>
-            <a href="/crabs/{{ $m.RemoltedBy }}">{{ or $m.RemoltedByName $m.RemoltedBy }}</a> Remolted</small>
+            <a href="/krabs/{{ $m.RemoltedBy }}">{{ or $m.RemoltedByName $m.RemoltedBy }}</a> Remolted</small>
         {{ end }}
         {{ if and $m.ReplyTo (not .InThread) }}{{ template "replying-to" . }}{{ end }}
         <div class="mini-molt-credentials absolute-container{{ if or .Pinned $m.Remolt (and $m.ReplyTo (not .InThread)) }} mt-1{{ end }}">
             <div class="mini-molt-credentials-text">
-                <a class="mini-molt-display-name zindex-front" href="/crabs/{{ $m.Author }}">{{ or $m.AuthorName $m.Author }}</a>
+                <a class="mini-molt-display-name zindex-front" href="/krabs/{{ $m.Author }}">{{ or $m.AuthorName $m.Author }}</a>
                 {{ if $m.AuthorVerified }}<span class="zindex-front">{{ template "verified" 17 }}</span>{{ end }}
                 <span class="mini-molt-username zindex-front">@{{ $m.Author }}</span>
                 <a class="mini-molt-timestamp zindex-front" href="/molt/view/{{ $m.ID }}">· {{ template "time" $m.CreatedAt }}</a>
@@ -98,8 +98,8 @@
     <div class="mini-molt px-3 py-2 absolute-container" data-quoted-id="{{ .ID }}">
         <div class="mini-molt-credentials">
             <div class="mini-molt-credentials-text">
-                <a class="zindex-front" href="/crabs/{{ .Author }}"><img class="kb-avatar kb-avatar-sm profile-picture mr-1" src="{{ avatarSrc .AuthorAvatar }}" width="20" height="20" loading="lazy" alt=""></a>
-                <a class="mini-molt-display-name zindex-front" href="/crabs/{{ .Author }}">{{ or .AuthorName .Author }}</a>
+                <a class="zindex-front" href="/krabs/{{ .Author }}"><img class="kb-avatar kb-avatar-sm profile-picture mr-1" src="{{ avatarSrc .AuthorAvatar }}" width="20" height="20" loading="lazy" alt=""></a>
+                <a class="mini-molt-display-name zindex-front" href="/krabs/{{ .Author }}">{{ or .AuthorName .Author }}</a>
                 {{ if .AuthorVerified }}{{ template "verified" 15 }}{{ end }}
                 <span class="mini-molt-username">@{{ .Author }}</span>
                 <span class="mini-molt-timestamp">· {{ template "time" .CreatedAt }}</span>
@@ -184,9 +184,9 @@
         </a>
         {{ end }}
         {{ if $d.IsModerator }}
-        <a class="kb-menu-item" href="/crabmin/molts/{{ $m.ID }}">
+        <a class="kb-menu-item" href="/krabmin/molts/{{ $m.ID }}">
             <svg width="19" height="19"><use href="{{ asset "img/sprites.svg" }}#lifebuoy"></use></svg>
-            Open in Crabmin
+            Open in Krabmin
         </a>
         {{ end }}
     </div>
@@ -329,9 +329,9 @@
 
 {{define "crab-row"}}{{ $c := .C }}
 <div class="d-flex align-items-center border-bottom border-dark px-3 py-2 crab-row" data-name="{{ $c.UserName }}">
-    <a href="/crabs/{{ $c.UserName }}" class="mr-3 kb-avatar-link">{{ template "avatar" $c.Avatar }}</a>
+    <a href="/krabs/{{ $c.UserName }}" class="mr-3 kb-avatar-link">{{ template "avatar" $c.Avatar }}</a>
     <div class="flex-grow-1 min-w-0">
-        <a href="/crabs/{{ $c.UserName }}" class="text-light font-weight-bold">{{ $c.Name }}</a>
+        <a href="/krabs/{{ $c.UserName }}" class="text-light font-weight-bold">{{ $c.Name }}</a>
         {{ if $c.Verified }}{{ template "verified" 17 }}{{ end }}
         {{ if $c.DisplayName }}<span class="text-muted small">@{{ $c.UserName }}</span>{{ end }}
         <div class="text-muted small">{{ $c.FollowerCount }} followers · {{ $c.MoltCount }} molts</div>

@@ -31,8 +31,8 @@ func TestActivationEmailAndDailyCap(t *testing.T) {
 	data := map[string]string{
 		"UserName":     "<spongebob>",
 		"Token":        "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
-		"ActivateURL":  "https://krabber.net/crab/activate?token=ABCDEFGHIJKLMNOPQRSTUVWXYZ",
-		"ActivatePage": "https://krabber.net/crab/activate",
+		"ActivateURL":  "https://krabber.net/krab/activate?token=ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+		"ActivatePage": "https://krabber.net/krab/activate",
 	}
 	if err := m.Send(context.Background(), "a@krabber.test", "activation", data); err != nil {
 		t.Fatal(err)

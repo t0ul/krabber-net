@@ -194,7 +194,7 @@ Bootstrap starts with local state, then moves its own state into the new bucket 
 | | Alarms | Section 11 |
 | | Budgets | **Monthly** $15 (alerts at 80% actual, 100% actual, 100% forecast) and **daily** $1.50 (normal is about $0.37/day). The first two budgets are free. |
 | | Cost Anomaly Detection | Service-level monitor with an immediate email subscription at a $3 impact threshold (free) |
-| | Uptime canary | Lambda `krabber-canary` (Go, arm64, 128 MB), triggered every 5 minutes by EventBridge Scheduler. It requests `https://krabber.net/healthz` and `/crab/login` and fails if either isn't a 200 or the login page is missing its form. |
+| | Uptime canary | Lambda `krabber-canary` (Go, arm64, 128 MB), triggered every 5 minutes by EventBridge Scheduler. It requests `https://krabber.net/healthz` and `/krab/login` and fails if either isn't a 200 or the login page is missing its form. |
 
 ### Region notes
 - **us-east-2:** DynamoDB, Beanstalk, EC2, S3, SES, SSM, the canary, most alarms and logs.
@@ -247,7 +247,7 @@ As implemented in `internal/store/keys.go` (the single source for every key form
 | Quote pointer | `QP#<quotedMoltID>` | `QP#<quoteMoltID>` | — (the quote itself is an ordinary molt with `quote_of`; the quotes list is a query plus one batch read) |
 | Bookmark marker | `BK#<crabID>` | `BK#<moltID>` | — (holds `list_sk`; read in the same batch as like and remolt markers) |
 | Bookmark entry | `BL#<crabID>` | `BL#<ksuid>` | — (holds the molt key; sorted by when the crab bookmarked) |
-| Crabtag pointer | `TG#<lowercase tag>` | `TG#<moltID>` | — (written in the molt's own transaction; the `/crabtag/<tag>` page is a query plus one batch read) |
+| Crabtag pointer | `TG#<lowercase tag>` | `TG#<moltID>` | — (written in the molt's own transaction; the `/krabtag/<tag>` page is a query plus one batch read) |
 | Like | `L#<crabID>` | `L#<moltID>` | GSI7 `L#<moltID>` (who liked a molt) |
 | Follow | `F#<followerID>` | `F#<followeeID>` | GSI6 `F#<followeeID>` (followers of a crab) |
 | Trench (feed) entry | `T#<crabID>` | `T#<moltID>` | — (stores the molt's key, so a feed page is one `BatchGetItem`; `expires_at` 90 days) |
@@ -303,7 +303,7 @@ All work is a port of `krabber-net-main` into this repo.
 |---|---|
 | Go 1.20 → **1.26** (toolchain pinned to **go1.26.8**; go1.26.0 had 23 standard-library vulnerabilities that `govulncheck` found reachable); current AWS SDK v2 and dependencies. `httprouter` and `alice` replaced by Go's own `ServeMux` and a small middleware chain. | `go.mod` |
 | Module path `github.com/t0ul/krabber-net` | `go.mod` |
-| Config from environment variables + SSM (`SSM_PREFIX`), validated at startup (fail fast). Remove `godotenv` in prod, the hard-coded `prod := false`, the `TableName` and `Crabmin` constants. | `application.go`, `internal/models/const.go` |
+| Config from environment variables + SSM (`SSM_PREFIX`), validated at startup (fail fast). Remove `godotenv` in prod, the hard-coded `prod := false`, the `TableName` and `Krabmin` constants. | `application.go`, `internal/models/const.go` |
 | AWS credentials from the **instance role**; remove static `DB_AKID`/`DB_SAC` | `createLocalClient` |
 | Use the request `context.Context` in every AWS call (no `context.TODO()`) | `internal/models` |
 | All dates in **UTC** explicitly (Lambda and EC2 default to UTC, but `time.Now()` without `.UTC()` depends on the machine) | `internal/models/molts.go`, `cmd/web/molts.go` |
@@ -317,7 +317,7 @@ All work is a port of `krabber-net-main` into this repo.
 | SMTP/Mailtrap → **SES v2 API** with the `krabber-transactional` configuration set | IAM-authenticated, no passwords |
 | Send **synchronously** in the handler with a 5-second timeout, instead of `app.background(...)` | A goroutine mid-send is lost when the instance is replaced |
 | **Daily send cap**: increment `RL#mail#<date>` before each send and refuse above `mail_daily_cap`. The refusal is logged, and a metric filter triggers an alarm. | Caps SES cost and protects sender reputation from email-bombing through signup |
-| **Resend activation email** form on `/crab/activate` | Covers failed sends and the sandbox period |
+| **Resend activation email** form on `/krab/activate` | Covers failed sends and the sandbox period |
 | **Password reset**: request page → email with a single-use token (1-hour expiry) → set-new-password page, which sets `sessions_valid_after` | Users who forget their password are stuck today |
 
 ### 6.3 Background work on the instance
@@ -354,7 +354,7 @@ Found while porting (all fixed, most with a test):
 20. **Any missing record crashed the request** (`panic`, or indexing `[0]` of an empty result) in nearly every lookup.
 21. **Molt authors were inconsistent**: one handler stored the username, the other the crab ID.
 22. **The model validator never recorded errors** (`AddError` was a no-op), so the model-level validations never rejected anything.
-23. **Activation was a 500** for any invalid token, and the activation email pointed at the old API (`PUT /v1/crabs/activated`) instead of the website.
+23. **Activation was a 500** for any invalid token, and the activation email pointed at the old API (`PUT /v1/krabs/activated`) instead of the website.
 24. **Liking or following twice returned a 500**; now it's a harmless no-op.
 25. **Trench and sea pages made 50+ DynamoDB calls**, one per molt plus its comments. Now it's one query plus one batch read, and comments load only on the thread page.
 
@@ -364,8 +364,8 @@ Found while porting (all fixed, most with a test):
 | Privacy policy (`/privacy`) ✅ | What's stored and what's public, the one session cookie, AWS (Ohio) and Turnstile, emails, retention, deletion. No ads or tracking. Deleting a molt erases its text, and remolts don't copy it. Update the page whenever what's stored changes. |
 | Terms (`/terms`) ✅ | Age 13+, content license, rules, moderation and bans, leaving, no guarantees. Linked from signup, login, the welcome page and the sidebar footer. |
 | Account deletion (`POST /settings/delete`) ✅ | Asks for the password again. Deletes the crab's email and profile immediately (a tombstone keeps the username reserved), deletes their molts, likes, follows and trench entries in the background worker, and invalidates sessions. Details in `docs/NOTES.md` section 3.11. |
-| Report a molt ✅ | Writes an `R#` item (GSI8 `Q#report`); `/crabmin/reports` lists open reports with remove, dismiss and ban-author actions. Details in `docs/NOTES.md` section 3.12. |
-| Admin | A `role` attribute on the crab (`admin` or `moderator`) checked by `requireModerator`, replacing the hard-coded `Crabmin` ID. The first admin is set with `cmd/crabctl`; admins appoint moderators in Crabmin. See `docs/NOTES.md` section 3.9. |
+| Report a molt ✅ | Writes an `R#` item (GSI8 `Q#report`); `/krabmin/reports` lists open reports with remove, dismiss and ban-author actions. Details in `docs/NOTES.md` section 3.12. |
+| Admin | A `role` attribute on the crab (`admin` or `moderator`) checked by `requireModerator`, replacing the hard-coded `Krabmin` ID. The first admin is set with `cmd/crabctl`; admins appoint moderators in Krabmin. See `docs/NOTES.md` section 3.9. |
 | Maintenance page | `ui/static/maintenance.html`, shown by CloudFront's custom error response for **403**, which is what WAF returns when the maintenance switch is on (section 7.2). So the app itself **never returns 403**: CSRF rejections use 400 (set with `CrossOriginProtection`'s deny handler), missing auth redirects to login, and admin-only pages return 404. |
 | `robots.txt`, `favicon.ico`, 404/500 pages ✅ | `robots.txt` keeps crawlers out of private and per-crab pages; `/favicon.ico` redirects to the SVG; unknown URLs and server errors render `error.html` with the right status. |
 
@@ -392,7 +392,7 @@ Found while porting (all fixed, most with a test):
 | # | Rule | Action |
 |---|---|---|
 | 1 | **Maintenance switch**: matches every request | Normally *Count* (does nothing). `make maintenance-on` flips it to *Block*, stopping all traffic at the edge for $0 while you investigate. `make maintenance-off` or any `terraform apply` puts it back. CloudFront shows the maintenance page for the resulting 403s. |
-| 2 | Rate limit on auth paths: `/crab/login`, `/crab/signup`, `/crab/password*`, `/crab/resend` | Block above **20 requests per IP per 5 minutes** |
+| 2 | Rate limit on auth paths: `/krab/login`, `/krab/signup`, `/krab/password*`, `/krab/resend` | Block above **20 requests per IP per 5 minutes** |
 | 3 | Rate limit, all paths | Block above **500 requests per IP per 5 minutes** (a page is about 5 requests including assets) |
 | 4 | AWS managed IP reputation list | Block |
 | 5 | AWS managed common rule set | *Count* for the first week to check it doesn't break htmx posts, then *Block* |
@@ -523,7 +523,7 @@ krabber-net/
 4. Bundle `bin/application` + `Procfile` + `.platform/` as `krabber-<git-sha>.zip` and upload it to the artifacts bucket.
 5. `aws elasticbeanstalk create-application-version --version-label <git-sha> --process`
 6. `aws elasticbeanstalk update-environment --environment-name krabber-prod --version-label <git-sha>`, then `wait environment-updated`. The deploy is **immutable**: Beanstalk boots a new instance, switches only when it's healthy, and throws it away if it isn't. That takes about 5–8 minutes, with no downtime.
-7. Smoke test through CloudFront: `/healthz` 200, `/` 200, `/crab/login` renders its form.
+7. Smoke test through CloudFront: `/healthz` 200, `/` 200, `/krab/login` renders its form.
 8. If the smoke test fails, **redeploy the previous version label automatically** and fail the workflow.
 
 `concurrency: deploy-prod` so only one deploy runs at a time.

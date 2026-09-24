@@ -49,7 +49,7 @@ func (app *App) forgotPost(w http.ResponseWriter, r *http.Request) {
 	const done = "If that email belongs to an account, we've sent a link to reset the password. It expires in an hour."
 	finish := func() {
 		app.sessions.Put(r.Context(), sessionFlash, done)
-		http.Redirect(w, r, "/crab/reset", http.StatusSeeOther)
+		http.Redirect(w, r, "/krab/reset", http.StatusSeeOther)
 	}
 
 	ipOK, err := app.underLimit(r, "reset-ip", clientIP(r), resetIPLimit, time.Hour)
@@ -92,7 +92,7 @@ func (app *App) sendReset(r *http.Request, c *store.Crab) error {
 	if err != nil {
 		return err
 	}
-	page := app.cfg.BaseURL.JoinPath("/crab/reset")
+	page := app.cfg.BaseURL.JoinPath("/krab/reset")
 	link := *page
 	link.RawQuery = url.Values{"token": {token}}.Encode()
 	return app.mailer.Send(r.Context(), c.Email, "password-reset", map[string]string{
@@ -166,5 +166,5 @@ func (app *App) resetPost(w http.ResponseWriter, r *http.Request) {
 	}
 	app.endSession(r)
 	app.sessions.Put(r.Context(), sessionFlash, "Your password is reset and every device is signed out. Log in with the new one.")
-	http.Redirect(w, r, "/crab/login", http.StatusSeeOther)
+	http.Redirect(w, r, "/krab/login", http.StatusSeeOther)
 }

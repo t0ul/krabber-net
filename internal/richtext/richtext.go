@@ -160,7 +160,7 @@ func HTML(s string, known func(lowerName string) (string, bool)) template.HTML {
 			}
 			at := m[2] - 1
 			b.WriteString(html.EscapeString(s[last:at]))
-			b.WriteString(`<a href="/crabs/` + url.PathEscape(name) + `" class="mention zindex-front">`)
+			b.WriteString(`<a href="/krabs/` + url.PathEscape(name) + `" class="mention zindex-front">`)
 			b.WriteString(html.EscapeString(s[at:m[3]]))
 			b.WriteString(`</a>`)
 			last = m[3]
@@ -171,7 +171,7 @@ func HTML(s string, known func(lowerName string) (string, bool)) template.HTML {
 			}
 			pct := m[4] - 1
 			b.WriteString(html.EscapeString(s[last:pct]))
-			b.WriteString(`<a href="/crabtag/` + url.PathEscape(strings.ToLower(name)) + `" class="crabtag zindex-front">`)
+			b.WriteString(`<a href="/krabtag/` + url.PathEscape(strings.ToLower(name)) + `" class="crabtag zindex-front">`)
 			b.WriteString(html.EscapeString(s[pct:m[5]]))
 			b.WriteString(`</a>`)
 			last = m[5]

@@ -18,7 +18,7 @@
 {{define "compose"}}
 <div class="mini-compose-box border-bottom border-dark px-3 py-2 d-flex flex-row focused">
     <div class="mini-molt-profile-box">
-        <a href="/crabs/{{ .CrabName }}">{{ template "avatar" .Avatar }}</a>
+        <a href="/krabs/{{ .CrabName }}">{{ template "avatar" .Avatar }}</a>
     </div>
     <div class="mini-molt-text-box w-100 h-100 px-2">
         <form hx-post="/molt/create" hx-target="#molt-list" hx-swap="afterbegin" hx-disabled-elt="find button" data-reset-on-success>
@@ -44,7 +44,7 @@
         </div>
         <div class="modal-body row">
             <div class="mini-molt-profile-box col-lg-1 mr-2">
-                <a href="/crabs/{{ .CrabName }}">{{ template "avatar" .Avatar }}</a>
+                <a href="/krabs/{{ .CrabName }}">{{ template "avatar" .Avatar }}</a>
             </div>
             <div class="mini-molt-text-box w-100 h-100 px-2 col">
                 <form method="POST" action="/molt/create">
@@ -87,7 +87,7 @@
 </form>
 {{end}}
 
-{{define "quote-title"}}Quoting <a class="text-light" href="/crabs/{{ .Author }}">{{ or .AuthorName .Author }}</a>{{end}}
+{{define "quote-title"}}Quoting <a class="text-light" href="/krabs/{{ .Author }}">{{ or .AuthorName .Author }}</a>{{end}}
 
 {{define "quote-modal"}}
 <div class="modal-header py-2 border-dark">
@@ -96,7 +96,7 @@
 </div>
 <div class="modal-body row">
     <div class="mini-molt-profile-box col-lg-1 mr-2">
-        <a href="/crabs/{{ .CrabName }}">{{ template "avatar" .Avatar }}</a>
+        <a href="/krabs/{{ .CrabName }}">{{ template "avatar" .Avatar }}</a>
     </div>
     <div class="mini-molt-text-box w-100 h-100 px-2 col">{{ template "quote-form" . }}</div>
 </div>
@@ -123,7 +123,7 @@
 </div>
 <div class="modal-body row">
     <div class="mini-molt-profile-box col-lg-1 mr-2">
-        <a href="/crabs/{{ .CrabName }}">{{ template "avatar" .Avatar }}</a>
+        <a href="/krabs/{{ .CrabName }}">{{ template "avatar" .Avatar }}</a>
     </div>
     <div class="mini-molt-text-box w-100 h-100 px-2 col">{{ template "edit-form" . }}</div>
 </div>

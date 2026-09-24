@@ -8,7 +8,7 @@
     <div id="stats-body" class="p-4">
         <div class="stat-group absolute-container">
             <h1 class="user-count text-center">{{ commas .Crabs }}</h1>
-            <h2 class="text-center">active crab{{ if ne .Crabs 1 }}s{{ end }}</h2>
+            <h2 class="text-center">active krab{{ if ne .Crabs 1 }}s{{ end }}</h2>
             {{ template "stats-badge" "big-badge" }}
             {{ template "stats-badge" "big-badge-back" }}
         </div>
@@ -22,12 +22,12 @@
         </div>
 
         {{ with .King }}
-        {{ template "stats-heading" (dict "Title" "Crab King" "Why" "The most followed crab") }}
+        {{ template "stats-heading" (dict "Title" "Krab King" "Why" "The most followed krab") }}
         {{ template "stats-crab" (dict "C" . "Crown" true "Note" (print .FollowerCount " follower" (or (and (ne .FollowerCount 1) "s") ""))) }}
         {{ end }}
 
         {{ with .Baby }}
-        {{ template "stats-heading" (dict "Title" "Baby Crab" "Why" "Our newest member. Go say hello!") }}
+        {{ template "stats-heading" (dict "Title" "Baby Krab" "Why" "Our newest member. Go say hello!") }}
         {{ template "stats-crab" (dict "C" . "Badge" "clock-f" "Note" (print "a member for " $d.Stats.BabyDays " day" (or (and (ne $d.Stats.BabyDays 1) "s") ""))) }}
         {{ end }}
 
@@ -41,8 +41,8 @@
             {{ with .Talked }}{{ template "molt" (dict "M" . "D" $d) }}{{ else }}<div class="p-5 text-muted text-center">Nothing here.</div>{{ end }}
         </div>
 
-        {{ template "stats-heading" (dict "Title" "Trendy" "Why" "The crabtag the most crabs used this week") }}
-        {{ with .Trendy }}<div class="trendy-tag"><h2 class="text-center"><a class="text-primary" href="/crabtag/{{ . }}">%{{ . }}</a></h2></div>{{ end }}
+        {{ template "stats-heading" (dict "Title" "Trendy" "Why" "The krabtag the most krabs used this week") }}
+        {{ with .Trendy }}<div class="trendy-tag"><h2 class="text-center"><a class="text-primary" href="/krabtag/{{ . }}">%{{ . }}</a></h2></div>{{ end }}
         <div class="trendy-tag-molts neue-card neue-card-media p-1">
             {{ range .TrendyMolts }}{{ template "molt" (dict "M" . "D" $d) }}{{ else }}<div class="p-5 text-muted text-center">Nothing here.</div>{{ end }}
         </div>
@@ -87,7 +87,7 @@
             <p class="text-muted mb-1">@{{ $c.UserName }} <span class="follow-count px-1 ml-1">{{ .Note }}</span></p>
         </div>
     </div>
-    <a href="/crabs/{{ $c.UserName }}" class="absolute-fill" aria-label="@{{ $c.UserName }}"></a>
+    <a href="/krabs/{{ $c.UserName }}" class="absolute-fill" aria-label="@{{ $c.UserName }}"></a>
 </div>
 {{end}}
 

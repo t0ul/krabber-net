@@ -1,4 +1,4 @@
-{{define "title"}}{{ if .ListTitle }}{{ .ListTitle }}{{ else }}Crabs{{ end }}{{end}}
+{{define "title"}}{{ if .ListTitle }}{{ .ListTitle }}{{ else }}Krabs{{ end }}{{end}}
 
 {{ define "page" }}
 {{ template "shell-top" . }}
@@ -7,7 +7,7 @@
     {{ if .CrabRows }}
     <div class="px-3 py-2 border-bottom border-dark kb-crab-toolbar">
         <input class="form-control form-control-sm kb-filter" type="search" id="crab-filter" placeholder="Filter by name…" autocomplete="off">
-        <div class="text-muted small mt-2" id="crab-count">{{ len .CrabRows }} crabs</div>
+        <div class="text-muted small mt-2" id="crab-count">{{ len .CrabRows }} krabs</div>
     </div>
     {{ end }}
     {{ $d := . }}

@@ -108,5 +108,5 @@ func (app *App) setBlock(w http.ResponseWriter, r *http.Request, block bool) {
 		noContent(w)
 		return
 	}
-	http.Redirect(w, r, "/crabs/"+other.UserName, http.StatusSeeOther)
+	http.Redirect(w, r, "/krabs/"+other.UserName, http.StatusSeeOther)
 }

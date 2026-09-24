@@ -231,26 +231,26 @@ func (h *harness) sessionCookie() string {
 
 func (h *harness) signupAndActivate(name, email, password string) {
 	h.t.Helper()
-	tok := h.csrf("/crab/signup")
-	status, body, hdr := h.post("/crab/signup", url.Values{"csrf_token": {tok}, "name": {name}, "email": {email}, "password": {password}})
-	if status != http.StatusSeeOther || hdr.Get("Location") != "/crab/activate" {
+	tok := h.csrf("/krab/signup")
+	status, body, hdr := h.post("/krab/signup", url.Values{"csrf_token": {tok}, "name": {name}, "email": {email}, "password": {password}})
+	if status != http.StatusSeeOther || hdr.Get("Location") != "/krab/activate" {
 		h.t.Fatalf("signup: %d %s %s", status, hdr.Get("Location"), body)
 	}
 	m := regexp.MustCompile(`token=([A-Z2-7]{26})`).FindStringSubmatch(h.mail.last(h.t).Text)
 	if m == nil {
 		h.t.Fatalf("no token in activation email: %s", h.mail.last(h.t).Text)
 	}
-	tok = h.csrf("/crab/activate?token=" + m[1])
-	status, _, hdr = h.post("/crab/activate", url.Values{"csrf_token": {tok}, "token": {m[1]}})
-	if status != http.StatusSeeOther || hdr.Get("Location") != "/crab/login" {
+	tok = h.csrf("/krab/activate?token=" + m[1])
+	status, _, hdr = h.post("/krab/activate", url.Values{"csrf_token": {tok}, "token": {m[1]}})
+	if status != http.StatusSeeOther || hdr.Get("Location") != "/krab/login" {
 		h.t.Fatalf("activate: %d %s", status, hdr.Get("Location"))
 	}
 }
 
 func (h *harness) login(email, password string) (int, string) {
 	h.t.Helper()
-	tok := h.csrf("/crab/login")
-	status, body, _ := h.post("/crab/login", url.Values{"csrf_token": {tok}, "email": {email}, "password": {password}})
+	tok := h.csrf("/krab/login")
+	status, body, _ := h.post("/krab/login", url.Values{"csrf_token": {tok}, "email": {email}, "password": {password}})
 	return status, body
 }
 
@@ -305,10 +305,10 @@ func TestSignupActivateLoginMoltLogout(t *testing.T) {
 		t.Fatalf("cross-site post: %d", status)
 	}
 
-	if status, _, _ := h.post("/crab/logout", url.Values{"csrf_token": {tok}}); status != http.StatusSeeOther {
+	if status, _, _ := h.post("/krab/logout", url.Values{"csrf_token": {tok}}); status != http.StatusSeeOther {
 		t.Fatalf("logout: %d", status)
 	}
-	if status, _, hdr := h.get("/trench"); status != http.StatusSeeOther || hdr.Get("Location") != "/crab/login" {
+	if status, _, hdr := h.get("/trench"); status != http.StatusSeeOther || hdr.Get("Location") != "/krab/login" {
 		t.Fatalf("after logout: %d %s", status, hdr.Get("Location"))
 	}
 }
@@ -350,16 +350,16 @@ func TestFeedsProfileSearchAndLiveCounts(t *testing.T) {
 	}
 
 	// Follow from the profile page; the button flips to "Following".
-	status, body, _ := h.get("/crabs/SANDY")
+	status, body, _ := h.get("/krabs/SANDY")
 	if status != http.StatusOK || !strings.Contains(body, "@sandy") || !strings.Contains(body, ">Follow<") {
 		t.Fatalf("profile before follow: %d", status)
 	}
-	tok := h.csrf("/crabs/sandy")
+	tok := h.csrf("/krabs/sandy")
 	status, body, _ = h.post("/follow/"+sandy.ID, url.Values{"csrf_token": {tok}}, "HX-Request", "true")
 	if status != http.StatusOK || !strings.Contains(body, "Following") || !strings.Contains(body, "/unfollow/"+sandy.ID) {
 		t.Fatalf("follow fragment: %d %s", status, body)
 	}
-	if _, body, _ := h.get("/crabs/sandy/followers"); !strings.Contains(body, `data-name="gary"`) {
+	if _, body, _ := h.get("/krabs/sandy/followers"); !strings.Contains(body, `data-name="gary"`) {
 		t.Fatal("followers list is missing gary")
 	}
 
@@ -423,7 +423,7 @@ func TestDeleteMolt(t *testing.T) {
 		t.Fatal("author has no delete option on the thread")
 	}
 
-	h.post("/crab/logout", url.Values{"csrf_token": {tok}})
+	h.post("/krab/logout", url.Values{"csrf_token": {tok}})
 	h.login("larry@krabber.test", "pump-it-up-now")
 	tok = h.csrf("/trench")
 	if _, body, _ := h.get("/sea"); strings.Contains(body, "/molt/delete/"+id) {
@@ -433,7 +433,7 @@ func TestDeleteMolt(t *testing.T) {
 		t.Fatalf("deleting someone else's molt: %d", status)
 	}
 
-	h.post("/crab/logout", url.Values{"csrf_token": {tok}})
+	h.post("/krab/logout", url.Values{"csrf_token": {tok}})
 	h.login("pearl@krabber.test", "whale-of-a-time")
 	tok = h.csrf("/trench")
 	status, _, hdr := h.post("/molt/delete/"+id, url.Values{"csrf_token": {tok}}, "HX-Request", "true")
@@ -463,7 +463,7 @@ func TestNotifications(t *testing.T) {
 	id := molts[0].ID
 	// Liking your own molt doesn't notify you.
 	h.post("/molt/like/"+id, url.Values{"csrf_token": {tok}}, "HX-Request", "true")
-	h.post("/crab/logout", url.Values{"csrf_token": {tok}})
+	h.post("/krab/logout", url.Values{"csrf_token": {tok}})
 
 	h.login("plankton@krabber.test", "formula-thief!")
 	tok = h.csrf("/trench")
@@ -472,7 +472,7 @@ func TestNotifications(t *testing.T) {
 		h.post("/molt/like/"+id, url.Values{"csrf_token": {tok}}, "HX-Request", "true")
 	}
 	h.post("/molt/reply/"+id, url.Values{"csrf_token": {tok}, "content": {"Coming, my love"}}, "HX-Request", "true")
-	h.post("/crab/logout", url.Values{"csrf_token": {tok}})
+	h.post("/krab/logout", url.Values{"csrf_token": {tok}})
 
 	h.login("karen@krabber.test", "computer-wife!")
 	_, body, _ := h.get("/trench")
@@ -508,7 +508,7 @@ func TestSettings(t *testing.T) {
 	if status != http.StatusSeeOther || hdr.Get("Location") != "/settings" {
 		t.Fatalf("save profile: %d", status)
 	}
-	_, body, _ = h.get("/crabs/gary")
+	_, body, _ = h.get("/krabs/gary")
 	for _, want := range []string{"Gary the Snail", "Meow.\nSnail.", "Pineapple", `href="https://garythesnail.example/"`, "</svg> garythesnail.example\n", "Edit profile"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("profile missing %q", want)
@@ -556,7 +556,7 @@ func TestFunFacts(t *testing.T) {
 	ctx := context.Background()
 	h.signupAndActivate("gary", "gary@krabber.test", "meow-meow-meow")
 	h.login("gary@krabber.test", "meow-meow-meow")
-	if _, body, _ := h.get("/crabs/gary"); !strings.Contains(body, "Full bio") || !strings.Contains(body, "filled out their bio") {
+	if _, body, _ := h.get("/krabs/gary"); !strings.Contains(body, "Full bio") || !strings.Contains(body, "filled out their bio") {
 		t.Fatal("an empty full bio should say so")
 	}
 
@@ -574,7 +574,7 @@ func TestFunFacts(t *testing.T) {
 	if gary.Pronouns != "he/him" || gary.Jam != "MeowMeow" || gary.Emoji != "🐌" || gary.DisplayName != "Gary" {
 		t.Fatalf("stored %+v", gary.Profile)
 	}
-	_, body, _ = h.get("/crabs/gary")
+	_, body, _ = h.get("/krabs/gary")
 	for _, want := range []string{"<th>Pronouns</th><td>he/him</td>", "<th>My jam</th><td>MeowMeow</td>", "<th>Favorite emoji</th><td>🐌</td>"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("profile missing %s", want)
@@ -599,12 +599,12 @@ func TestFunFacts(t *testing.T) {
 	}
 	h.client = h.newClient()
 	h.login("boss@krabber.test", "secret-boss")
-	tok = h.csrf("/crabmin/crabs/gary")
-	h.post("/crabmin/crabs/"+gary.ID, url.Values{"csrf_token": {tok}, "action": {"clear_fun_facts"}})
+	tok = h.csrf("/krabmin/krabs/gary")
+	h.post("/krabmin/krabs/"+gary.ID, url.Values{"csrf_token": {tok}, "action": {"clear_fun_facts"}})
 	if c, _ := h.store.CrabByUsername(ctx, "gary"); !c.Empty() || c.DisplayName != "Gary" {
 		t.Fatalf("after clearing: %+v", c.Profile)
 	}
-	if _, body, _ := h.get("/crabmin/log"); !strings.Contains(body, "cleared the fun facts of") {
+	if _, body, _ := h.get("/krabmin/log"); !strings.Contains(body, "cleared the fun facts of") {
 		t.Error("clearing not logged")
 	}
 }
@@ -620,7 +620,7 @@ func TestDeleteAccountFlow(t *testing.T) {
 	tok := h.csrf("/trench")
 	h.post("/molt/create", url.Values{"csrf_token": {tok}, "content": {"Hi-yah! Texas pride"}}, "HX-Request", "true")
 	sandyMolts, _ := h.store.MoltsByOwner(ctx, sandyID, 1)
-	h.post("/crab/logout", url.Values{"csrf_token": {tok}})
+	h.post("/krab/logout", url.Values{"csrf_token": {tok}})
 
 	h.login("squidward@krabber.test", "clarinet-solo")
 	tok = h.csrf("/trench")
@@ -654,7 +654,7 @@ func TestDeleteAccountFlow(t *testing.T) {
 	if _, body, _ := h.get("/molt/view/" + sandyMolts[0].ID); strings.Contains(body, "Keep it down") {
 		t.Error("the deleted crab's reply is still shown")
 	}
-	for _, path := range []string{"/crabs/squidward", "/molt/view/" + squidMolts[0].ID} {
+	for _, path := range []string{"/krabs/squidward", "/molt/view/" + squidMolts[0].ID} {
 		if status, _, _ := h.get(path); status != http.StatusNotFound {
 			t.Errorf("%s: %d", path, status)
 		}
@@ -720,37 +720,37 @@ func TestReporting(t *testing.T) {
 	if _, body, _ := h.get("/molt/view/" + m.ID); !strings.Contains(body, "already reported") {
 		t.Error("a second report should say it's already reported")
 	}
-	if status, _, _ := h.get("/crabmin/reports"); status != http.StatusNotFound {
+	if status, _, _ := h.get("/krabmin/reports"); status != http.StatusNotFound {
 		t.Fatalf("report queue for a regular crab: %d", status)
 	}
 	h.client = h.newClient()
 
 	h.login("mrkrabs@krabber.test", "secret-mrkrabs")
-	_, body, _ := h.get("/crabmin/reports")
+	_, body, _ := h.get("/krabmin/reports")
 	for _, want := range []string{"Chum Bucket", "Spam or scam", "1 report "} {
 		if !strings.Contains(body, want) {
 			t.Errorf("queue missing %q", want)
 		}
 	}
-	_, body, _ = h.get("/crabmin/molts/" + m.ID)
+	_, body, _ = h.get("/krabmin/molts/" + m.ID)
 	if !strings.Contains(body, "@sandy") || !strings.Contains(body, "Lies about the Krusty Krab") {
 		t.Error("molt page doesn't show the report")
 	}
-	tok = h.csrf("/crabmin/reports")
-	status, _, hdr = h.post("/crabmin/molts/"+m.ID, url.Values{"csrf_token": {tok}, "action": {"dismiss"}})
-	if status != http.StatusSeeOther || hdr.Get("Location") != "/crabmin/reports" {
+	tok = h.csrf("/krabmin/reports")
+	status, _, hdr = h.post("/krabmin/molts/"+m.ID, url.Values{"csrf_token": {tok}, "action": {"dismiss"}})
+	if status != http.StatusSeeOther || hdr.Get("Location") != "/krabmin/reports" {
 		t.Fatalf("dismiss: %d", status)
 	}
-	if _, body, _ := h.get("/crabmin/reports"); strings.Contains(body, `action="/crabmin/molts/`+m.ID) || !strings.Contains(body, "No open reports") {
+	if _, body, _ := h.get("/krabmin/reports"); strings.Contains(body, `action="/krabmin/molts/`+m.ID) || !strings.Contains(body, "No open reports") {
 		t.Error("dismissed report still queued")
 	}
-	if _, body, _ := h.get("/crabmin/log"); !strings.Contains(body, "dismissed reports on a molt by") {
+	if _, body, _ := h.get("/krabmin/log"); !strings.Contains(body, "dismissed reports on a molt by") {
 		t.Error("dismissal not logged")
 	}
 
 	// Banning emails the crab the reason.
 	sent := h.mail.count()
-	h.post("/crabmin/crabs/"+troll.ID, url.Values{"csrf_token": {tok}, "action": {"ban"}, "note": {"Spam about the Krusty Krab"}})
+	h.post("/krabmin/krabs/"+troll.ID, url.Values{"csrf_token": {tok}, "action": {"ban"}, "note": {"Spam about the Krusty Krab"}})
 	if h.mail.count() != sent+1 {
 		t.Fatal("no ban email")
 	}
@@ -771,7 +771,7 @@ func TestReplyThread(t *testing.T) {
 	h.post("/molt/create", url.Values{"csrf_token": {tok}, "content": {"Dinner is ready"}}, "HX-Request", "true")
 	molts, _ := h.store.MoltsByOwner(ctx, karenID, 1)
 	root := molts[0].ID
-	h.post("/crab/logout", url.Values{"csrf_token": {tok}})
+	h.post("/krab/logout", url.Values{"csrf_token": {tok}})
 
 	h.login("plankton@krabber.test", "formula-thief!")
 	tok = h.csrf("/trench")
@@ -784,13 +784,13 @@ func TestReplyThread(t *testing.T) {
 	}
 	replies, _ := h.store.RepliesByOwner(ctx, planktonID, 1)
 	reply := replies[0].ID
-	if _, body, _ := h.get("/crabs/plankton"); strings.Contains(body, "Is it chum again?") {
+	if _, body, _ := h.get("/krabs/plankton"); strings.Contains(body, "Is it chum again?") {
 		t.Error("the reply shows on the Molts timeline")
 	}
 	if _, body, _ := h.get("/sea"); strings.Contains(body, "/molt/view/"+reply) {
 		t.Error("the reply shows in the Sea")
 	}
-	h.post("/crab/logout", url.Values{"csrf_token": {tok}})
+	h.post("/krab/logout", url.Values{"csrf_token": {tok}})
 
 	h.login("karen@krabber.test", "computer-wife!")
 	tok = h.csrf("/trench")
@@ -823,7 +823,7 @@ func TestProfileTabs(t *testing.T) {
 	h.login("karen@krabber.test", "computer-wife!")
 	tok := h.csrf("/trench")
 	h.post("/molt/create", url.Values{"csrf_token": {tok}, "content": {"Dinner is ready"}}, "HX-Request", "true")
-	h.post("/crab/logout", url.Values{"csrf_token": {tok}})
+	h.post("/krab/logout", url.Values{"csrf_token": {tok}})
 	molts, _ := h.store.MoltsByOwner(ctx, karenID, 1)
 	root := `data-molt-id="` + molts[0].ID + `"`
 
@@ -840,10 +840,10 @@ func TestProfileTabs(t *testing.T) {
 		has, hasNot []string
 		active      string
 	}{
-		"/crabs/plankton":         {[]string{mine, `name="content"`}, []string{reply, root}, `/crabs/plankton" aria-current="page"`},
-		"/crabs/plankton/replies": {[]string{reply, "replying to"}, []string{mine, root, `hx-post="/molt/create"`}, `/crabs/plankton/replies" aria-current="page"`},
-		"/crabs/plankton/likes":   {[]string{root, "liked"}, []string{mine, reply}, `/crabs/plankton/likes" aria-current="page"`},
-		"/crabs/karen/replies":    {[]string{"hasn&#39;t replied to anyone yet"}, []string{reply}, `/crabs/karen/replies" aria-current="page"`},
+		"/krabs/plankton":         {[]string{mine, `name="content"`}, []string{reply, root}, `/krabs/plankton" aria-current="page"`},
+		"/krabs/plankton/replies": {[]string{reply, "replying to"}, []string{mine, root, `hx-post="/molt/create"`}, `/krabs/plankton/replies" aria-current="page"`},
+		"/krabs/plankton/likes":   {[]string{root, "liked"}, []string{mine, reply}, `/krabs/plankton/likes" aria-current="page"`},
+		"/krabs/karen/replies":    {[]string{"hasn&#39;t replied to anyone yet"}, []string{reply}, `/krabs/karen/replies" aria-current="page"`},
 	} {
 		status, body, _ := h.get(path)
 		if status != http.StatusOK || !strings.Contains(body, want.active) {
@@ -874,40 +874,40 @@ func TestAuthorNames(t *testing.T) {
 	h.login("karen@krabber.test", "computer-wife!")
 	tok := h.csrf("/trench")
 	_, body, _ := h.post("/molt/create", url.Values{"csrf_token": {tok}, "content": {"Dinner is ready"}}, "HX-Request", "true")
-	if !strings.Contains(body, `mini-molt-display-name zindex-front" href="/crabs/karen">karen<`) {
+	if !strings.Contains(body, `mini-molt-display-name zindex-front" href="/krabs/karen">karen<`) {
 		t.Errorf("new molt doesn't fall back to the username: %s", body)
 	}
 	molts, _ := h.store.MoltsByOwner(ctx, karenID, 1)
 	root := molts[0].ID
 	h.post("/settings/profile", url.Values{"csrf_token": {tok}, "display_name": {"Karen 2.0"}})
-	h.post("/crab/logout", url.Values{"csrf_token": {tok}})
+	h.post("/krab/logout", url.Values{"csrf_token": {tok}})
 
 	h.login("plankton@krabber.test", "formula-thief!")
 	tok = h.csrf("/trench")
-	if _, body, _ := h.get("/crabs/karen"); strings.Contains(body, "Follows you") {
+	if _, body, _ := h.get("/krabs/karen"); strings.Contains(body, "Follows you") {
 		t.Error("karen doesn't follow plankton yet")
 	}
 	h.post("/follow/"+karenID, url.Values{"csrf_token": {tok}}, "HX-Request", "true")
 	h.post("/molt/reply/"+root, url.Values{"csrf_token": {tok}, "content": {"Is it chum?"}}, "HX-Request", "true")
 	h.post("/remolt/"+root, url.Values{"csrf_token": {tok}}, "HX-Request", "true")
 	h.post("/settings/profile", url.Values{"csrf_token": {tok}, "display_name": {"Sheldon"}})
-	_, body, _ = h.get("/crabs/plankton")
+	_, body, _ = h.get("/krabs/plankton")
 	for _, want := range []string{">Karen 2.0</a>", "@karen", ">Sheldon</a> Remolted"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("profile is missing %q", want)
 		}
 	}
-	if _, body, _ := h.get("/crabs/plankton/replies"); !strings.Contains(body, "Karen 2.0</a></small>") {
+	if _, body, _ := h.get("/krabs/plankton/replies"); !strings.Contains(body, "Karen 2.0</a></small>") {
 		t.Error("reply doesn't name who it's replying to")
 	}
-	h.post("/crab/logout", url.Values{"csrf_token": {tok}})
+	h.post("/krab/logout", url.Values{"csrf_token": {tok}})
 
 	h.login("karen@krabber.test", "computer-wife!")
-	_, body, _ = h.get("/crabs/plankton")
+	_, body, _ = h.get("/krabs/plankton")
 	if !strings.Contains(body, `<small class="follows-you">Follows you</small>`) {
 		t.Error("plankton follows karen but the badge is missing")
 	}
-	if _, body, _ := h.get("/crabs/plankton/replies"); !strings.Contains(body, ">you</a></small>") {
+	if _, body, _ := h.get("/krabs/plankton/replies"); !strings.Contains(body, ">you</a></small>") {
 		t.Error("a reply to you should say \"replying to you\"")
 	}
 }
@@ -924,7 +924,7 @@ func TestQuotes(t *testing.T) {
 	h.post("/molt/create", url.Values{"csrf_token": {tok}, "content": {"Dinner is ready"}}, "HX-Request", "true")
 	molts, _ := h.store.MoltsByOwner(ctx, karenID, 1)
 	root := molts[0].ID
-	h.post("/crab/logout", url.Values{"csrf_token": {tok}})
+	h.post("/krab/logout", url.Values{"csrf_token": {tok}})
 
 	h.login("plankton@krabber.test", "formula-thief!")
 	tok = h.csrf("/trench")
@@ -967,7 +967,7 @@ func TestQuotes(t *testing.T) {
 	if got, _ := h.store.MoltByID(ctx, root); got.RemoltCount != 0 || got.QuoteCount != 1 {
 		t.Fatalf("counts: %d remolts, %d quotes", got.RemoltCount, got.QuoteCount)
 	}
-	h.post("/crab/logout", url.Values{"csrf_token": {tok}})
+	h.post("/krab/logout", url.Values{"csrf_token": {tok}})
 
 	h.login("karen@krabber.test", "computer-wife!")
 	tok = h.csrf("/trench")
@@ -989,8 +989,8 @@ func TestMentionsAndCrabtags(t *testing.T) {
 	tok := h.csrf("/trench")
 	_, body, _ := h.post("/molt/create", url.Values{"csrf_token": {tok}, "content": {"Try the %KrabbyPatty, @Plankton & @nobody <3"}}, "HX-Request", "true")
 	for _, want := range []string{
-		`<a href="/crabtag/krabbypatty" class="crabtag zindex-front">%KrabbyPatty</a>`,
-		`<a href="/crabs/plankton" class="mention zindex-front">@Plankton</a>`,
+		`<a href="/krabtag/krabbypatty" class="crabtag zindex-front">%KrabbyPatty</a>`,
+		`<a href="/krabs/plankton" class="mention zindex-front">@Plankton</a>`,
 		"&amp; @nobody &lt;3",
 	} {
 		if !strings.Contains(body, want) {
@@ -998,20 +998,20 @@ func TestMentionsAndCrabtags(t *testing.T) {
 		}
 	}
 	_, body, _ = h.get("/sea")
-	if !strings.Contains(body, `href="/crabtag/krabbypatty"`) || !strings.Contains(body, "%krabbypatty</span>") || !strings.Contains(body, "Used by 1 crab recently.") {
+	if !strings.Contains(body, `href="/krabtag/krabbypatty"`) || !strings.Contains(body, "%krabbypatty</span>") || !strings.Contains(body, "Used by 1 krab recently.") {
 		t.Error("the Sea or the trending panel is missing the crabtag")
 	}
-	status, body, _ := h.get("/crabtag/KrabbyPatty")
+	status, body, _ := h.get("/krabtag/KrabbyPatty")
 	if status != http.StatusOK || !strings.Contains(body, "Try the") || !strings.Contains(body, "Exploring") {
 		t.Errorf("crabtag page: %d", status)
 	}
-	if status, body, _ := h.get("/crabtag/nothing"); status != http.StatusOK || !strings.Contains(body, "No molts use %nothing yet.") {
+	if status, body, _ := h.get("/krabtag/nothing"); status != http.StatusOK || !strings.Contains(body, "No molts use %nothing yet.") {
 		t.Errorf("empty crabtag page: %d", status)
 	}
-	if status, _, _ := h.get("/crabtag/not-a-tag"); status != http.StatusNotFound {
+	if status, _, _ := h.get("/krabtag/not-a-tag"); status != http.StatusNotFound {
 		t.Errorf("bad crabtag: %d", status)
 	}
-	h.post("/crab/logout", url.Values{"csrf_token": {tok}})
+	h.post("/krab/logout", url.Values{"csrf_token": {tok}})
 
 	h.login("plankton@krabber.test", "formula-thief!")
 	tok = h.csrf("/trench")
@@ -1020,7 +1020,7 @@ func TestMentionsAndCrabtags(t *testing.T) {
 	}
 	molts, _ := h.store.MoltsByOwner(context.Background(), currentID(t, h, "karen"), 1)
 	h.post("/molt/reply/"+molts[0].ID, url.Values{"csrf_token": {tok}, "content": {"@karen never!"}}, "HX-Request", "true")
-	h.post("/crab/logout", url.Values{"csrf_token": {tok}})
+	h.post("/krab/logout", url.Values{"csrf_token": {tok}})
 
 	h.login("karen@krabber.test", "computer-wife!")
 	if _, body, _ := h.get("/notifications"); !strings.Contains(body, "replied to your molt") || strings.Contains(body, "mentioned you") {
@@ -1035,7 +1035,7 @@ func TestBookmarks(t *testing.T) {
 	h.login("karen@krabber.test", "computer-wife!")
 	tok := h.csrf("/trench")
 	h.post("/molt/create", url.Values{"csrf_token": {tok}, "content": {"Secret formula, don't look"}}, "HX-Request", "true")
-	h.post("/crab/logout", url.Values{"csrf_token": {tok}})
+	h.post("/krab/logout", url.Values{"csrf_token": {tok}})
 	molts, _ := h.store.MoltsByOwner(context.Background(), currentID(t, h, "karen"), 1)
 	id := molts[0].ID
 
@@ -1064,8 +1064,8 @@ func TestBookmarks(t *testing.T) {
 	if status, _, _ := h.post("/molt/bookmark/nope", url.Values{"csrf_token": {tok}}, "HX-Request", "true"); status != http.StatusNotFound {
 		t.Errorf("bookmark a missing molt: %d", status)
 	}
-	h.post("/crab/logout", url.Values{"csrf_token": {tok}})
-	if status, _, hdr := h.get("/bookmarks"); status/100 != 3 || !strings.HasPrefix(hdr.Get("Location"), "/crab/login") {
+	h.post("/krab/logout", url.Values{"csrf_token": {tok}})
+	if status, _, hdr := h.get("/bookmarks"); status/100 != 3 || !strings.HasPrefix(hdr.Get("Location"), "/krab/login") {
 		t.Errorf("signed-out bookmarks: %d %s", status, hdr.Get("Location"))
 	}
 }
@@ -1085,14 +1085,14 @@ func TestPins(t *testing.T) {
 	if _, body, _ := h.get("/sea"); strings.Contains(body, "/molt/pin/") {
 		t.Error("Pin shows outside your own profile")
 	}
-	if _, body, _ := h.get("/crabs/karen"); !strings.Contains(body, "/molt/pin/"+oldest) || strings.Contains(body, "Pinned Molt") {
+	if _, body, _ := h.get("/krabs/karen"); !strings.Contains(body, "/molt/pin/"+oldest) || strings.Contains(body, "Pinned Molt") {
 		t.Error("own profile should offer Pin and show no pin yet")
 	}
 	status, _, hdr := h.post("/molt/pin/"+oldest, url.Values{"csrf_token": {tok}}, "HX-Request", "true")
 	if status != http.StatusNoContent || hdr.Get("HX-Refresh") != "true" {
 		t.Fatalf("pin: %d %v", status, hdr)
 	}
-	_, body, _ := h.get("/crabs/karen")
+	_, body, _ := h.get("/krabs/karen")
 	pin, list := strings.Index(body, `id="pinned-molt"`), strings.Index(body, `id="molt-list"`)
 	if pin < 0 || pin > list || !strings.Contains(body[pin:list], "Pinned Molt") || !strings.Contains(body[pin:list], "Oldest thought") {
 		t.Error("the pinned molt isn't above the list")
@@ -1100,25 +1100,25 @@ func TestPins(t *testing.T) {
 	if !strings.Contains(body, "/molt/unpin/"+oldest) {
 		t.Error("the pinned molt's menu should offer Unpin")
 	}
-	if _, body, _ := h.get("/crabs/karen/replies"); strings.Contains(body, "Pinned Molt") {
+	if _, body, _ := h.get("/krabs/karen/replies"); strings.Contains(body, "Pinned Molt") {
 		t.Error("the pin shows on the Replies tab")
 	}
-	h.post("/crab/logout", url.Values{"csrf_token": {tok}})
+	h.post("/krab/logout", url.Values{"csrf_token": {tok}})
 
 	h.login("plankton@krabber.test", "formula-thief!")
 	tok = h.csrf("/trench")
-	if _, body, _ := h.get("/crabs/karen"); !strings.Contains(body, "Pinned Molt") || strings.Contains(body, "/molt/pin/") || strings.Contains(body, "/molt/unpin/") {
+	if _, body, _ := h.get("/krabs/karen"); !strings.Contains(body, "Pinned Molt") || strings.Contains(body, "/molt/pin/") || strings.Contains(body, "/molt/unpin/") {
 		t.Error("visitors should see the pin but not Pin or Unpin")
 	}
 	if status, _, _ := h.post("/molt/pin/"+oldest, url.Values{"csrf_token": {tok}}, "HX-Request", "true"); status != http.StatusNotFound {
 		t.Errorf("pin someone else's molt: %d", status)
 	}
-	h.post("/crab/logout", url.Values{"csrf_token": {tok}})
+	h.post("/krab/logout", url.Values{"csrf_token": {tok}})
 
 	h.login("karen@krabber.test", "computer-wife!")
 	tok = h.csrf("/trench")
 	h.post("/molt/unpin/"+oldest, url.Values{"csrf_token": {tok}}, "HX-Request", "true")
-	if _, body, _ := h.get("/crabs/karen"); strings.Contains(body, "Pinned Molt") {
+	if _, body, _ := h.get("/krabs/karen"); strings.Contains(body, "Pinned Molt") {
 		t.Error("unpin left the pin")
 	}
 	h.post("/molt/pin/"+oldest, url.Values{"csrf_token": {tok}}, "HX-Request", "true")
@@ -1137,21 +1137,21 @@ func TestNavLayout(t *testing.T) {
 	_, body, _ := h.get("/trench")
 	nav := body[strings.Index(body, `id="nav-panel"`):strings.Index(body, `id="add-panel"`)]
 	last := -1
-	for _, want := range []string{`href="/trench"`, `href="/sea"`, `href="/notifications"`, `href="/bookmarks"`, `href="/crabs/karen"`, `id="molt-btn"`, `href="/stats"`, `href="/settings"`, `action="/crab/logout"`} {
+	for _, want := range []string{`href="/trench"`, `href="/sea"`, `href="/notifications"`, `href="/bookmarks"`, `href="/krabs/karen"`, `id="molt-btn"`, `href="/stats"`, `href="/settings"`, `action="/krab/logout"`} {
 		i := strings.Index(nav, want)
 		if i <= last {
 			t.Fatalf("nav: %s is missing or out of order", want)
 		}
 		last = i
 	}
-	if strings.Contains(nav, `href="/crabs"`) || strings.Contains(nav, `href="/crabmin"`) || strings.Contains(nav, `href="/search"`) {
+	if strings.Contains(nav, `href="/krabs"`) || strings.Contains(nav, `href="/krabmin"`) || strings.Contains(nav, `href="/search"`) {
 		t.Error("nav shows Crabs, Search, or Crabmin to a crab who isn't a moderator")
 	}
 	side := body[strings.Index(body, `id="add-panel"`):]
 	if !strings.Contains(side, `action="/search"`) || strings.Index(side, `name="q"`) > strings.Index(side, `id="trending"`) {
 		t.Error("the search box should sit at the top of the sidebar")
 	}
-	h.post("/crab/logout", url.Values{"csrf_token": {h.csrf("/trench")}})
+	h.post("/krab/logout", url.Values{"csrf_token": {h.csrf("/trench")}})
 	if _, body, _ = h.get("/sea"); strings.Contains(body, `href="/search"`) {
 		t.Error("signed-out nav shows Search")
 	}
@@ -1159,7 +1159,7 @@ func TestNavLayout(t *testing.T) {
 
 func TestSitePages(t *testing.T) {
 	h := newHarness(t)
-	for _, path := range []string{"/no-such-page", "/molt/view/nope", "/crabs/nobody"} {
+	for _, path := range []string{"/no-such-page", "/molt/view/nope", "/krabs/nobody"} {
 		status, body, hdr := h.get(path)
 		if status != http.StatusNotFound || !strings.Contains(body, "sank to the bottom of the sea") || !strings.HasPrefix(hdr.Get("Content-Type"), "text/html") {
 			t.Errorf("%s: %d %q", path, status, hdr.Get("Content-Type"))
@@ -1168,7 +1168,7 @@ func TestSitePages(t *testing.T) {
 	for path, want := range map[string]string{
 		"/terms":      "The rules",
 		"/privacy":    "What we store",
-		"/robots.txt": "Disallow: /crabmin",
+		"/robots.txt": "Disallow: /krabmin",
 	} {
 		if status, body, _ := h.get(path); status != http.StatusOK || !strings.Contains(body, want) {
 			t.Errorf("%s: %d, missing %q", path, status, want)
@@ -1177,7 +1177,7 @@ func TestSitePages(t *testing.T) {
 	if status, _, hdr := h.get("/favicon.ico"); status != http.StatusMovedPermanently || !strings.Contains(hdr.Get("Location"), "favicon.svg") {
 		t.Errorf("/favicon.ico: %d %q", status, hdr.Get("Location"))
 	}
-	if _, body, _ := h.get("/crab/signup"); !strings.Contains(body, `href="/terms"`) || !strings.Contains(body, `href="/privacy"`) {
+	if _, body, _ := h.get("/krab/signup"); !strings.Contains(body, `href="/terms"`) || !strings.Contains(body, `href="/privacy"`) {
 		t.Error("signup doesn't link the terms and privacy policy")
 	}
 }
@@ -1193,7 +1193,7 @@ func TestBlocking(t *testing.T) {
 	tok := h.csrf("/trench")
 	h.post("/follow/"+sandyID, url.Values{"csrf_token": {tok}}, "HX-Request", "true")
 	h.post("/molt/create", url.Values{"csrf_token": {tok}, "content": {"Give me the formula"}}, "HX-Request", "true")
-	h.post("/crab/logout", url.Values{"csrf_token": {tok}})
+	h.post("/krab/logout", url.Values{"csrf_token": {tok}})
 
 	h.login("sandy@krabber.test", "karate-chop!")
 	tok = h.csrf("/trench")
@@ -1206,12 +1206,12 @@ func TestBlocking(t *testing.T) {
 	if status != http.StatusNoContent || hdr.Get("HX-Refresh") != "true" {
 		t.Fatalf("block: %d", status)
 	}
-	for _, path := range []string{"/sea", "/crabs", "/search?q=formula"} {
-		if _, body, _ := h.get(path); strings.Contains(body, "Give me the formula") || strings.Contains(body, `href="/crabs/plankton"`) {
+	for _, path := range []string{"/sea", "/krabs", "/search?q=formula"} {
+		if _, body, _ := h.get(path); strings.Contains(body, "Give me the formula") || strings.Contains(body, `href="/krabs/plankton"`) {
 			t.Errorf("%s still shows plankton", path)
 		}
 	}
-	if _, body, _ := h.get("/crabs/plankton"); !strings.Contains(body, "You blocked @plankton") || !strings.Contains(body, "/unblock/"+planktonID) {
+	if _, body, _ := h.get("/krabs/plankton"); !strings.Contains(body, "You blocked @plankton") || !strings.Contains(body, "/unblock/"+planktonID) {
 		t.Error("blocked profile should offer unblock")
 	}
 	if _, body, _ := h.get("/settings"); !strings.Contains(body, "/unblock/"+planktonID) {
@@ -1220,12 +1220,12 @@ func TestBlocking(t *testing.T) {
 	if c, _ := h.store.CrabByUsername(ctx, "sandy"); c.FollowerCount != 0 {
 		t.Errorf("follow survived the block: %d followers", c.FollowerCount)
 	}
-	h.post("/crab/logout", url.Values{"csrf_token": {tok}})
+	h.post("/krab/logout", url.Values{"csrf_token": {tok}})
 
 	// Plankton can't find, follow or touch Sandy.
 	h.login("plankton@krabber.test", "formula-thief!")
 	tok = h.csrf("/trench")
-	if status, _, _ := h.get("/crabs/sandy"); status != http.StatusNotFound {
+	if status, _, _ := h.get("/krabs/sandy"); status != http.StatusNotFound {
 		t.Errorf("blocker's profile: %d", status)
 	}
 	if _, body, _ := h.get("/sea"); strings.Contains(body, "Texas pride") {
@@ -1240,7 +1240,7 @@ func TestBlocking(t *testing.T) {
 	if ok, _ := h.store.IsFollowing(ctx, planktonID, sandyID); ok {
 		t.Error("follow went through")
 	}
-	h.post("/crab/logout", url.Values{"csrf_token": {tok}})
+	h.post("/krab/logout", url.Values{"csrf_token": {tok}})
 
 	h.login("sandy@krabber.test", "karate-chop!")
 	tok = h.csrf("/trench")
@@ -1259,12 +1259,12 @@ func TestPasswordReset(t *testing.T) {
 	sent := h.mail.count()
 
 	// Unknown emails get the same answer and no email.
-	tok := h.csrf("/crab/forgot")
-	status, _, hdr := h.post("/crab/forgot", url.Values{"csrf_token": {tok}, "email": {"nobody@krabber.test"}})
-	if status != http.StatusSeeOther || hdr.Get("Location") != "/crab/reset" || h.mail.count() != sent {
+	tok := h.csrf("/krab/forgot")
+	status, _, hdr := h.post("/krab/forgot", url.Values{"csrf_token": {tok}, "email": {"nobody@krabber.test"}})
+	if status != http.StatusSeeOther || hdr.Get("Location") != "/krab/reset" || h.mail.count() != sent {
 		t.Fatalf("unknown email: %d %s, %d emails", status, hdr.Get("Location"), h.mail.count()-sent)
 	}
-	h.post("/crab/forgot", url.Values{"csrf_token": {tok}, "email": {"PEARL@krabber.test"}})
+	h.post("/krab/forgot", url.Values{"csrf_token": {tok}, "email": {"PEARL@krabber.test"}})
 	msg := h.mail.last(t)
 	m := regexp.MustCompile(`token=([A-Z2-7]{26})`).FindStringSubmatch(msg.Text)
 	if h.mail.count() != sent+1 || m == nil || !strings.Contains(msg.Subject, "Reset") {
@@ -1272,16 +1272,16 @@ func TestPasswordReset(t *testing.T) {
 	}
 
 	// A rejected password keeps the token usable.
-	tok = h.csrf("/crab/reset?token=" + m[1])
-	if status, _, _ := h.post("/crab/reset", url.Values{"csrf_token": {tok}, "token": {m[1]}, "password": {"short"}, "confirm_password": {"short"}}); status != http.StatusUnprocessableEntity {
+	tok = h.csrf("/krab/reset?token=" + m[1])
+	if status, _, _ := h.post("/krab/reset", url.Values{"csrf_token": {tok}, "token": {m[1]}, "password": {"short"}, "confirm_password": {"short"}}); status != http.StatusUnprocessableEntity {
 		t.Fatalf("short password: %d", status)
 	}
-	status, _, hdr = h.post("/crab/reset", url.Values{"csrf_token": {tok}, "token": {m[1]}, "password": {"daddy-buy-me"}, "confirm_password": {"daddy-buy-me"}})
-	if status != http.StatusSeeOther || hdr.Get("Location") != "/crab/login" {
+	status, _, hdr = h.post("/krab/reset", url.Values{"csrf_token": {tok}, "token": {m[1]}, "password": {"daddy-buy-me"}, "confirm_password": {"daddy-buy-me"}})
+	if status != http.StatusSeeOther || hdr.Get("Location") != "/krab/login" {
 		t.Fatalf("reset: %d %s", status, hdr.Get("Location"))
 	}
-	tok = h.csrf("/crab/reset")
-	if status, body, _ := h.post("/crab/reset", url.Values{"csrf_token": {tok}, "token": {m[1]}, "password": {"again-and-again"}, "confirm_password": {"again-and-again"}}); status != http.StatusUnprocessableEntity || !strings.Contains(body, "invalid or has expired") {
+	tok = h.csrf("/krab/reset")
+	if status, body, _ := h.post("/krab/reset", url.Values{"csrf_token": {tok}, "token": {m[1]}, "password": {"again-and-again"}, "confirm_password": {"again-and-again"}}); status != http.StatusUnprocessableEntity || !strings.Contains(body, "invalid or has expired") {
 		t.Fatalf("token reused: %d", status)
 	}
 
@@ -1332,28 +1332,28 @@ func TestCrabmin(t *testing.T) {
 	h.post("/molt/create", url.Values{"csrf_token": {tok}, "content": {"Barnacles to all of you"}}, "HX-Request", "true")
 	molts, _ := h.store.MoltsByOwner(ctx, crab("troll").ID, 1)
 	moltID := molts[0].ID
-	if status, _, _ := h.get("/crabmin"); status != http.StatusNotFound {
+	if status, _, _ := h.get("/krabmin"); status != http.StatusNotFound {
 		t.Fatalf("crabmin for a regular crab: %d", status)
 	}
-	if _, body, _ := h.get("/trench"); strings.Contains(body, `href="/crabmin"`) {
+	if _, body, _ := h.get("/trench"); strings.Contains(body, `href="/krabmin"`) {
 		t.Error("regular crab sees the Crabmin nav button")
 	}
 
 	h.client = h.newClient()
 	h.login("mod@krabber.test", "shell-game-mod")
-	if _, body, _ := h.get("/sea"); !strings.Contains(body, `href="/crabmin"`) || !strings.Contains(body, "/crabmin/molts/"+moltID) {
+	if _, body, _ := h.get("/sea"); !strings.Contains(body, `href="/krabmin"`) || !strings.Contains(body, "/krabmin/molts/"+moltID) {
 		t.Error("moderator should see the Crabmin nav button and the molt menu entry")
 	}
-	if status, _, hdr := h.get("/crabmin?q=%40Troll"); status != http.StatusSeeOther || hdr.Get("Location") != "/crabmin/crabs/troll" {
+	if status, _, hdr := h.get("/krabmin?q=%40Troll"); status != http.StatusSeeOther || hdr.Get("Location") != "/krabmin/krabs/troll" {
 		t.Fatalf("look up by username: %d %s", status, hdr.Get("Location"))
 	}
-	if _, _, hdr := h.get("/crabmin?q=" + moltID); hdr.Get("Location") != "/crabmin/molts/"+moltID {
+	if _, _, hdr := h.get("/krabmin?q=" + moltID); hdr.Get("Location") != "/krabmin/molts/"+moltID {
 		t.Fatalf("look up by molt ID: %s", hdr.Get("Location"))
 	}
-	tok = h.csrf("/crabmin/crabs/troll")
+	tok = h.csrf("/krabmin/krabs/troll")
 	act := func(target, action, note string) string {
 		t.Helper()
-		status, _, hdr := h.post("/crabmin/crabs/"+crab(target).ID, url.Values{"csrf_token": {tok}, "action": {action}, "note": {note}})
+		status, _, hdr := h.post("/krabmin/krabs/"+crab(target).ID, url.Values{"csrf_token": {tok}, "action": {action}, "note": {note}})
 		if status != http.StatusSeeOther {
 			t.Fatalf("%s %s: %d", action, target, status)
 		}
@@ -1370,18 +1370,18 @@ func TestCrabmin(t *testing.T) {
 		t.Fatalf("bio not cleared: %q", c.Bio)
 	}
 
-	tok = h.csrf("/crabmin/molts/" + moltID)
-	h.post("/crabmin/molts/"+moltID, url.Values{"csrf_token": {tok}, "action": {"remove"}})
+	tok = h.csrf("/krabmin/molts/" + moltID)
+	h.post("/krabmin/molts/"+moltID, url.Values{"csrf_token": {tok}, "action": {"remove"}})
 	if _, body, _ := h.get("/sea"); strings.Contains(body, "Barnacles to all of you") {
 		t.Error("removed molt still in the sea")
 	}
 	if status, _, _ := h.get("/molt/view/" + moltID); status != http.StatusNotFound {
 		t.Errorf("removed molt page: %d", status)
 	}
-	if _, body, _ := h.get("/crabmin/molts/" + moltID); !strings.Contains(body, "Removed by a moderator") {
+	if _, body, _ := h.get("/krabmin/molts/" + moltID); !strings.Contains(body, "Removed by a moderator") {
 		t.Error("crabmin should still show the removed molt")
 	}
-	h.post("/crabmin/molts/"+moltID, url.Values{"csrf_token": {tok}, "action": {"restore"}})
+	h.post("/krabmin/molts/"+moltID, url.Values{"csrf_token": {tok}, "action": {"restore"}})
 	if status, _, _ := h.get("/molt/view/" + moltID); status != http.StatusOK {
 		t.Errorf("restored molt page: %d", status)
 	}
@@ -1403,7 +1403,7 @@ func TestCrabmin(t *testing.T) {
 	if _, body, _ := h.get("/sea"); strings.Contains(body, "Barnacles to all of you") {
 		t.Error("banned crab's molt still in the sea")
 	}
-	_, logPage, _ := h.get("/crabmin/log")
+	_, logPage, _ := h.get("/krabmin/log")
 	for _, want := range []string{"banned", "warned", "cleared the bio of", "removed a molt by", "restored a molt by", "tried to ban", "tried to make a moderator:"} {
 		if !strings.Contains(logPage, want) {
 			t.Errorf("log missing %q", want)
@@ -1418,7 +1418,7 @@ func TestCrabmin(t *testing.T) {
 	// The admin can moderate moderators, but nobody touches an admin from the web.
 	h.client = h.newClient()
 	h.login("boss@krabber.test", "shell-game-boss")
-	tok = h.csrf("/crabmin/crabs/peer")
+	tok = h.csrf("/krabmin/krabs/peer")
 	act("peer", "remove_moderator", "")
 	if crab("peer").Role != "" {
 		t.Error("admin couldn't remove a moderator")
@@ -1428,7 +1428,7 @@ func TestCrabmin(t *testing.T) {
 		t.Error("admin couldn't unban")
 	}
 	h.client = mine
-	tok = h.csrf("/crabmin/crabs/boss")
+	tok = h.csrf("/krabmin/krabs/boss")
 	if body := act("boss", "ban", "mutiny"); !strings.Contains(body, "Not allowed") || crab("boss").Banned {
 		t.Error("moderator banned the admin")
 	}
@@ -1447,15 +1447,15 @@ func TestLoginRules(t *testing.T) {
 	h := newHarness(t)
 
 	// Not activated yet: the right password still doesn't sign in.
-	tok := h.csrf("/crab/signup")
-	h.post("/crab/signup", url.Values{"csrf_token": {tok}, "name": {"plankton"}, "email": {"plankton@krabber.test"}, "password": {"formula-is-mine"}})
+	tok := h.csrf("/krab/signup")
+	h.post("/krab/signup", url.Values{"csrf_token": {tok}, "name": {"plankton"}, "email": {"plankton@krabber.test"}, "password": {"formula-is-mine"}})
 	if status, body := h.login("plankton@krabber.test", "formula-is-mine"); status != http.StatusUnprocessableEntity || !strings.Contains(body, "activate your account") {
 		t.Fatalf("unactivated login: %d", status)
 	}
 
 	// Same email in another case, or same name, can't register again.
-	tok = h.csrf("/crab/signup")
-	if status, body, _ := h.post("/crab/signup", url.Values{"csrf_token": {tok}, "name": {"other"}, "email": {"PLANKTON@krabber.test"}, "password": {"formula-is-mine"}}); status != http.StatusUnprocessableEntity || !strings.Contains(body, "already in use") {
+	tok = h.csrf("/krab/signup")
+	if status, body, _ := h.post("/krab/signup", url.Values{"csrf_token": {tok}, "name": {"other"}, "email": {"PLANKTON@krabber.test"}, "password": {"formula-is-mine"}}); status != http.StatusUnprocessableEntity || !strings.Contains(body, "already in use") {
 		t.Fatalf("duplicate email: %d", status)
 	}
 
@@ -1542,10 +1542,10 @@ func TestEditMolt(t *testing.T) {
 	if _, body, _ := h.get("/molt/view/" + id); !strings.Contains(body, "%plan</a> two") || !strings.Contains(body, "This molt has been edited") {
 		t.Error("the thread doesn't show the edit")
 	}
-	if _, body, _ := h.get("/crabtag/plan"); !strings.Contains(body, "two") {
+	if _, body, _ := h.get("/krabtag/plan"); !strings.Contains(body, "two") {
 		t.Error("the crabtag page doesn't show the new text")
 	}
-	h.post("/crab/logout", url.Values{"csrf_token": {tok}})
+	h.post("/krab/logout", url.Values{"csrf_token": {tok}})
 
 	for name, want := range map[string]int{"karen": 1, "sandy": 1} {
 		n, err := h.store.Notifications(context.Background(), currentID(t, h, name), 10)
@@ -1579,8 +1579,8 @@ func TestEditable(t *testing.T) {
 func TestComposeModals(t *testing.T) {
 	h := newHarness(t)
 	h.signupAndActivate("karen", "karen@krabber.test", "computer-wife!")
-	tok := h.csrf("/crab/login")
-	if status, _, hdr := h.post("/crab/login", url.Values{"csrf_token": {tok}, "email": {"karen@krabber.test"}, "password": {"computer-wife!"}}); status != http.StatusSeeOther || hdr.Get("Location") != "/trench" {
+	tok := h.csrf("/krab/login")
+	if status, _, hdr := h.post("/krab/login", url.Values{"csrf_token": {tok}, "email": {"karen@krabber.test"}, "password": {"computer-wife!"}}); status != http.StatusSeeOther || hdr.Get("Location") != "/trench" {
 		t.Fatalf("login lands on %d %s, want the Trench", status, hdr.Get("Location"))
 	}
 	if status, _, _ := h.get("/moltinTime"); status != http.StatusNotFound {
@@ -1735,7 +1735,7 @@ func TestGeneratedAvatars(t *testing.T) {
 	if status != http.StatusOK || !strings.Contains(banner, `viewBox="0 0 360 120"`) || hdr.Get("Content-Type") != "image/svg+xml; charset=utf-8" {
 		t.Fatalf("banner: %d %s", status, hdr.Get("Content-Type"))
 	}
-	if _, body, _ := h.get("/crabs/karen"); !strings.Contains(body, "/banner/"+code+".svg") {
+	if _, body, _ := h.get("/krabs/karen"); !strings.Contains(body, "/banner/"+code+".svg") {
 		t.Fatal("profile missing banner")
 	}
 	if status, _, _ := h.get("/avatar/not-a-crab.svg"); status != http.StatusNotFound {
@@ -1850,17 +1850,17 @@ func TestNSFW(t *testing.T) {
 
 	h.client = h.newClient()
 	h.login("mrkrabs@krabber.test", "secret-mrkrabs")
-	tok = h.csrf("/crabmin/molts/" + id)
-	if status, _, _ := h.post("/crabmin/molts/"+id, url.Values{"csrf_token": {tok}, "action": {"nsfw"}}); status != http.StatusSeeOther {
+	tok = h.csrf("/krabmin/molts/" + id)
+	if status, _, _ := h.post("/krabmin/molts/"+id, url.Values{"csrf_token": {tok}, "action": {"nsfw"}}); status != http.StatusSeeOther {
 		t.Fatalf("mark nsfw: %d", status)
 	}
 	if m, _ := h.store.MoltByID(ctx, id); !m.NSFW {
 		t.Fatal("moderator label not stored")
 	}
-	if _, body, _ := h.get("/crabmin/molts/" + id); !strings.Contains(body, "Mark SFW") {
+	if _, body, _ := h.get("/krabmin/molts/" + id); !strings.Contains(body, "Mark SFW") {
 		t.Error("crabmin should offer Mark SFW")
 	}
-	if _, body, _ := h.get("/crabmin/log"); !strings.Contains(body, "marked NSFW a molt by") {
+	if _, body, _ := h.get("/krabmin/log"); !strings.Contains(body, "marked NSFW a molt by") {
 		t.Error("label not logged")
 	}
 }
@@ -1907,7 +1907,7 @@ func TestMutedWords(t *testing.T) {
 	if !strings.Contains(body, "I brought chum for lunch") {
 		t.Error("sandy's own molt should never be muted")
 	}
-	if _, body, _ := h.get("/crabs/karen"); strings.Contains(body, "Chum Bucket") {
+	if _, body, _ := h.get("/krabs/karen"); strings.Contains(body, "Chum Bucket") {
 		t.Error("profile list shows a muted molt")
 	}
 	if _, body, _ := h.get("/search?q=bucket"); strings.Contains(body, "Chum Bucket") {
@@ -2041,11 +2041,11 @@ func TestStats(t *testing.T) {
 	if !strings.Contains(body, `<h1 class="user-count text-center">3</h1>`) {
 		t.Error("active crab count")
 	}
-	if s := section("Crab King"); !strings.Contains(s, "@karen") || !strings.Contains(s, "2 followers") {
-		t.Error("Crab King should be karen with 2 followers")
+	if s := section("Krab King"); !strings.Contains(s, "@karen") || !strings.Contains(s, "2 followers") {
+		t.Error("Krab King should be karen with 2 followers")
 	}
-	if s := section("Baby Crab"); !strings.Contains(s, "@gary") {
-		t.Error("Baby Crab should be the newest crab, gary")
+	if s := section("Baby Krab"); !strings.Contains(s, "@gary") {
+		t.Error("Baby Krab should be the newest crab, gary")
 	}
 	if s := section("Best Molt"); !strings.Contains(s, "</a> is the answer") {
 		t.Error("Best Molt should be karen's liked molt")
@@ -2053,7 +2053,7 @@ func TestStats(t *testing.T) {
 	if s := section("Talked About"); !strings.Contains(s, "Who wants to talk") {
 		t.Error("Talked About should be sandy's molt with two replies")
 	}
-	if s := section("Trendy"); !strings.Contains(s, `href="/crabtag/science">%science</a>`) {
+	if s := section("Trendy"); !strings.Contains(s, `href="/krabtag/science">%science</a>`) {
 		t.Error("Trendy should be the science crabtag")
 	}
 
@@ -2100,36 +2100,72 @@ func TestVerifiedBadge(t *testing.T) {
 	const badge = `aria-label="Verified"`
 
 	h.login("mod@krabber.test", "secret-mod")
-	tok := h.csrf("/crabmin/crabs/karen")
-	if _, body, _ := h.get("/crabmin/crabs/karen"); strings.Contains(body, `value="verify"`) {
+	tok := h.csrf("/krabmin/krabs/karen")
+	if _, body, _ := h.get("/krabmin/krabs/karen"); strings.Contains(body, `value="verify"`) {
 		t.Error("moderators shouldn't get the Verify button")
 	}
-	h.post("/crabmin/crabs/"+karen.ID, url.Values{"csrf_token": {tok}, "action": {"verify"}})
+	h.post("/krabmin/krabs/"+karen.ID, url.Values{"csrf_token": {tok}, "action": {"verify"}})
 	if crab("karen").Verified {
 		t.Fatal("a moderator verified a crab")
 	}
 
 	h.client = h.newClient()
 	h.login("boss@krabber.test", "secret-boss")
-	tok = h.csrf("/crabmin/crabs/karen")
-	if status, _, _ := h.post("/crabmin/crabs/"+karen.ID, url.Values{"csrf_token": {tok}, "action": {"verify"}}); status != http.StatusSeeOther {
+	tok = h.csrf("/krabmin/krabs/karen")
+	if status, _, _ := h.post("/krabmin/krabs/"+karen.ID, url.Values{"csrf_token": {tok}, "action": {"verify"}}); status != http.StatusSeeOther {
 		t.Fatalf("verify: %d", status)
 	}
 	if !crab("karen").Verified {
 		t.Fatal("not verified")
 	}
-	for _, path := range []string{"/crabs/karen", "/sea", "/crabs"} {
+	for _, path := range []string{"/krabs/karen", "/sea", "/krabs"} {
 		if _, body, _ := h.get(path); !strings.Contains(body, badge) {
 			t.Errorf("%s has no badge", path)
 		}
 	}
-	_, body, _ := h.get("/crabmin/log")
+	_, body, _ := h.get("/krabmin/log")
 	if !strings.Contains(body, "tried to verify") || !strings.Contains(body, "verified") {
 		t.Error("verification attempts and actions should be logged")
 	}
-	h.post("/crabmin/crabs/"+karen.ID, url.Values{"csrf_token": {tok}, "action": {"unverify"}})
-	if _, body, _ := h.get("/crabs/karen"); strings.Contains(body, badge) {
+	h.post("/krabmin/krabs/"+karen.ID, url.Values{"csrf_token": {tok}, "action": {"unverify"}})
+	if _, body, _ := h.get("/krabs/karen"); strings.Contains(body, badge) {
 		t.Error("badge still on the profile after unverify")
+	}
+}
+
+func TestLegacyCrabURLsRedirect(t *testing.T) {
+	h := newHarness(t)
+	noFollow := h.newClient()
+	noFollow.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	for old, want := range map[string]string{
+		"/crabs/karen/likes":           "/krabs/karen/likes",
+		"/crabs":                       "/krabs",
+		"/crab/activate?token=ABC":     "/krab/activate?token=ABC",
+		"/crabtag/krabbypatty":         "/krabtag/krabbypatty",
+		"/crabmin/crabs/karen":         "/krabmin/krabs/karen",
+		"/crabmin":                     "/krabmin",
+		"/crab/reset?token=X&next=%2F": "/krab/reset?token=X&next=%2F",
+	} {
+		res, err := noFollow.Get(h.srv.URL + old)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = res.Body.Close()
+		if res.StatusCode != http.StatusPermanentRedirect || res.Header.Get("Location") != want {
+			t.Errorf("%s: %d → %q, want 308 → %q", old, res.StatusCode, res.Header.Get("Location"), want)
+		}
+	}
+	req, _ := http.NewRequest(http.MethodPost, h.srv.URL+"/crab/login", strings.NewReader("x=1"))
+	res, err := noFollow.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = res.Body.Close()
+	if res.StatusCode != http.StatusPermanentRedirect || res.Header.Get("Location") != "/krab/login" {
+		t.Errorf("POST /crab/login: %d %q", res.StatusCode, res.Header.Get("Location"))
+	}
+	if status, _, _ := h.get("/crabsalad"); status != http.StatusNotFound {
+		t.Errorf("/crabsalad isn't an old URL: %d", status)
 	}
 }
 

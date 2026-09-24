@@ -95,7 +95,7 @@ func (app *App) endSession(r *http.Request) {
 func (app *App) requireAuthentication(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if currentCrab(r) == nil {
-			redirect(w, r, "/crab/login")
+			redirect(w, r, "/krab/login")
 			return
 		}
 		next(w, r)

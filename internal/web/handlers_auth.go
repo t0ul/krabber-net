@@ -122,7 +122,7 @@ func (app *App) signupPost(w http.ResponseWriter, r *http.Request) {
 		flash = "Your account is ready, but we couldn't send the activation email just now. Use \"resend\" below in a few minutes."
 	}
 	app.sessions.Put(r.Context(), sessionFlash, flash)
-	http.Redirect(w, r, "/crab/activate", http.StatusSeeOther)
+	http.Redirect(w, r, "/krab/activate", http.StatusSeeOther)
 }
 
 func (app *App) sendActivation(r *http.Request, c *store.Crab) error {
@@ -130,7 +130,7 @@ func (app *App) sendActivation(r *http.Request, c *store.Crab) error {
 	if err != nil {
 		return err
 	}
-	page := app.cfg.BaseURL.JoinPath("/crab/activate")
+	page := app.cfg.BaseURL.JoinPath("/krab/activate")
 	link := *page
 	link.RawQuery = url.Values{"token": {token}}.Encode()
 	return app.mailer.Send(r.Context(), c.Email, "activation", map[string]string{
@@ -177,7 +177,7 @@ func (app *App) activatePost(w http.ResponseWriter, r *http.Request) {
 		app.dir.putCrab(*c)
 	}
 	app.sessions.Put(r.Context(), sessionFlash, "You're activated! Log in to start molting.")
-	http.Redirect(w, r, "/crab/login", http.StatusSeeOther)
+	http.Redirect(w, r, "/krab/login", http.StatusSeeOther)
 }
 
 // resendPost always answers the same way so it can't be used to discover
@@ -202,7 +202,7 @@ func (app *App) resendPost(w http.ResponseWriter, r *http.Request) {
 	}
 	if !ipOK || !human || !validator.Matches(email, validator.EmailRX) {
 		app.sessions.Put(r.Context(), sessionFlash, done)
-		http.Redirect(w, r, "/crab/activate", http.StatusSeeOther)
+		http.Redirect(w, r, "/krab/activate", http.StatusSeeOther)
 		return
 	}
 
@@ -225,7 +225,7 @@ func (app *App) resendPost(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	app.sessions.Put(r.Context(), sessionFlash, done)
-	http.Redirect(w, r, "/crab/activate", http.StatusSeeOther)
+	http.Redirect(w, r, "/krab/activate", http.StatusSeeOther)
 }
 
 func (app *App) loginPage(w http.ResponseWriter, r *http.Request) {

@@ -12,17 +12,17 @@
     <div class="panel d-none d-xl-block" id="recommended-crabs">
         <div class="panel-title"><span>Who to follow</span></div>
         {{ range . }}{{ template "crab-row" (dict "C" .Crab "D" $d "Following" .Following) }}{{ end }}
-        <div class="px-3 py-2"><a href="/crabs">See all crabs</a></div>
+        <div class="px-3 py-2"><a href="/krabs">See all krabs</a></div>
     </div>
     {{ end }}
 
     <div class="panel" id="trending">
         <div class="panel-title"><span>Trending</span></div>
         {{ range .Sidebar.Trending }}
-        <a href="/crabtag/{{ .Name }}">
+        <a href="/krabtag/{{ .Name }}">
             <div class="trending-tag">
                 <span class="text-primary">%{{ .Name }}</span>
-                <small class="text-muted">Used by {{ .Crabs }} crab{{ if ne .Crabs 1 }}s{{ end }} recently.</small>
+                <small class="text-muted">Used by {{ .Crabs }} krab{{ if ne .Crabs 1 }}s{{ end }} recently.</small>
             </div>
         </a>
         {{ else }}

@@ -25,9 +25,9 @@
                     <div class="kb-menu-items">
                         {{ template "block-button" (dict "ID" $p.ID "Name" $p.UserName "D" .) }}
                         {{ if .IsModerator }}
-                        <a class="kb-menu-item" href="/crabmin/crabs/{{ $p.UserName }}">
+                        <a class="kb-menu-item" href="/krabmin/krabs/{{ $p.UserName }}">
                             <svg width="19" height="19"><use href="{{ asset "img/sprites.svg" }}#lifebuoy"></use></svg>
-                            Open in Crabmin
+                            Open in Krabmin
                         </a>
                         {{ end }}
                     </div>
@@ -53,8 +53,8 @@
         </div>
         <div class="mt-3 kb-profile-stats">
             <span><strong>{{ $p.MoltCount }}</strong> <span class="text-muted">molts</span></span>
-            <a class="ml-3 text-light" href="/crabs/{{ $p.UserName }}/following"><strong>{{ $p.FollowingCount }}</strong> <span class="text-muted">following</span></a>
-            <a class="ml-3 text-light" href="/crabs/{{ $p.UserName }}/followers"><strong>{{ $p.FollowerCount }}</strong> <span class="text-muted">followers</span></a>
+            <a class="ml-3 text-light" href="/krabs/{{ $p.UserName }}/following"><strong>{{ $p.FollowingCount }}</strong> <span class="text-muted">following</span></a>
+            <a class="ml-3 text-light" href="/krabs/{{ $p.UserName }}/followers"><strong>{{ $p.FollowerCount }}</strong> <span class="text-muted">followers</span></a>
         </div>
         <details class="kb-full-bio mt-3">
             <summary>
@@ -64,7 +64,7 @@
             <h5 class="mt-2">Fun facts</h5>
             <div class="rounded neue-card p-3">
                 {{ with $p.FunFacts }}{{ if .Empty }}
-                <p class="text-muted mb-0">This crab hasn't filled out their bio 😦</p>
+                <p class="text-muted mb-0">This krab hasn't filled out their bio 😦</p>
                 {{ else }}
                 <table class="kb-fun-facts">
                     {{ with .Age }}<tr><th>Age</th><td>{{ . }}</td></tr>{{ end }}
@@ -81,9 +81,9 @@
     </div>
     {{ if not .IsBlocking }}
     <nav class="kb-tabs d-flex border-bottom border-dark" aria-label="Profile">
-        {{ template "profile-tab" (dict "Href" (print "/crabs/" $p.UserName) "Label" "Molts" "Active" (eq .Tab "molts")) }}
-        {{ template "profile-tab" (dict "Href" (print "/crabs/" $p.UserName "/replies") "Label" "Replies" "Active" (eq .Tab "replies")) }}
-        {{ template "profile-tab" (dict "Href" (print "/crabs/" $p.UserName "/likes") "Label" "Likes" "Active" (eq .Tab "likes")) }}
+        {{ template "profile-tab" (dict "Href" (print "/krabs/" $p.UserName) "Label" "Molts" "Active" (eq .Tab "molts")) }}
+        {{ template "profile-tab" (dict "Href" (print "/krabs/" $p.UserName "/replies") "Label" "Replies" "Active" (eq .Tab "replies")) }}
+        {{ template "profile-tab" (dict "Href" (print "/krabs/" $p.UserName "/likes") "Label" "Likes" "Active" (eq .Tab "likes")) }}
     </nav>
     {{ end }}
     {{ if and (eq $p.ID .CrabID) (eq .Tab "molts") }}{{ template "compose" . }}{{ end }}

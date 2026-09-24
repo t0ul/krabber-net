@@ -154,7 +154,7 @@ func moltReturnPath(r *http.Request) string {
 	case "/trench", "/sea":
 		return ref.Path
 	}
-	if strings.HasPrefix(ref.Path, "/crabs/") {
+	if strings.HasPrefix(ref.Path, "/krabs/") {
 		return ref.Path
 	}
 	return "/trench"

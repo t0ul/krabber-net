@@ -73,7 +73,7 @@ func (app *App) sea(w http.ResponseWriter, r *http.Request) {
 
 func (app *App) trench(w http.ResponseWriter, r *http.Request) {
 	p, err := app.store.TrenchPage(r.Context(), currentCrab(r).ID, afterParam(r), pageSize)
-	app.renderFeed(w, r, "trench.html", p, err, "Your trench is empty. Molt something, or follow some crabs.")
+	app.renderFeed(w, r, "trench.html", p, err, "Your trench is empty. Molt something, or follow some krabs.")
 }
 
 // notifications lists the crab's notifications and clears the unread badge.
@@ -221,12 +221,12 @@ func (app *App) followList(w http.ResponseWriter, r *http.Request, followers boo
 		data.CrabRows = append(data.CrabRows, crabRow{Crab: c, Following: followed[id]})
 	}
 	data.CrabRows = app.visibleCrabs(r, data.CrabRows)
-	data.ListBack = "/crabs/" + p.UserName
+	data.ListBack = "/krabs/" + p.UserName
 	if followers {
-		data.ListTitle = "Crabs following @" + p.UserName
+		data.ListTitle = "Krabs following @" + p.UserName
 		data.EmptyMessage = "No followers yet."
 	} else {
-		data.ListTitle = "Crabs @" + p.UserName + " follows"
+		data.ListTitle = "Krabs @" + p.UserName + " follows"
 		data.EmptyMessage = "Not following anyone yet."
 	}
 	app.render(w, r, http.StatusOK, "crabs.html", data)
@@ -247,8 +247,8 @@ func (app *App) allCrabs(w http.ResponseWriter, r *http.Request) {
 	sort.SliceStable(data.CrabRows, func(i, j int) bool {
 		return data.CrabRows[i].Crab.FollowerCount > data.CrabRows[j].Crab.FollowerCount
 	})
-	data.ListTitle = "All crabs"
-	data.EmptyMessage = "No other crabs yet. Invite a friend!"
+	data.ListTitle = "All krabs"
+	data.EmptyMessage = "No other krabs yet. Invite a friend!"
 	app.render(w, r, http.StatusOK, "crabs.html", data)
 }
 
@@ -305,7 +305,7 @@ func (app *App) setFollow(w http.ResponseWriter, r *http.Request, follow bool) {
 	}
 	app.dir.invalidate()
 	if !isHTMX(r) {
-		http.Redirect(w, r, "/crabs/"+followee.UserName, http.StatusSeeOther)
+		http.Redirect(w, r, "/krabs/"+followee.UserName, http.StatusSeeOther)
 		return
 	}
 	data := app.newTemplateData(r)
@@ -363,8 +363,8 @@ func (app *App) privacyPage(w http.ResponseWriter, r *http.Request) {
 // robotsTxt keeps crawlers to public profiles and molts; pages behind sign-in
 // would only redirect them to the login form.
 const robotsTxt = `User-agent: *
-Disallow: /crab/
-Disallow: /crabmin
+Disallow: /krab/
+Disallow: /krabmin
 Disallow: /settings
 Disallow: /notifications
 Disallow: /trench

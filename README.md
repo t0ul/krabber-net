@@ -9,12 +9,12 @@ See [PLAN.md](PLAN.md) for the architecture, security design and roadmap.
 Needs Go (the toolchain in `go.mod` downloads itself) and Docker.
 
 ```bash
-make dev    # DynamoDB Local + table + sample crabs, then the site on http://localhost:5050
+make dev    # DynamoDB Local + table + sample krabs, then the site on http://localhost:5050
 ```
 
 Sign in as `mrkrabs@krabber.test`, `spongebob@krabber.test` or `plankton@krabber.test`
 with password `crabcakes123`. Emails (activation links) print to the server log.
-`spongebob` is an admin and `mrkrabs` a moderator, so both see Crabmin (`/crabmin`).
+`spongebob` is an admin and `mrkrabs` a moderator, so both see Krabmin (`/krabmin`).
 
 Roles live on the account and can only be granted with `crabctl`, never from the site.
 For example, this makes you the admin in prod:
@@ -23,7 +23,7 @@ For example, this makes you the admin in prod:
 AWS_PROFILE=krabber-admin TABLE_NAME=krabber-prod go run ./cmd/crabctl role <username> admin
 ```
 
-Moderators can then be added or removed by an admin in Crabmin.
+Moderators can then be added or removed by an admin in Krabmin.
 
 ## Test
 
@@ -41,7 +41,7 @@ Tests that need DynamoDB Local are skipped when `KRABBER_TEST_DYNAMO_ENDPOINT` i
 | Path | What |
 |---|---|
 | `cmd/web` | The website (Beanstalk runs this) |
-| `cmd/devseed` | Dev only: create the table in DynamoDB Local and add sample crabs |
+| `cmd/devseed` | Dev only: create the table in DynamoDB Local and add sample krabs |
 | `cmd/crabctl` | Operator commands run from your machine (set a crab's role) |
 | `internal/store` | All DynamoDB access; every key format is in `keys.go` |
 | `internal/web` | Routes, handlers, templates, security middleware |

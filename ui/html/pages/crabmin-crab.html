@@ -1,10 +1,10 @@
-{{define "title"}}Crabmin · @{{ .Profile.UserName }}{{end}}
+{{define "title"}}Krabmin · @{{ .Profile.UserName }}{{end}}
 
 {{define "page"}}
 {{ template "shell-top" . }}
     {{ $c := .Profile }}
-    {{ template "heading" (printf "Crabmin · @%s" $c.UserName) }}
-    {{ template "crabmin-tabs" . }}
+    {{ template "heading" (printf "Krabmin · @%s" $c.UserName) }}
+    {{ template "krabmin-tabs" . }}
     <div class="px-3 py-3 border-bottom border-dark">
         <div class="d-flex align-items-center">
             {{ template "avatar" $c.Avatar }}
@@ -15,7 +15,7 @@
                     {{ with $c.Role }} · <span class="kb-role">{{ . }}</span>{{ end }}
                 </div>
             </div>
-            {{ if not (or $c.Banned $c.Deleted) }}<a class="ml-auto small" href="/crabs/{{ $c.UserName }}">Public profile</a>{{ end }}
+            {{ if not (or $c.Banned $c.Deleted) }}<a class="ml-auto small" href="/krabs/{{ $c.UserName }}">Public profile</a>{{ end }}
         </div>
         {{ if $c.Deleted }}
         <div class="alert alert-secondary mt-3 mb-0 small">Deleted by its owner. The username stays reserved.</div>
@@ -43,7 +43,7 @@
     </div>
 
     {{ if .CanModerate }}
-    {{ $action := printf "/crabmin/crabs/%s" $c.ID }}
+    {{ $action := printf "/krabmin/krabs/%s" $c.ID }}
     <div class="px-3 py-3 border-bottom border-dark kb-crabmin-actions">
         {{ if $c.Banned }}
         <form method="POST" action="{{ $action }}">
@@ -97,7 +97,7 @@
 
     <div class="px-3 pt-3 pb-1"><h2 class="h6 font-weight-bold">Recent molts and replies</h2></div>
     {{ range .Molts }}
-    <a class="d-block border-bottom border-dark px-3 py-2 small text-light" href="/crabmin/molts/{{ if .Remolt }}{{ .RemoltOf }}{{ else }}{{ .ID }}{{ end }}">
+    <a class="d-block border-bottom border-dark px-3 py-2 small text-light" href="/krabmin/molts/{{ if .Remolt }}{{ .RemoltOf }}{{ else }}{{ .ID }}{{ end }}">
         <span class="text-muted">{{ template "time" .CreatedAt }}{{ if .Remolt }} · remolted a molt by @{{ .Author }}{{ else if .ReplyTo }} · reply to @{{ .ReplyToAuthor }}{{ else if .QuoteOf }} · quote{{ end }}</span>
         {{ if not .Remolt }}<div class="kb-bio">{{ .Content }}</div>{{ end }}
     </a>

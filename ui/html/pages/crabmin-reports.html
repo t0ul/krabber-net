@@ -1,22 +1,22 @@
-{{define "title"}}Crabmin · reports{{end}}
+{{define "title"}}Krabmin · reports{{end}}
 
 {{define "page"}}
 {{ template "shell-top" . }}
-    {{ template "heading" "Crabmin · reports" }}
-    {{ template "crabmin-tabs" . }}
+    {{ template "heading" "Krabmin · reports" }}
+    {{ template "krabmin-tabs" . }}
     {{ $gone := .Gone }}
     {{ range .Reports }}
     <div class="border-bottom border-dark px-3 py-3 small">
         <div class="d-flex align-items-center">
-            <a href="/crabmin/crabs/{{ .Author }}" class="font-weight-bold">@{{ .Author }}</a>
+            <a href="/krabmin/krabs/{{ .Author }}" class="font-weight-bold">@{{ .Author }}</a>
             {{ if index $gone .AuthorID }}<span class="ml-2 badge badge-secondary">banned or deleted</span>{{ end }}
             <span class="ml-auto text-muted">{{ .OpenReports }} report{{ if ne .OpenReports 1 }}s{{ end }} · last {{ template "time" .LastAt }}</span>
         </div>
         <div class="kb-bio my-2">{{ .Snippet }}</div>
         <div class="d-flex align-items-center">
             <span class="text-muted">{{ range $i, $r := .Reasons }}{{ if $i }}, {{ end }}{{ reportLabel $r }}{{ end }}</span>
-            <a class="ml-auto mr-3" href="/crabmin/molts/{{ .MoltID }}">Review</a>
-            <form method="POST" action="/crabmin/molts/{{ .MoltID }}">
+            <a class="ml-auto mr-3" href="/krabmin/molts/{{ .MoltID }}">Review</a>
+            <form method="POST" action="/krabmin/molts/{{ .MoltID }}">
                 <input type='hidden' name='csrf_token' value='{{ $.CSRFToken }}'>
                 <button type="submit" name="action" value="dismiss" class="btn btn-sm btn-outline-light rounded-pill">Dismiss</button>
             </form>

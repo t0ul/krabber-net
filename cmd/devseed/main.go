@@ -68,7 +68,7 @@ func main() {
 		}
 		fmt.Printf("crab %-10s role=%s\n", c.UserName, role)
 	}
-	fmt.Printf("table %s ready; sign in as any crab with password crabcakes123\n", table)
+	fmt.Printf("table %s ready; sign in as any krab with password crabcakes123\n", table)
 }
 
 func mustCrabs(ctx context.Context, s *store.Store, hash []byte, names ...string) []*store.Crab {
@@ -149,7 +149,7 @@ func seedMolts(ctx context.Context, s *store.Store, crabs []*store.Crab) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	if _, err := s.Reply(ctx, crabs[1], barnacles, "Barnacles are just crabs who love their rocks!"); err != nil {
+	if _, err := s.Reply(ctx, crabs[1], barnacles, "Barnacles are just krabs who love their rocks!"); err != nil {
 		log.Fatal(err)
 	}
 	quote, err := s.Quote(ctx, crabs[2], ready, "He has been saying this since six in the morning.")

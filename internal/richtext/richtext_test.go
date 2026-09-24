@@ -25,7 +25,7 @@ func TestHTML(t *testing.T) {
 		return "", false
 	}
 	got := string(HTML("<b>hi</b> @spongebob & @nobody %Tag!", known))
-	want := `&lt;b&gt;hi&lt;/b&gt; <a href="/crabs/SpongeBob" class="mention zindex-front">@spongebob</a> &amp; @nobody <a href="/crabtag/tag" class="crabtag zindex-front">%Tag</a>!`
+	want := `&lt;b&gt;hi&lt;/b&gt; <a href="/krabs/SpongeBob" class="mention zindex-front">@spongebob</a> &amp; @nobody <a href="/krabtag/tag" class="crabtag zindex-front">%Tag</a>!`
 	if got != want {
 		t.Errorf("HTML =\n%s\nwant\n%s", got, want)
 	}
@@ -36,8 +36,8 @@ func TestHTML(t *testing.T) {
 
 func TestLinks(t *testing.T) {
 	none := func(string) (string, bool) { return "", false }
-	got := string(HTML(`see https://krabber.net/crabs/bob?a=1&b="2". and (https://en.wikipedia.org/wiki/Crab_(disambiguation)) ok`, none))
-	want := `see <a href="https://krabber.net/crabs/bob?a=1&amp;b=" class="mention zindex-front" target="_blank" rel="nofollow ugc noopener noreferrer">krabber.net/crabs/bob?a=1&amp;b=</a>&#34;2&#34;. and (https://en.wikipedia.org/wiki/Crab_(disambiguation)) ok`
+	got := string(HTML(`see https://krabber.net/krabs/bob?a=1&b="2". and (https://en.wikipedia.org/wiki/Crab_(disambiguation)) ok`, none))
+	want := `see <a href="https://krabber.net/krabs/bob?a=1&amp;b=" class="mention zindex-front" target="_blank" rel="nofollow ugc noopener noreferrer">krabber.net/krabs/bob?a=1&amp;b=</a>&#34;2&#34;. and (https://en.wikipedia.org/wiki/Crab_(disambiguation)) ok`
 	if got != want {
 		t.Errorf("HTML =\n%s\nwant\n%s", got, want)
 	}

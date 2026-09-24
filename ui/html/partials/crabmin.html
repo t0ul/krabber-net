@@ -1,8 +1,8 @@
-{{define "crabmin-tabs"}}
+{{define "krabmin-tabs"}}
 <div class="d-flex border-bottom border-dark px-3 py-2 small kb-crabmin-tabs">
-    <a href="/crabmin" class="mr-3{{ if eq .CurrentPath "/crabmin" }} font-weight-bold{{ end }}">Look up</a>
-    <a href="/crabmin/reports" class="mr-3{{ if eq .CurrentPath "/crabmin/reports" }} font-weight-bold{{ end }}">Reports</a>
-    <a href="/crabmin/log" class="mr-3{{ if eq .CurrentPath "/crabmin/log" }} font-weight-bold{{ end }}">Log</a>
+    <a href="/krabmin" class="mr-3{{ if eq .CurrentPath "/krabmin" }} font-weight-bold{{ end }}">Look up</a>
+    <a href="/krabmin/reports" class="mr-3{{ if eq .CurrentPath "/krabmin/reports" }} font-weight-bold{{ end }}">Reports</a>
+    <a href="/krabmin/log" class="mr-3{{ if eq .CurrentPath "/krabmin/log" }} font-weight-bold{{ end }}">Log</a>
     <span class="ml-auto text-muted">{{ if .IsAdmin }}Admin{{ else }}Moderator{{ end }}</span>
 </div>
 {{end}}
@@ -13,8 +13,8 @@
     <div class="d-flex">
         <strong class="mr-1">@{{ .Moderator }}</strong>
         <span class="{{ if hasPrefix .Action "attempted_" }}text-danger{{ else }}text-muted{{ end }}">{{ modActionLabel .Action }}</span>
-        {{ with .Crab }}<a class="ml-1" href="/crabmin/crabs/{{ . }}">@{{ . }}</a>{{ end }}
-        {{ with .MoltID }}<a class="ml-1" href="/crabmin/molts/{{ . }}">molt</a>{{ end }}
+        {{ with .Crab }}<a class="ml-1" href="/krabmin/krabs/{{ . }}">@{{ . }}</a>{{ end }}
+        {{ with .MoltID }}<a class="ml-1" href="/krabmin/molts/{{ . }}">molt</a>{{ end }}
         <span class="ml-auto text-muted">{{ template "time" .CreatedAt }}</span>
     </div>
     {{ with .Note }}<div class="text-muted kb-bio">{{ . }}</div>{{ end }}

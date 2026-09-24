@@ -7,7 +7,7 @@
     <body class="bg-dark text-light">
     {{ with .Flash }}<div class="alert alert-info m-4 flash" role="status">{{ . }}</div>{{ end }}
         <img class="logo m-4" src="/static/img/krabber_logo.svg" alt="Krabber Logo" width="43" height="43">
-        <form class="w-75 m-4" action='/crab/activate' method='POST' novalidate>
+        <form class="w-75 m-4" action='/krab/activate' method='POST' novalidate>
             <h1>Activate your account</h1>
             <p class="text-muted">Click the link in your email, or paste the token from it here.</p>
             <input type='hidden' name='csrf_token' value='{{.CSRFToken}}'>
@@ -21,7 +21,7 @@
             <button type="submit" class="btn btn-primary rounded-pill">Activate</button>
         </form>
 
-        <form class="w-75 m-4" action='/crab/activate/resend' method='POST' novalidate>
+        <form class="w-75 m-4" action='/krab/activate/resend' method='POST' novalidate>
             <h2 class="h5 mt-5">Didn't get the email?</h2>
             <input type='hidden' name='csrf_token' value='{{.CSRFToken}}'>
             <div class="form-group cool-input">
@@ -33,7 +33,7 @@
                 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
             {{ end }}
             <button type="submit" class="btn btn-secondary rounded-pill">Send a new link</button>
-            <p class="mt-3"><a href="/crab/login">Back to log in</a></p>
+            <p class="mt-3"><a href="/krab/login">Back to log in</a></p>
         </form>
     </body>
 </html>

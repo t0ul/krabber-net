@@ -1,23 +1,23 @@
-{{define "title"}}Crabmin · molt{{end}}
+{{define "title"}}Krabmin · molt{{end}}
 
 {{define "page"}}
 {{ template "shell-top" . }}
     {{ $m := .Molt }}
-    {{ template "heading" "Crabmin · molt" }}
-    {{ template "crabmin-tabs" . }}
+    {{ template "heading" "Krabmin · molt" }}
+    {{ template "krabmin-tabs" . }}
     <div class="px-3 py-3 border-bottom border-dark">
         <div class="d-flex small">
-            <a href="/crabmin/crabs/{{ $m.Author }}" class="font-weight-bold">@{{ $m.Author }}</a>
+            <a href="/krabmin/krabs/{{ $m.Author }}" class="font-weight-bold">@{{ $m.Author }}</a>
             <span class="ml-2 text-muted">{{ template "time" $m.CreatedAt }}</span>
             {{ if $m.NSFW }}<span class="ml-2 nsfw-badge">NSFW</span>{{ end }}
             {{ if not $m.Removed }}<a class="ml-auto" href="/molt/view/{{ $m.ID }}">Public page</a>{{ end }}
         </div>
         {{ if $m.Removed }}<div class="alert alert-danger mt-3 mb-0 small">Removed by a moderator. Only moderators can see it.</div>{{ end }}
         <p class="mt-3 mb-2 kb-bio">{{ $m.Content }}</p>
-        <div class="small text-muted">{{ $m.LikeCount }} likes · {{ $m.RemoltCount }} remolts · {{ $m.ReplyCount }} replies · {{ $m.QuoteCount }} quotes{{ with $m.QuoteOf }} · <a href="/crabmin/molts/{{ . }}">quote of a molt</a>{{ end }}{{ with $m.ReplyTo }} · <a href="/crabmin/molts/{{ . }}">reply to @{{ $m.ReplyToAuthor }}</a>{{ end }} · ID {{ $m.ID }}</div>
+        <div class="small text-muted">{{ $m.LikeCount }} likes · {{ $m.RemoltCount }} remolts · {{ $m.ReplyCount }} replies · {{ $m.QuoteCount }} quotes{{ with $m.QuoteOf }} · <a href="/krabmin/molts/{{ . }}">quote of a molt</a>{{ end }}{{ with $m.ReplyTo }} · <a href="/krabmin/molts/{{ . }}">reply to @{{ $m.ReplyToAuthor }}</a>{{ end }} · ID {{ $m.ID }}</div>
     </div>
     {{ if .CanModerate }}
-    <form class="px-3 py-3 border-bottom border-dark" method="POST" action="/crabmin/molts/{{ $m.ID }}">
+    <form class="px-3 py-3 border-bottom border-dark" method="POST" action="/krabmin/molts/{{ $m.ID }}">
         <input type='hidden' name='csrf_token' value='{{ .CSRFToken }}'>
         {{ if $m.Removed }}
         <button type="submit" name="action" value="restore" class="btn btn-sm btn-outline-light rounded-pill">Restore molt</button>
@@ -45,7 +45,7 @@
     {{ range .ReportRows }}
     <div class="border-bottom border-dark px-3 py-2 small">
         <div class="d-flex">
-            <a href="/crabmin/crabs/{{ .Reporter }}" class="mr-2">@{{ .Reporter }}</a>
+            <a href="/krabmin/krabs/{{ .Reporter }}" class="mr-2">@{{ .Reporter }}</a>
             <span class="text-muted">{{ reportLabel .Reason }}</span>
             <span class="ml-auto text-muted">{{ template "time" .CreatedAt }}</span>
         </div>

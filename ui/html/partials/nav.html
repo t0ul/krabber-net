@@ -26,7 +26,7 @@
         <svg class="btn-icon" width="28" height="28"><use href="{{ asset "img/sprites.svg" }}#anchor"></use></svg>
         <strong class="d-none d-lg-inline-block ml-2">Bookmarks</strong>
     </a>
-    {{ $me := printf "/crabs/%s" .CrabName }}
+    {{ $me := printf "/krabs/%s" .CrabName }}
     <a href="{{ $me }}" class="btn rounded-pill mx-auto mx-lg-0 mt-2 nav-link-btn"{{ if or (eq $p $me) (hasPrefix $p (print $me "/")) }} id="nav-active" aria-current="page"{{ end }}>
         <img class="rounded-circle profile-picture kb-nav-avatar" src="{{ avatarSrc .Avatar }}" width="28" height="28" alt="">
         <strong class="d-none d-lg-inline-block ml-2">Profile</strong>
@@ -40,16 +40,16 @@
         <strong class="d-none d-lg-inline-block ml-2">Stats</strong>
     </a>
     {{ if .IsModerator }}
-    <a href="/crabmin" class="btn rounded-pill mx-auto mx-lg-0 mt-2 extra-navs"{{ if hasPrefix $p "/crabmin" }} id="nav-active" aria-current="page"{{ end }}>
+    <a href="/krabmin" class="btn rounded-pill mx-auto mx-lg-0 mt-2 extra-navs"{{ if hasPrefix $p "/krabmin" }} id="nav-active" aria-current="page"{{ end }}>
         <svg class="btn-icon text-muted" width="28" height="28"><use href="{{ asset "img/sprites.svg" }}#lifebuoy"></use></svg>
-        <strong class="d-none d-lg-inline-block ml-2">Crabmin</strong>
+        <strong class="d-none d-lg-inline-block ml-2">Krabmin</strong>
     </a>
     {{ end }}
     <a href="/settings" class="btn rounded-pill mx-auto mx-lg-0 mt-2 extra-navs"{{ if eq $p "/settings" }} id="nav-active" aria-current="page"{{ end }}>
         <svg class="btn-icon text-muted" width="28" height="28"><use href="/static/img/sprites.svg?version=1704178675#{{ if eq $p "/settings" }}cog-f{{ else }}cog{{ end }}"></use></svg>
         <strong class="d-none d-lg-inline-block ml-2">Settings</strong>
     </a>
-    <form action="/crab/logout" method="POST" data-confirm="Are you sure you want to log out?">
+    <form action="/krab/logout" method="POST" data-confirm="Are you sure you want to log out?">
         <input type='hidden' name='csrf_token' value='{{ .CSRFToken }}'>
         <button type="submit" class="btn rounded-pill mx-auto mx-lg-0 mt-2 extra-navs">
             <svg class="btn-icon text-muted" width="28" height="28"><use href="/static/img/sprites.svg?version=1704178675#log-out"></use></svg>
@@ -57,8 +57,8 @@
         </button>
     </form>
     {{ else }}
-    <a href="/crab/login" class="btn btn-primary rounded-pill mx-auto mx-lg-0 mt-4 d-block"><strong>Log in</strong></a>
-    <a href="/crab/signup" class="btn btn-secondary rounded-pill mx-auto mx-lg-0 mt-2 d-block"><strong>Sign up</strong></a>
+    <a href="/krab/login" class="btn btn-primary rounded-pill mx-auto mx-lg-0 mt-4 d-block"><strong>Log in</strong></a>
+    <a href="/krab/signup" class="btn btn-secondary rounded-pill mx-auto mx-lg-0 mt-2 d-block"><strong>Sign up</strong></a>
     {{ end }}
 </div>
 {{end}}

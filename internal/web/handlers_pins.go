@@ -42,5 +42,5 @@ func (app *App) backToProfile(w http.ResponseWriter, r *http.Request, c *store.C
 		noContent(w)
 		return
 	}
-	http.Redirect(w, r, "/crabs/"+c.UserName, http.StatusSeeOther)
+	http.Redirect(w, r, "/krabs/"+c.UserName, http.StatusSeeOther)
 }

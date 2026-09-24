@@ -9,9 +9,9 @@
     {{ with .Flash }}<div class="alert alert-info m-4 flash" role="status">{{ . }}</div>{{ end }}
     <img class="logo"
      src="/static/img/krabber_logo.svg" alt="Krabber Logo" width="43" height="43">
-    <form class="w-75 m-4" method="POST" action="/crab/login" novalidate>
+    <form class="w-75 m-4" method="POST" action="/krab/login" novalidate>
         <h1>Welcome back to the Krabber!</h1>
-        <p class="text-muted mb-5">First time? <a href="/crab/signup">Create an account.</a></p>
+        <p class="text-muted mb-5">First time? <a href="/krab/signup">Create an account.</a></p>
         <input type='hidden' name='csrf_token' value='{{.CSRFToken}}'>
          {{range .Form.NonFieldErrors}}
             <div class='error'>{{.}}</div>
@@ -33,10 +33,10 @@
             <button type="submit" class="login-btn btn btn-primary rounded-pill mr-4">
                 Let me in!
             </button>
-            <a class="inline-block mr-4" href="/crab/forgot">
+            <a class="inline-block mr-4" href="/krab/forgot">
                 Forgot password?
             </a>
-            <a class="inline-block" href="/crab/activate">
+            <a class="inline-block" href="/krab/activate">
                 Need a new activation email?
             </a>
         </div>

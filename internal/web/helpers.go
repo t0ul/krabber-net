@@ -32,7 +32,7 @@ type errorPage struct {
 
 var errorPages = map[int]errorPage{
 	http.StatusNotFound: {http.StatusNotFound, "This page sank to the bottom of the sea",
-		"The crab, molt or page you're looking for doesn't exist, was deleted, or is hidden from you."},
+		"The krab, molt or page you're looking for doesn't exist, was deleted, or is hidden from you."},
 	http.StatusInternalServerError: {http.StatusInternalServerError, "Something went wrong on our side of the reef",
 		"We've been told about it. Please try again in a moment."},
 }

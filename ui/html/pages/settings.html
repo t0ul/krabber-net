@@ -20,7 +20,7 @@
         <div class="form-group">
             <label for="bio">Bio</label>
             {{ with $p.FieldErrors.bio }}<div class="error small">{{ . }}</div>{{ end }}
-            <textarea name="bio" id="bio" class="form-control" rows="3" maxlength="512" placeholder="Tell the other crabs about yourself.">{{ $p.Bio }}</textarea>
+            <textarea name="bio" id="bio" class="form-control" rows="3" maxlength="512" placeholder="Tell the other krabs about yourself.">{{ $p.Bio }}</textarea>
         </div>
 
         <div class="form-row">
@@ -46,12 +46,12 @@
         {{ template "fun-input" (dict "Name" "fun_emoji" "Label" "Favorite emoji" "Value" $p.Emoji "Max" 32 "Hint" "e.g. 🦀 or ;)" "Err" $p.FieldErrors.fun_emoji) }}
 
         <button type="submit" class="btn btn-primary rounded-pill mt-2">Save profile</button>
-        <a class="ml-3" href="/crabs/{{ .CrabName }}">View profile</a>
+        <a class="ml-3" href="/krabs/{{ .CrabName }}">View profile</a>
     </form>
 
     <form class="px-3 py-3 border-bottom border-dark kb-settings" method="POST" action="/settings/avatar">
         <input type='hidden' name='csrf_token' value='{{ .CSRFToken }}'>
-        <h2 class="h6 font-weight-bold mb-3">Your crab</h2>
+        <h2 class="h6 font-weight-bold mb-3">Your krab</h2>
         <div class="kb-settings-banner">
             <img src="{{ bannerSrc .Avatar }}" width="360" height="120" alt="">
         </div>
@@ -59,7 +59,7 @@
             <img class="kb-avatar kb-avatar-lg" src="{{ avatarSrc .Avatar }}" width="96" height="96" alt="">
             <div class="ml-3">
                 {{ with .Form.AvatarError }}<div class="error small mb-2">{{ . }}</div>{{ end }}
-                <button type="submit" class="btn btn-outline-light rounded-pill">Reroll my crab</button>
+                <button type="submit" class="btn btn-outline-light rounded-pill">Reroll my krab</button>
                 <small class="form-text text-muted">A new look and a new stretch of ocean, three times a day. The old combination goes back in the pot.</small>
             </div>
         </div>
@@ -108,7 +108,7 @@
     </form>
 
     <div class="px-3 py-3 border-bottom border-dark">
-        <h2 class="h6 font-weight-bold mb-3">Blocked crabs</h2>
+        <h2 class="h6 font-weight-bold mb-3">Blocked krabs</h2>
         {{ range .Blocked }}
         <div class="d-flex align-items-center py-1">
             {{ template "avatar" .Avatar }}
@@ -119,7 +119,7 @@
             </form>
         </div>
         {{ else }}
-        <div class="text-muted small">You haven't blocked anyone. You can block a crab from their profile or any of their molts.</div>
+        <div class="text-muted small">You haven't blocked anyone. You can block a krab from their profile or any of their molts.</div>
         {{ end }}
     </div>
 

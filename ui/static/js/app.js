@@ -234,6 +234,6 @@ document.addEventListener("DOMContentLoaded", function () {
       row.hidden = !match;
       if (match) shown += 1;
     });
-    if (count) count.textContent = shown + (shown === 1 ? " crab" : " crabs");
+    if (count) count.textContent = shown + (shown === 1 ? " krab" : " krabs");
   });
 });

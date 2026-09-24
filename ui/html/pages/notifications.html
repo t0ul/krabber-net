@@ -29,11 +29,11 @@
         </div>
         <div class="flex-grow-1 min-w-0">
             <div class="d-flex align-items-center mb-1">
-                <a href="/crabs/{{ .Actor }}" class="mr-2">{{ template "avatar" .ActorAvatar }}</a>
+                <a href="/krabs/{{ .Actor }}" class="mr-2">{{ template "avatar" .ActorAvatar }}</a>
                 <span class="text-muted small ml-auto">{{ template "time" .CreatedAt }}</span>
             </div>
             <div>
-                <a href="/crabs/{{ .Actor }}" class="text-light font-weight-bold">@{{ .Actor }}</a>{{ if .ActorVerified }} {{ template "verified" 15 }}{{ end }}
+                <a href="/krabs/{{ .Actor }}" class="text-light font-weight-bold">@{{ .Actor }}</a>{{ if .ActorVerified }} {{ template "verified" 15 }}{{ end }}
                 {{ if eq .Type "like" }}liked your molt
                 {{ else if eq .Type "remolt" }}remolted your molt
                 {{ else if eq .Type "reply" }}replied to your molt
@@ -48,7 +48,7 @@
     </div>
     {{ end }}
     {{ else }}
-    <div class="p-4 text-center text-muted">Nothing yet. When crabs like, remolt, quote or reply to your molts, mention you or follow you, it shows up here.</div>
+    <div class="p-4 text-center text-muted">Nothing yet. When krabs like, remolt, quote or reply to your molts, mention you or follow you, it shows up here.</div>
     {{ end }}
 {{ template "shell-bottom" . }}
 {{end}}

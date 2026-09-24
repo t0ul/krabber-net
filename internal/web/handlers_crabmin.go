@@ -32,15 +32,15 @@ type modMoltForm struct {
 func (app *App) crabmin(w http.ResponseWriter, r *http.Request) {
 	if q := strings.TrimPrefix(strings.TrimSpace(r.URL.Query().Get("q")), "@"); q != "" {
 		if c, err := app.store.CrabByUsername(r.Context(), q); err == nil {
-			http.Redirect(w, r, "/crabmin/crabs/"+url.PathEscape(c.UserName), http.StatusSeeOther)
+			http.Redirect(w, r, "/krabmin/krabs/"+url.PathEscape(c.UserName), http.StatusSeeOther)
 			return
 		}
 		if _, err := app.store.MoltForModeration(r.Context(), q); err == nil {
-			http.Redirect(w, r, "/crabmin/molts/"+url.PathEscape(q), http.StatusSeeOther)
+			http.Redirect(w, r, "/krabmin/molts/"+url.PathEscape(q), http.StatusSeeOther)
 			return
 		}
-		app.sessions.Put(r.Context(), sessionFlash, "No crab or molt matches “"+q+"”.")
-		http.Redirect(w, r, "/crabmin", http.StatusSeeOther)
+		app.sessions.Put(r.Context(), sessionFlash, "No krab or molt matches “"+q+"”.")
+		http.Redirect(w, r, "/krabmin", http.StatusSeeOther)
 		return
 	}
 	app.renderModLog(w, r, "crabmin.html", crabminLogPreview)
@@ -147,7 +147,7 @@ func (app *App) crabminCrabPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	mod := currentCrab(r)
-	back := "/crabmin/crabs/" + url.PathEscape(target.UserName)
+	back := "/krabmin/krabs/" + url.PathEscape(target.UserName)
 	done := func(msg string) {
 		app.sessions.Put(r.Context(), sessionFlash, msg)
 		http.Redirect(w, r, back, http.StatusSeeOther)
@@ -222,7 +222,7 @@ func (app *App) crabminCrabPost(w http.ResponseWriter, r *http.Request) {
 		if !mod.IsAdmin() {
 			entry.Action = "attempted_" + f.Action
 			app.logMod(r, entry)
-			done("Only admins can verify crabs.")
+			done("Only admins can verify krabs.")
 			return
 		}
 		err = app.store.SetVerified(ctx, target, f.Action == "verify")
@@ -279,7 +279,7 @@ func (app *App) crabminMoltPost(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		app.sessions.Put(r.Context(), sessionFlash, "Reports dismissed.")
-		http.Redirect(w, r, "/crabmin/reports", http.StatusSeeOther)
+		http.Redirect(w, r, "/krabmin/reports", http.StatusSeeOther)
 		return
 	case errors.Is(err, store.ErrNotFound):
 		app.notFound(w, r)
@@ -288,10 +288,10 @@ func (app *App) crabminMoltPost(w http.ResponseWriter, r *http.Request) {
 		app.serverError(w, r, err)
 		return
 	}
-	back := "/crabmin/molts/" + url.PathEscape(m.ID)
+	back := "/krabmin/molts/" + url.PathEscape(m.ID)
 	action := f.Action + "_molt"
 	if f.Action == "dismiss" {
-		action, back = "dismiss_reports", "/crabmin/reports"
+		action, back = "dismiss_reports", "/krabmin/reports"
 	}
 	entry := store.ModAction{ModeratorID: mod.ID, Moderator: mod.UserName, Action: action, CrabID: m.AuthorID, Crab: m.Author, MoltID: m.ID, Note: store.Snippet(m.Content)}
 	author, err := app.store.CrabByID(r.Context(), m.AuthorID)

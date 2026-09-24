@@ -58,6 +58,6 @@ func (app *App) settingsAvatarPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	app.dir.putCrab(*fresh)
-	app.sessions.Put(r.Context(), sessionFlash, "Your crab has a new look.")
+	app.sessions.Put(r.Context(), sessionFlash, "Your krab has a new look.")
 	http.Redirect(w, r, "/settings", http.StatusSeeOther)
 }

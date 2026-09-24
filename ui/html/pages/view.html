@@ -21,13 +21,13 @@
         {{ if .Remolt }}
         <small class="mini-molt-remolt text-muted d-block ml-4 mb-1">
             <svg class="mini-molt-action-icon remolt-icon" width="12" height="12"><use href="/static/img/sprites.svg?version=1704178675#repeat"></use></svg>
-            <a href="/crabs/{{ .RemoltedBy }}">{{ or .RemoltedByName .RemoltedBy }}</a> Remolted</small>
+            <a href="/krabs/{{ .RemoltedBy }}">{{ or .RemoltedByName .RemoltedBy }}</a> Remolted</small>
         {{ end }}
         {{ if .ReplyTo }}<div class="ml-4 mb-1">{{ template "replying-to" (dict "M" . "D" $d) }}</div>{{ end }}
         <div class="d-flex align-items-center mb-2">
-            <a href="/crabs/{{ .Author }}" class="mr-2">{{ template "avatar" .AuthorAvatar }}</a>
+            <a href="/krabs/{{ .Author }}" class="mr-2">{{ template "avatar" .AuthorAvatar }}</a>
             <div class="mini-molt-credentials-text flex-grow-1">
-                <a href="/crabs/{{ .Author }}" class="mini-molt-display-name">{{ or .AuthorName .Author }}</a>
+                <a href="/krabs/{{ .Author }}" class="mini-molt-display-name">{{ or .AuthorName .Author }}</a>
                 {{ if .AuthorVerified }}{{ template "verified" 17 }}{{ end }}<br>
                 <span class="mini-molt-username">@{{ .Author }}</span>
                 {{ if .NSFW }}{{ template "nsfw-badge" }}{{ end }}
@@ -69,7 +69,7 @@
         </div>
     </form>
     {{ else }}
-    <p class="px-3 py-2 text-muted"><a href="/crab/login">Log in</a> to reply.</p>
+    <p class="px-3 py-2 text-muted"><a href="/krab/login">Log in</a> to reply.</p>
     {{ end }}
     {{ end }}
 
