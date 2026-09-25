@@ -1166,13 +1166,24 @@ func TestNavLayout(t *testing.T) {
 	h.login("karen@krabber.test", "computer-wife!")
 	_, body, _ := h.get("/trench")
 	nav := body[strings.Index(body, `id="nav-panel"`):strings.Index(body, `id="add-panel"`)]
+	// The phone "•••" sheet repeats the extras; the sidebar order is without it.
+	start, end := strings.Index(nav, `<details class="kb-menu kb-nav-more">`), strings.Index(nav, `</details>`)
+	if start < 0 || end < start {
+		t.Fatal(`nav has no "•••" sheet for phones`)
+	}
+	sheet, sidebar := nav[start:end], nav[:start]+nav[end:]
 	last := -1
 	for _, want := range []string{`href="/trench"`, `href="/sea"`, `href="/notifications"`, `href="/bookmarks"`, `href="/krabs/karen"`, `id="molt-btn"`, `href="/stats"`, `href="/settings"`, `action="/krab/logout"`} {
-		i := strings.Index(nav, want)
+		i := strings.Index(sidebar, want)
 		if i <= last {
 			t.Fatalf("nav: %s is missing or out of order", want)
 		}
 		last = i
+	}
+	for _, want := range []string{`href="/bookmarks"`, `href="/stats"`, `href="/settings"`, `action="/krab/logout"`} {
+		if !strings.Contains(sheet, want) {
+			t.Errorf(`the "•••" sheet lacks %s`, want)
+		}
 	}
 	if strings.Contains(nav, `href="/krabs"`) || strings.Contains(nav, `href="/krabmin"`) || strings.Contains(nav, `href="/search"`) {
 		t.Error("nav shows Crabs, Search, or Crabmin to a crab who isn't a moderator")
