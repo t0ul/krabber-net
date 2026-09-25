@@ -45,6 +45,7 @@ type App struct {
 	cards     CardQueue
 	turnstile *turnstile
 	dir       *directory
+	fof       *suggestions
 }
 
 // Deps are the collaborators App needs.
@@ -97,5 +98,6 @@ func New(d Deps) (*App, error) {
 		cards:     d.Cards,
 		turnstile: newTurnstile(d.Config.TurnstileSecret),
 		dir:       &directory{},
+		fof:       &suggestions{},
 	}, nil
 }

@@ -226,7 +226,7 @@ func (app *App) following(r *http.Request) map[string]bool {
 }
 
 func (app *App) sidebarFor(r *http.Request) sidebar {
-	crabs, _, recent := app.snapshot(r)
+	crabs, byID, recent := app.snapshot(r)
 	var sb sidebar
 
 	me := ""
@@ -235,9 +235,22 @@ func (app *App) sidebarFor(r *http.Request) sidebar {
 	}
 	followed := app.following(r)
 	blocks := blocksOf(r)
+	// Friends of friends first, as Crabber does, then the most followed crabs
+	// the viewer doesn't follow, then the rest.
+	var candidates []store.Crab
+	picked := map[string]bool{}
+	for _, id := range app.friendsOfFriends(r, me, followed) {
+		if c, ok := byID[id]; ok && !blocks.Hides(id) && !followed[id] {
+			candidates = append(candidates, c)
+			picked[id] = true
+		}
+		if len(candidates) == whoToFollowCount {
+			break
+		}
+	}
 	var fresh, rest []store.Crab
 	for _, c := range crabs {
-		if c.ID == me || blocks.Hides(c.ID) {
+		if c.ID == me || blocks.Hides(c.ID) || picked[c.ID] {
 			continue
 		}
 		if followed[c.ID] {
@@ -249,7 +262,7 @@ func (app *App) sidebarFor(r *http.Request) sidebar {
 	byFollowers := func(a, b store.Crab) bool { return a.FollowerCount > b.FollowerCount }
 	sort.SliceStable(fresh, func(i, j int) bool { return byFollowers(fresh[i], fresh[j]) })
 	sort.SliceStable(rest, func(i, j int) bool { return byFollowers(rest[i], rest[j]) })
-	candidates := append(fresh, rest...)
+	candidates = append(append(candidates, fresh...), rest...)
 	for _, c := range candidates[:min(whoToFollowCount, len(candidates))] {
 		sb.WhoToFollow = append(sb.WhoToFollow, crabRow{Crab: c, Following: followed[c.ID]})
 	}

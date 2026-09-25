@@ -305,6 +305,7 @@ func (app *App) setFollow(w http.ResponseWriter, r *http.Request, follow bool) {
 		return
 	}
 	app.dir.invalidate()
+	app.fof.forget(currentCrab(r).ID)
 	if !isHTMX(r) {
 		http.Redirect(w, r, "/krabs/"+followee.UserName, http.StatusSeeOther)
 		return

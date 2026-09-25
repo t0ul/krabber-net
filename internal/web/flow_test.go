@@ -2319,6 +2319,65 @@ func TestInviteCodes(t *testing.T) {
 	}
 }
 
+func TestFriendsOfFriends(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	h.signupAndActivate("karen", "karen@krabber.test", "computer-wife!")
+	crabs := map[string]*store.Crab{}
+	for _, name := range []string{"sandy", "gary", "patrick", "squidward", "plankton", "pearl"} {
+		c, err := h.store.CreateCrab(ctx, name, name+"@krabber.test", []byte("h"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := h.store.ActivateCrab(ctx, c.ID); err != nil {
+			t.Fatal(err)
+		}
+		crabs[name] = c
+	}
+	karen, _ := h.store.CrabByUsername(ctx, "karen")
+	follow := func(who *store.Crab, whom string) {
+		t.Helper()
+		if err := h.store.Follow(ctx, who, crabs[whom]); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Patrick is the most followed; gary and pearl are only followed by sandy,
+	// whom karen follows.
+	follow(crabs["squidward"], "patrick")
+	follow(crabs["plankton"], "patrick")
+	follow(crabs["pearl"], "patrick")
+	follow(crabs["sandy"], "gary")
+	follow(crabs["sandy"], "pearl")
+	follow(karen, "sandy")
+
+	h.login("karen@krabber.test", "computer-wife!")
+	panel := func() []string {
+		t.Helper()
+		_, body, _ := h.get("/sea")
+		i := strings.Index(body, `id="recommended-crabs"`)
+		if i < 0 {
+			t.Fatal("no Who to follow panel")
+		}
+		body = body[i:]
+		body = body[:strings.Index(body, "See all krabs")]
+		var names []string
+		for _, m := range regexp.MustCompile(`data-name="(\w+)"`).FindAllStringSubmatch(body, -1) {
+			names = append(names, m[1])
+		}
+		return names
+	}
+	got := panel()
+	if len(got) < 3 || !slices.Contains(got[:2], "gary") || !slices.Contains(got[:2], "pearl") || got[2] != "patrick" {
+		t.Fatalf("who to follow = %v, want gary and pearl (friends of friends) before patrick", got)
+	}
+
+	tok := h.csrf("/sea")
+	h.post("/follow/"+crabs["gary"].ID, url.Values{"csrf_token": {tok}})
+	if got := panel(); slices.Contains(got, "gary") || got[0] != "pearl" {
+		t.Fatalf("after following gary: %v", got)
+	}
+}
+
 func TestLegacyCrabURLsRedirect(t *testing.T) {
 	h := newHarness(t)
 	noFollow := h.newClient()
