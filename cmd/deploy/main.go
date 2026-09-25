@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -135,11 +136,13 @@ func (d deployer) waitProcessed(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("describe version: %w", err)
 		}
+		// The API answers PROCESSED where the SDK's constant says Processed.
 		if len(out.ApplicationVersions) == 1 {
-			switch out.ApplicationVersions[0].Status {
-			case ebtypes.ApplicationVersionStatusProcessed:
+			status := string(out.ApplicationVersions[0].Status)
+			switch {
+			case strings.EqualFold(status, string(ebtypes.ApplicationVersionStatusProcessed)):
 				return nil
-			case ebtypes.ApplicationVersionStatusFailed:
+			case strings.EqualFold(status, string(ebtypes.ApplicationVersionStatusFailed)):
 				return errors.New("beanstalk couldn't process the bundle")
 			}
 		}
@@ -178,11 +181,11 @@ func (d deployer) waitHealthy(ctx context.Context, since time.Time) error {
 			return fmt.Errorf("environment %s not found", d.env)
 		}
 		e := out.Environments[0]
-		if e.Status == ebtypes.EnvironmentStatusReady {
+		if strings.EqualFold(string(e.Status), string(ebtypes.EnvironmentStatusReady)) {
 			switch {
 			case aws.ToString(e.VersionLabel) != d.label:
 				return fmt.Errorf("beanstalk rolled back to %s; see the events above", aws.ToString(e.VersionLabel))
-			case e.Health != ebtypes.EnvironmentHealthGreen:
+			case !strings.EqualFold(string(e.Health), string(ebtypes.EnvironmentHealthGreen)):
 				return fmt.Errorf("deployed, but the environment is %s", e.Health)
 			}
 			return nil

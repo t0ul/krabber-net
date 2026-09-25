@@ -229,16 +229,13 @@ resource "aws_budgets_budget" "daily" {
   }
 }
 
-resource "aws_ce_anomaly_monitor" "services" {
-  name              = "krabber-services"
-  monitor_type      = "DIMENSIONAL"
-  monitor_dimension = "SERVICE"
-}
-
+# An account can have one service monitor, and AWS made one
+# (Default-Services-Monitor) when Cost Explorer was turned on, so this
+# subscription watches that one.
 resource "aws_ce_anomaly_subscription" "email" {
   name             = "krabber-anomalies"
   frequency        = "DAILY"
-  monitor_arn_list = [aws_ce_anomaly_monitor.services.arn]
+  monitor_arn_list = ["arn:aws:ce::${local.account_id}:anomalymonitor/62ceb2ff-1f09-4140-aae6-9c24c37cff4f"]
 
   subscriber {
     type    = "EMAIL"
