@@ -137,6 +137,28 @@ func TestTemplatesParse(t *testing.T) {
 	}
 }
 
+func TestInstallable(t *testing.T) {
+	for path, want := range map[string]string{
+		asset("manifest.webmanifest"): "application/manifest+json",
+	} {
+		rec := httptest.NewRecorder()
+		staticFiles().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+		if rec.Code != http.StatusOK || rec.Header().Get("Content-Type") != want || !strings.Contains(rec.Body.String(), `"start_url": "/trench"`) {
+			t.Errorf("%s: %d %q", path, rec.Code, rec.Header().Get("Content-Type"))
+		}
+	}
+	for path, h := range map[string]http.HandlerFunc{
+		"/sw.js":   serveEmbedded("static/js/sw.js", "text/javascript; charset=utf-8"),
+		"/offline": serveEmbedded("static/offline.html", "text/html; charset=utf-8"),
+	} {
+		rec := httptest.NewRecorder()
+		h(rec, httptest.NewRequest(http.MethodGet, path, nil))
+		if rec.Code != http.StatusOK || rec.Header().Get("Cache-Control") != "no-cache" || rec.Body.Len() == 0 {
+			t.Errorf("%s: %d %q", path, rec.Code, rec.Header().Get("Cache-Control"))
+		}
+	}
+}
+
 func TestClientNet(t *testing.T) {
 	for ip, want := range map[string]string{
 		"203.0.113.9":          "203.0.113.9",

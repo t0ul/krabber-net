@@ -101,6 +101,8 @@ func (app *App) Routes() http.Handler {
 	root.HandleFunc("GET /healthz", app.healthz)
 	root.HandleFunc("GET /robots.txt", robots)
 	root.HandleFunc("GET /favicon.ico", favicon)
+	root.HandleFunc("GET /sw.js", serveEmbedded("static/js/sw.js", "text/javascript; charset=utf-8"))
+	root.HandleFunc("GET /offline", serveEmbedded("static/offline.html", "text/html; charset=utf-8"))
 	for old := range legacyRedirects {
 		root.HandleFunc(old, redirectLegacy)
 		root.HandleFunc(old+"/", redirectLegacy)

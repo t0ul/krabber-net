@@ -28,6 +28,11 @@
   });
 })();
 
+// The service worker makes Krabber installable and shows an offline page.
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/sw.js").catch(function () {});
+}
+
 // Forms marked data-reset-on-success clear after a successful htmx post.
 document.addEventListener("htmx:afterRequest", function (event) {
   var form = event.target.closest && event.target.closest("form[data-reset-on-success]");

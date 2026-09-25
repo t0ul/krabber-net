@@ -1,0 +1,14 @@
+{
+  "name": "Krabber",
+  "short_name": "Krabber",
+  "description": "Dumb blogging for krabs.",
+  "start_url": "/trench",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#15181c",
+  "theme_color": "#15181c",
+  "icons": [
+    { "src": "/static/img/app-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/static/img/app-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

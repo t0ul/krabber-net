@@ -3,6 +3,7 @@ package web
 import (
 	"errors"
 	"io/fs"
+	"mime"
 	"net/http"
 	"net/url"
 	"slices"
@@ -522,6 +523,21 @@ Disallow: /molt/report/
 Disallow: /molt/likes/
 `
 
+// serveEmbedded serves one embedded file at a root path: the service worker
+// (which must live at / to control the whole site) and the offline page it
+// keeps. Both are revalidated on every load so an update takes effect.
+func serveEmbedded(name, contentType string) http.HandlerFunc {
+	body, err := fs.ReadFile(ui.Files, name)
+	if err != nil {
+		panic(err)
+	}
+	return func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", contentType)
+		w.Header().Set("Cache-Control", "no-cache")
+		_, _ = w.Write(body)
+	}
+}
+
 func robots(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("Cache-Control", "public, max-age=86400")
@@ -540,6 +556,8 @@ func favicon(w http.ResponseWriter, r *http.Request) {
 // files get new URLs everywhere; the deploy pipeline also invalidates
 // /static/* as a backstop.
 func staticFiles() http.Handler {
+	// Go doesn't know the web app manifest's type.
+	_ = mime.AddExtensionType(".webmanifest", "application/manifest+json")
 	sub, err := fs.Sub(ui.Files, "static")
 	if err != nil {
 		panic(err)

@@ -5,6 +5,12 @@
     <meta name="htmx-config" content='{"allowEval":false,"allowScriptTags":false,"includeIndicatorStyles":false,"selfRequestsOnly":true}'>
     <title>{{ template "title" . }} · Krabber</title>
     <link rel='icon' href='{{ asset "img/favicon.svg" }}' type='image/svg+xml'>
+    <link rel="manifest" href="{{ asset "manifest.webmanifest" }}">
+    <link rel="apple-touch-icon" href="{{ asset "img/apple-touch-icon.png" }}">
+    <meta name="theme-color" content="#15181c">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Krabber">
     <link rel="stylesheet" href="{{ asset "css/bootstrap.min.css" }}" />
     <link rel="stylesheet" href="{{ asset "css/style.css" }}" />
     <link rel="stylesheet" href="{{ asset "css/color_overrides.css" }}">
