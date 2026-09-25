@@ -123,6 +123,7 @@ func run(log *slog.Logger) error {
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		log.Warn("http shutdown", "err", err)
 	}
+	app.Wait()
 	stopJobs()
 	runner.Wait(10 * time.Second)
 	log.Info("stopped")

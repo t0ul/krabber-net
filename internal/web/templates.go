@@ -72,6 +72,7 @@ type templateData struct {
 	Blocked     []store.Crab
 	ModLog      []store.ModAction
 	CanModerate bool
+	MoltGone    bool // krabmin's molt page: the author deleted it
 	// Krabmin's crab page: who invited them, and whether their code is off.
 	InvitedBy      string
 	InviteDisabled bool

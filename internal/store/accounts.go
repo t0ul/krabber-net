@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 
@@ -73,6 +75,82 @@ func (s *Store) DeleteAccount(ctx context.Context, c *Crab) (*Crab, error) {
 		return nil, fmt.Errorf("delete account: %w", err)
 	}
 	return tomb, nil
+}
+
+// ExpireUnactivated removes signups created before cutoff that were never
+// activated, freeing their username, email and avatar for someone else. An
+// account activated meanwhile is left alone. It scans the crab index, so
+// it's for a daily job.
+func (s *Store) ExpireUnactivated(ctx context.Context, cutoff time.Time) ([]string, error) {
+	var stale []Crab
+	p := dynamodb.NewScanPaginator(s.db, &dynamodb.ScanInput{
+		TableName:              s.tableName(),
+		IndexName:              aws.String(gsiCrabByID),
+		ReturnConsumedCapacity: types.ReturnConsumedCapacityTotal,
+		ProjectionExpression:   aws.String("PK, SK, #id, #un, #ca, #act, #ban, #del, #av"),
+		ExpressionAttributeNames: map[string]string{
+			"#id":  "id",
+			"#un":  "user_name",
+			"#ca":  "created_at",
+			"#act": "activated",
+			"#ban": "banned",
+			"#del": "deleted",
+			"#av":  "avatar",
+		},
+	})
+	for p.HasMorePages() {
+		page, err := p.NextPage(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("scan signups: %w", err)
+		}
+		var crabs []Crab
+		if err := attributevalue.UnmarshalListOfMaps(page.Items, &crabs); err != nil {
+			return nil, fmt.Errorf("scan signups: %w", err)
+		}
+		for _, c := range crabs {
+			if !c.Activated && !c.Banned && !c.Deleted && c.CreatedAt.Before(cutoff) {
+				stale = append(stale, c)
+			}
+		}
+		if p.HasMorePages() {
+			if err := pace(ctx, page.ConsumedCapacity); err != nil {
+				return nil, fmt.Errorf("scan signups: %w", err)
+			}
+		}
+	}
+	var gone []string
+	for _, c := range stale {
+		items := []types.TransactWriteItem{
+			{Delete: &types.Delete{
+				TableName:                 s.tableName(),
+				Key:                       keyOf(c.PK, c.SK),
+				ConditionExpression:       aws.String("id = :id AND activated = :f"),
+				ExpressionAttributeValues: map[string]types.AttributeValue{":id": str(c.ID), ":f": boolean(false)},
+			}},
+			{Delete: &types.Delete{
+				TableName:                 s.tableName(),
+				Key:                       keyOf(usernamePK(c.UserName), usernameSK()),
+				ConditionExpression:       aws.String("crab_id = :id"),
+				ExpressionAttributeValues: map[string]types.AttributeValue{":id": str(c.ID)},
+			}},
+		}
+		if avatar.Valid(c.Avatar) {
+			items = append(items, types.TransactWriteItem{Delete: &types.Delete{
+				TableName:                 s.tableName(),
+				Key:                       keyOf(avatarPK(c.Avatar), avatarSK()),
+				ConditionExpression:       aws.String("crab_id = :id"),
+				ExpressionAttributeValues: map[string]types.AttributeValue{":id": str(c.ID)},
+			}})
+		}
+		switch err := s.transact(ctx, items...); {
+		case cancelledAt(err, 0), cancelledAt(err, 1), cancelledAt(err, 2):
+		case err != nil:
+			return gone, fmt.Errorf("expire signup %s: %w", c.ID, err)
+		default:
+			gone = append(gone, c.ID)
+		}
+	}
+	return gone, nil
 }
 
 // PendingPurges returns the IDs of deleted accounts not yet cleaned up.

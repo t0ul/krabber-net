@@ -36,6 +36,10 @@ const (
 	cardQueueSize     = 128
 	cardFetchTimeout  = 10 * time.Second
 	awardShowEvery    = 24 * time.Hour
+	signupSweepEvery  = 24 * time.Hour
+	// SignupExpiry is how long a signup can go unactivated before its name
+	// and email are freed; activation tokens last as long.
+	SignupExpiry = 3 * 24 * time.Hour
 )
 
 // Runner owns the background goroutines.
@@ -149,6 +153,18 @@ func (r *Runner) Start(ctx context.Context) {
 	go r.every(ctx, fanoutSweepEvery, 5*time.Second, r.sweepFanouts)
 	go r.every(ctx, purgeSweepEvery, 15*time.Second, r.sweepPurges)
 	go r.every(ctx, awardShowEvery, 2*time.Minute, r.awardShow)
+	go r.every(ctx, signupSweepEvery, 5*time.Minute, r.expireSignups)
+}
+
+// expireSignups frees the usernames and emails of signups nobody activated.
+func (r *Runner) expireSignups(ctx context.Context) {
+	gone, err := r.store.ExpireUnactivated(ctx, r.now().Add(-SignupExpiry))
+	if err != nil {
+		r.log.Error("signup expiry failed", "err", err)
+	}
+	if len(gone) > 0 {
+		r.log.Info("expired unactivated signups", "count", len(gone))
+	}
 }
 
 // awardShow gives "One Year" to crabs in the week after their first

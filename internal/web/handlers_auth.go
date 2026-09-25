@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/url"
@@ -154,7 +155,7 @@ func (app *App) signupPost(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	flash := "Your account is ready. Check your email for the activation link."
-	if err := app.sendActivation(r, crab); err != nil {
+	if err := app.sendActivation(r.Context(), crab); err != nil {
 		app.log.Warn("activation email not sent", "err", err, "crab", crab.ID)
 		flash = "Your account is ready, but we couldn't send the activation email just now. Use \"resend\" below in a few minutes."
 	}
@@ -162,15 +163,15 @@ func (app *App) signupPost(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/krab/activate", http.StatusSeeOther)
 }
 
-func (app *App) sendActivation(r *http.Request, c *store.Crab) error {
-	token, err := app.store.NewToken(r.Context(), c.ID, store.ScopeActivation, activationTTL)
+func (app *App) sendActivation(ctx context.Context, c *store.Crab) error {
+	token, err := app.store.NewToken(ctx, c.ID, store.ScopeActivation, activationTTL)
 	if err != nil {
 		return err
 	}
 	page := app.cfg.BaseURL.JoinPath("/krab/activate")
 	link := *page
 	link.RawQuery = url.Values{"token": {token}}.Encode()
-	return app.mailer.Send(r.Context(), c.Email, "activation", map[string]string{
+	return app.mailer.Send(ctx, c.Email, "activation", map[string]string{
 		"UserName":     c.UserName,
 		"Token":        token,
 		"ActivateURL":  link.String(),
@@ -243,24 +244,21 @@ func (app *App) resendPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	crab, err := app.store.CrabByEmail(r.Context(), email)
-	switch {
-	case errors.Is(err, store.ErrNotFound):
-	case err != nil:
-		app.serverError(w, r, err)
-		return
-	case !crab.Activated && !crab.Banned && !crab.Deleted:
-		emailOK, err := app.underLimit(r, "resend-email", email, resendEmailLimit, 24*time.Hour)
-		if err != nil {
-			app.serverError(w, r, err)
+	app.afterResponse(func(ctx context.Context) {
+		crab, err := app.store.CrabByEmail(ctx, email)
+		if err != nil || crab.Activated || crab.Banned || crab.Deleted {
+			if err != nil && !errors.Is(err, store.ErrNotFound) {
+				app.log.Warn("resend lookup", "err", err)
+			}
 			return
 		}
-		if emailOK {
-			if err := app.sendActivation(r, crab); err != nil && !errors.Is(err, mail.ErrDailyCapReached) {
-				app.log.Warn("activation email not sent", "err", err, "crab", crab.ID)
-			}
+		if n, err := app.store.Hit(ctx, "resend-email", email, 24*time.Hour); err != nil || n > resendEmailLimit {
+			return
 		}
-	}
+		if err := app.sendActivation(ctx, crab); err != nil && !errors.Is(err, mail.ErrDailyCapReached) {
+			app.log.Warn("activation email not sent", "err", err, "crab", crab.ID)
+		}
+	})
 	app.sessions.Put(r.Context(), sessionFlash, done)
 	http.Redirect(w, r, "/krab/activate", http.StatusSeeOther)
 }

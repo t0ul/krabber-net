@@ -4,9 +4,11 @@ package web
 
 import (
 	"cmp"
+	"context"
 	"html/template"
 	"log/slog"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/alexedwards/scs/v2"
@@ -54,7 +56,23 @@ type App struct {
 
 	version string    // the build's commit, for @system's molts
 	started time.Time // for @system's uptime
+
+	afterWork sync.WaitGroup
 }
+
+// afterResponse runs f in the background so the response goes out without
+// it: pages that mustn't reveal whether an account exists answer in the
+// same time either way. Wait blocks until it's done.
+func (app *App) afterResponse(f func(ctx context.Context)) {
+	app.afterWork.Go(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		f(ctx)
+	})
+}
+
+// Wait blocks until background work from afterResponse has finished.
+func (app *App) Wait() { app.afterWork.Wait() }
 
 // Deps are the collaborators App needs.
 type Deps struct {

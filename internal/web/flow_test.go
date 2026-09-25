@@ -231,6 +231,7 @@ func (h *harness) post(path string, form url.Values, headers ...string) (int, st
 	}
 	defer func() { _ = res.Body.Close() }()
 	b, _ := io.ReadAll(res.Body)
+	h.app.Wait()
 	return res.StatusCode, string(b), res.Header
 }
 
@@ -776,6 +777,15 @@ func TestReporting(t *testing.T) {
 	}
 	if msg := h.mail.last(t); msg.To != "plankton@krabber.test" || !strings.Contains(msg.Text, "Spam about the Krusty Krab") || !strings.Contains(msg.Subject, "banned") {
 		t.Fatalf("ban email: %+v", msg)
+	}
+
+	// Deleting a reported molt doesn't take the evidence with it.
+	if err := h.store.DeleteMolt(ctx, troll, m); err != nil {
+		t.Fatal(err)
+	}
+	status, body, _ = h.get("/krabmin/molts/" + m.ID)
+	if status != http.StatusOK || !strings.Contains(body, m.Content) || !strings.Contains(body, "The author deleted this molt") || !strings.Contains(body, "@sandy") {
+		t.Fatalf("deleted molt's review page: %d", status)
 	}
 }
 

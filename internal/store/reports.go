@@ -54,10 +54,13 @@ type Report struct {
 	GSI8PK string `dynamodbav:"GSI8PK,omitempty"`
 	GSI8SK string `dynamodbav:"GSI8SK,omitempty"`
 
-	MoltID      string    `dynamodbav:"molt_id"`
-	AuthorID    string    `dynamodbav:"author_id"`
-	Author      string    `dynamodbav:"author"`
-	Snippet     string    `dynamodbav:"snippet"`
+	MoltID   string `dynamodbav:"molt_id"`
+	AuthorID string `dynamodbav:"author_id"`
+	Author   string `dynamodbav:"author"`
+	Snippet  string `dynamodbav:"snippet"`
+	// Evidence is the molt's full text as of the latest report, kept for
+	// moderators after the author edits or deletes it.
+	Evidence    string    `dynamodbav:"evidence,omitempty"`
 	OpenReports int       `dynamodbav:"open_reports"`
 	Reasons     []string  `dynamodbav:"reasons,stringset,omitempty"`
 	LastAt      time.Time `dynamodbav:"last_at"`
@@ -101,7 +104,7 @@ func (s *Store) ReportMolt(ctx context.Context, by *Crab, m *Molt, reason, note 
 			TableName: s.tableName(),
 			Key:       keyOf(reportPK(m.ID), reportSummarySK()),
 			UpdateExpression: aws.String("SET GSI8PK = :q, GSI8SK = if_not_exists(GSI8SK, :sk), molt_id = :id, " +
-				"author_id = :aid, author = :a, snippet = :snip, last_at = :now " +
+				"author_id = :aid, author = :a, snippet = :snip, evidence = :ev, last_at = :now " +
 				"ADD open_reports :one, reasons :r REMOVE resolution, resolved_by"),
 			ExpressionAttributeValues: map[string]types.AttributeValue{
 				":q":    str(queueReports),
@@ -110,6 +113,7 @@ func (s *Store) ReportMolt(ctx context.Context, by *Crab, m *Molt, reason, note 
 				":aid":  str(m.AuthorID),
 				":a":    str(m.Author),
 				":snip": str(Snippet(m.Content)),
+				":ev":   str(m.Content),
 				":now":  str(now.Format(time.RFC3339Nano)), // how attributevalue stores time.Time
 				":one":  num(1),
 				":r":    &types.AttributeValueMemberSS{Value: []string{reason}},

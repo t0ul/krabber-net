@@ -36,13 +36,13 @@ variable "max_krabs" {
 variable "origin_https" {
   description = "CloudFront reaches the instance over HTTPS at origin.<domain> (step 2 in origin_tls.tf)."
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "origin_http_open" {
   description = "Port 80 stays open to CloudFront; close it once origin_https has served traffic (step 3 in origin_tls.tf)."
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "table_caps" {

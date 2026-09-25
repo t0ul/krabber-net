@@ -8,15 +8,18 @@
     <div class="px-3 py-3 border-bottom border-dark">
         <div class="d-flex small">
             <a href="/krabmin/krabs/{{ $m.Author }}" class="font-weight-bold">@{{ $m.Author }}</a>
-            <span class="ml-2 text-muted">{{ template "time" $m.CreatedAt }}</span>
+            {{ if not .MoltGone }}<span class="ml-2 text-muted">{{ template "time" $m.CreatedAt }}</span>{{ end }}
             {{ if $m.NSFW }}<span class="ml-2 nsfw-badge">NSFW</span>{{ end }}
-            {{ if not $m.Removed }}<a class="ml-auto" href="/molt/view/{{ $m.ID }}">Public page</a>{{ end }}
+            {{ if not (or $m.Removed .MoltGone) }}<a class="ml-auto" href="/molt/view/{{ $m.ID }}">Public page</a>{{ end }}
         </div>
+        {{ if .MoltGone }}<div class="alert alert-secondary mt-3 mb-0 small">The author deleted this molt. This is its text as of the latest report.</div>{{ end }}
         {{ if $m.Removed }}<div class="alert alert-danger mt-3 mb-0 small">Removed by a moderator. Only moderators can see it.</div>{{ end }}
         <p class="mt-3 mb-2 kb-bio">{{ $m.Content }}</p>
+        {{ if not .MoltGone }}
         <div class="small text-muted">{{ $m.LikeCount }} likes · {{ $m.RemoltCount }} remolts · {{ $m.ReplyCount }} replies · {{ $m.QuoteCount }} quotes{{ with $m.QuoteOf }} · <a href="/krabmin/molts/{{ . }}">quote of a molt</a>{{ end }}{{ with $m.ReplyTo }} · <a href="/krabmin/molts/{{ . }}">reply to @{{ $m.ReplyToAuthor }}</a>{{ end }} · ID {{ $m.ID }}</div>
+        {{ end }}
     </div>
-    {{ if .CanModerate }}
+    {{ if and .CanModerate (not .MoltGone) }}
     <form class="px-3 py-3 border-bottom border-dark" method="POST" action="/krabmin/molts/{{ $m.ID }}">
         <input type='hidden' name='csrf_token' value='{{ .CSRFToken }}'>
         {{ if $m.Removed }}

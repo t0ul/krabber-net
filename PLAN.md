@@ -57,14 +57,11 @@ flowchart LR
 1. The browser connects over HTTPS to CloudFront (ACM certificate for `krabber.net` and `www.krabber.net`).
 2. **WAF** (included in the plan) blocks obvious attacks and anyone exceeding the per-IP rate limits. Blocked requests don't count toward the plan's usage allowance.
 3. `/static/*` is served from CloudFront's cache. On a cache miss, CloudFront fetches it from the app's embedded files. No S3 bucket is needed for assets.
-4. Everything else goes to the Beanstalk environment's hostname over HTTP on port 80. CloudFront adds a secret `X-Origin-Verify` header and forwards all viewer headers, including `Host`, `CloudFront-Viewer-Address` (the real client IP), cookies and query strings.
-5. The instance's security group accepts port 80 **only** from AWS's managed CloudFront IP list (`com.amazonaws.global.cloudfront.origin-facing`). The app also rejects any request without the correct secret header.
+4. Everything else goes to `origin.krabber.net` (a CNAME for the Beanstalk hostname) over HTTPS on port 443. CloudFront adds a secret `X-Origin-Verify` header and forwards all viewer headers, including `Host`, `CloudFront-Viewer-Address` (the real client IP, which CloudFront overwrites, so viewers can't fake it), cookies and query strings.
+5. The instance's security groups accept port 443 **only** from AWS's managed CloudFront IP list (`com.amazonaws.global.cloudfront.origin-facing`). The app also rejects any request without the correct secret header.
 
-### Accepted risk: CloudFront to the instance is plain HTTP
-A single-instance environment has no load balancer to hold an ACM certificate, so the hop from CloudFront to the instance is unencrypted and carries session cookies. It's mitigated by the CloudFront-only security group and the secret header, and AWS says CloudFront reaches AWS origins over its private network, but it isn't encrypted. Ways to remove it:
-1. **Let's Encrypt on the instance** for an `origin.krabber.net` name (a `.platform` hook plus a renewal timer), with CloudFront connecting over HTTPS. About an hour of work; can be done right after launch.
-2. **The Lambda move** (section 13): HTTPS end to end.
-3. A load-balanced environment with an ALB (about $20 more per month) or CloudFront VPC origins (Business plan at $200/month). Not worth it at this size.
+### Origin TLS
+A single-instance environment has no load balancer to hold an ACM certificate, so nginx on the instance holds one: an **ACM exportable certificate** for `origin.krabber.net` ($7 per 198-day certificate, about $13 a year, renewed by ACM). A prebuild hook (`.platform/hooks/prebuild/10_origin_cert.sh`) exports it at deploy time with the instance role and adds nginx's 443 server; a daily timer re-exports it to pick up renewals. CloudFront accepts it because it matches the origin's domain name. `infra/prod/origin_tls.tf` has the three-step switch-over (serve 443, point CloudFront at it, close port 80), done 2026-09-25.
 
 ---
 
@@ -186,8 +183,8 @@ Bootstrap starts with local state, then moves its own state into the new bucket 
 | **App** | S3 bucket (artifacts) | `krabber-artifacts-381466680812`; private, encrypted; app bundles and the canary zip; old objects expire after 30 days |
 | | EB application | `krabber`; application version lifecycle keeps the latest 10 |
 | | EB environment | `krabber-prod`; `EnvironmentType=SingleInstance`; solution stack chosen by regex "64bit Amazon Linux 2023 .* running Go 1"; `t4g.micro` (arm64), `t4g.small` past about 5,000 daily active krabs (section 2.2) |
-| | Security group | `krabber-eb-origin`: port 80 inbound **only** from the CloudFront origin-facing prefix list, nothing else. The prefix list counts as about 55 of the 60-rule limit, so this group holds nothing else. |
-| | Default EB security group | **Disabled**: `aws:autoscaling:launchconfiguration` `DisableDefaultEC2SecurityGroup=true` with `SecurityGroups=krabber-eb-origin` |
+| | Security groups | `krabber-eb-origin-https`: port 443 inbound **only** from the CloudFront origin-facing prefix list, nothing else (`krabber-eb-origin` held port 80 the same way until origin TLS; it now only holds the outbound rule). The prefix list counts as about 55 of the 60-rule limit, so this group holds nothing else. |
+| | Default EB security group | **Disabled**: `aws:autoscaling:launchconfiguration` `DisableDefaultEC2SecurityGroup=true` with `SecurityGroups=krabber-eb-origin,krabber-eb-origin-https` |
 | | Instance role + profile | `krabber-eb-instance`: DynamoDB CRUD on `krabber-prod` and its indexes; `ses:SendEmail` on the `krabber.net` identity and configuration set only; `ssm:GetParametersByPath` on `/krabber/prod/*`; decrypt with the AWS-managed SSM key; CloudWatch Logs write; the SSM Session Manager core policy (no SSH) |
 | | EB service role | `krabber-eb-service` with the AWS-managed Beanstalk policies (enhanced health, managed updates) |
 | | Deploys | `DeploymentPolicy=Immutable` and `RollingUpdateType=Immutable`: every deploy boots a fresh instance, switches only when it's healthy, and terminates it automatically if it isn't |
@@ -664,7 +661,7 @@ Also:
 | **3. Infra + pipeline** ✅ (except support@) | Done 2026-09-25: `infra/prod` (57 resources; one root module split by file rather than the planned `modules/`), `ci.yml`/`deploy.yml` (deploys run through the `krabber` GitHub environment), `cmd/deploy` for app versions, first deploy, certificate and SES identity verified, M5 submitted. Still open: `support@krabber.net` receiving and forwarder (needs a bootstrap role for the Lambda), the uptime canary. | Me; you review the first plan | — |
 | **4. Launch checks** ✅ | Done 2026-09-25 on `https://krabber.net`: signup → activation → login → post → Trench → Sea (you); maintenance switch on (403 within 20 s) and off; WAF login rate limit (403 on `/krab/` while the rest served); point-in-time restore into a scratch table (same items and indexes, then deleted); each of the 6 alarms fired once. | Together | — |
 | **5. Product and legal** | Privacy, terms, account deletion, reports and bans, password reset UI, error and maintenance pages. Runs together with P1 of [`docs/NOTES.md`](docs/NOTES.md) (delete molt, notifications, settings, block). | Me | 0.5–1 day (2–3 with P1) |
-| **6. Origin TLS** (soon after launch) | Let's Encrypt on the instance, CloudFront to origin over HTTPS (section 1) | Me | 1–2 hours |
+| **6. Origin TLS** ✅ | ACM exportable certificate on the instance, CloudFront to origin over HTTPS (section 1) | Me | Done 2026-09-25 |
 
 **Timing:** live on `https://krabber.net` at the end of the first long day (Phases 0–4) if nothing surprising comes up. Public signups wait for **SES production access** (usually about a day after M5). Finish Phase 5 before inviting people.
 

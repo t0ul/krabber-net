@@ -1,6 +1,7 @@
 package web
 
 import (
+	"cmp"
 	"errors"
 	"net/http"
 	"net/url"
@@ -105,20 +106,27 @@ func (app *App) crabminCrab(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *App) crabminMolt(w http.ResponseWriter, r *http.Request) {
-	m, err := app.store.MoltForModeration(r.Context(), r.PathValue("id"))
-	if errors.Is(err, store.ErrNotFound) {
-		app.notFound(w, r)
-		return
-	} else if err != nil {
+	id := r.PathValue("id")
+	m, err := app.store.MoltForModeration(r.Context(), id)
+	if err != nil && !errors.Is(err, store.ErrNotFound) {
 		app.serverError(w, r, err)
 		return
 	}
-	report, rows, err := app.store.ReportsOn(r.Context(), m.ID)
-	if err != nil {
-		app.serverError(w, r, err)
+	report, rows, rerr := app.store.ReportsOn(r.Context(), id)
+	if rerr != nil {
+		app.serverError(w, r, rerr)
 		return
 	}
 	data := app.newTemplateData(r)
+	if m == nil {
+		// Deleted by its author: what was reported is all that's left.
+		if report == nil {
+			app.notFound(w, r)
+			return
+		}
+		m = &store.Molt{ID: id, AuthorID: report.AuthorID, Author: report.Author, Content: cmp.Or(report.Evidence, report.Snippet)}
+		data.MoltGone = true
+	}
 	data.Molt = *m
 	data.Report, data.ReportRows = report, rows
 	if author, err := app.store.CrabByID(r.Context(), m.AuthorID); err == nil {
