@@ -174,6 +174,15 @@ data "aws_iam_policy_document" "gha_deploy_services" {
     ]
   }
 
+  # Immutable deploys have CloudFormation read Beanstalk's own template and
+  # platform buckets with the caller's credentials; without this they fail
+  # with "S3 error: Access Denied".
+  statement {
+    sid       = "BeanstalkAssets"
+    actions   = ["s3:GetObject", "s3:GetObjectVersion", "s3:ListBucket", "s3:GetBucketLocation"]
+    resources = ["arn:aws:s3:::elasticbeanstalk-*", "arn:aws:s3:::elasticbeanstalk-*/*"]
+  }
+
   statement {
     sid       = "BucketDiscovery"
     actions   = ["s3:ListAllMyBuckets", "s3:GetBucketLocation", "s3:CreateBucket"]
