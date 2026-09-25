@@ -39,7 +39,8 @@ jobs:
           KRABBER_TEST_DYNAMO_ENDPOINT: http://localhost:8000
           AWS_ACCESS_KEY_ID: local
           AWS_SECRET_ACCESS_KEY: local
-        run: go test -race -count=1 ./...
+        # Without -race, which doubles the time; pull requests run it.
+        run: go test -count=1 ./...
 
   deploy:
     needs: test

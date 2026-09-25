@@ -10,6 +10,22 @@ variable "github_repo" {
   default     = "t0ul/krabber-net"
 }
 
+# GitHub's OIDC subjects name the owner and repository with their numeric IDs
+# (repo:t0ul@298514713/krabber-net@1383711855:...), which a recreated repo or
+# a new account with the same name can't match. Seen in CloudTrail's
+# AssumeRoleWithWebIdentity events.
+variable "github_owner_id" {
+  description = "Numeric ID of the repository's owner."
+  type        = string
+  default     = "298514713"
+}
+
+variable "github_repo_id" {
+  description = "Numeric ID of the repository."
+  type        = string
+  default     = "1383711855"
+}
+
 variable "admin_user_name" {
   description = "IAM user used for local admin work and bootstrap applies."
   type        = string

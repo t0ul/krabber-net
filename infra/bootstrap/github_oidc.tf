@@ -26,7 +26,7 @@ data "aws_iam_policy_document" "gha_plan_trust" {
     condition {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.github_repo}:pull_request"]
+      values   = ["repo:${local.github_subject}:pull_request"]
     }
   }
 }
@@ -123,7 +123,7 @@ data "aws_iam_policy_document" "gha_deploy_trust" {
     condition {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.github_repo}:environment:krabber"]
+      values   = ["repo:${local.github_subject}:environment:krabber"]
     }
   }
 }

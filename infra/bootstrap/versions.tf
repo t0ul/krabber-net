@@ -32,4 +32,9 @@ locals {
   eb_bucket        = "elasticbeanstalk-${var.region}-${local.account_id}"
 
   table_arn = "arn:aws:dynamodb:${var.region}:${local.account_id}:table/krabber-prod"
+
+  # owner@id/repo@id, as GitHub's OIDC subjects write it.
+  github_subject = format("%s@%s/%s@%s",
+    split("/", var.github_repo)[0], var.github_owner_id,
+  split("/", var.github_repo)[1], var.github_repo_id)
 }
