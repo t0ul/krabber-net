@@ -71,12 +71,18 @@ resource "aws_security_group" "origin" {
 }
 
 resource "aws_vpc_security_group_ingress_rule" "cloudfront" {
+  count             = var.origin_http_open ? 1 : 0
   security_group_id = aws_security_group.origin.id
   description       = "CloudFront origin-facing"
   ip_protocol       = "tcp"
   from_port         = 80
   to_port           = 80
   prefix_list_id    = data.aws_ec2_managed_prefix_list.cloudfront.id
+}
+
+moved {
+  from = aws_vpc_security_group_ingress_rule.cloudfront
+  to   = aws_vpc_security_group_ingress_rule.cloudfront[0]
 }
 
 # Out to DynamoDB, SES, SSM and link-card fetches.
@@ -121,7 +127,7 @@ locals {
     ["aws:ec2:vpc", "Subnets", join(",", sort(data.aws_subnets.default.ids))],
     ["aws:ec2:vpc", "AssociatePublicIpAddress", "true"],
     ["aws:autoscaling:launchconfiguration", "IamInstanceProfile", local.eb_instance_profile],
-    ["aws:autoscaling:launchconfiguration", "SecurityGroups", aws_security_group.origin.id],
+    ["aws:autoscaling:launchconfiguration", "SecurityGroups", "${aws_security_group.origin.id},${aws_security_group.origin_https.id}"],
     ["aws:autoscaling:launchconfiguration", "DisableDefaultEC2SecurityGroup", "true"],
     ["aws:autoscaling:launchconfiguration", "DisableIMDSv1", "true"],
     ["aws:autoscaling:launchconfiguration", "RootVolumeType", "gp3"],
@@ -149,6 +155,7 @@ locals {
     ["aws:elasticbeanstalk:application:environment", "SSM_PREFIX", "/krabber/prod"],
     ["aws:elasticbeanstalk:application:environment", "BASE_URL", "https://${var.domain}"],
     ["aws:elasticbeanstalk:application:environment", "MAX_KRABS", tostring(var.max_krabs)],
+    ["aws:elasticbeanstalk:application:environment", "ORIGIN_CERT_ARN", aws_acm_certificate_validation.origin.certificate_arn],
   ]
 }
 

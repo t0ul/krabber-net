@@ -52,7 +52,8 @@ func (app *App) RunSystemKrab(ctx context.Context) {
 }
 
 // systemKrab loads @system, creating it (activated, verified, with no
-// password anyone knows) the first time.
+// password anyone knows) the first time, and finishing that setup if an
+// earlier run stopped partway.
 func (app *App) systemKrab(ctx context.Context) (*store.Crab, error) {
 	c, err := app.store.CrabByUsername(ctx, systemName)
 	switch {
@@ -60,22 +61,26 @@ func (app *App) systemKrab(ctx context.Context) (*store.Crab, error) {
 		if !strings.EqualFold(c.Email, systemEmail) {
 			return nil, fmt.Errorf("@%s belongs to someone else", systemName)
 		}
-		return c, nil
-	case !errors.Is(err, store.ErrNotFound):
+		if c.Activated && c.Verified {
+			return c, nil
+		}
+	case errors.Is(err, store.ErrNotFound):
+		secret := make([]byte, 32)
+		if _, err := rand.Read(secret); err != nil {
+			return nil, err
+		}
+		hash, err := auth.HashPassword(hex.EncodeToString(secret))
+		if err != nil {
+			return nil, err
+		}
+		if c, err = app.store.CreateCrab(ctx, systemName, systemEmail, hash); err != nil {
+			return nil, fmt.Errorf("create @%s: %w", systemName, err)
+		}
+	default:
 		return nil, err
 	}
-	secret := make([]byte, 32)
-	if _, err := rand.Read(secret); err != nil {
-		return nil, err
-	}
-	hash, err := auth.HashPassword(hex.EncodeToString(secret))
-	if err != nil {
-		return nil, err
-	}
-	if c, err = app.store.CreateCrab(ctx, systemName, systemEmail, hash); err != nil {
-		return nil, fmt.Errorf("create @%s: %w", systemName, err)
-	}
-	if err := app.store.ActivateCrab(ctx, c.ID); err != nil {
+	// By table key: GSI2 may not have the new krab yet.
+	if err := app.store.ActivateCrabKey(ctx, c.PK, c.SK); err != nil {
 		return nil, err
 	}
 	if c, err = app.store.CrabByKey(ctx, c.PK, c.SK); err != nil {

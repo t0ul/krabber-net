@@ -33,6 +33,18 @@ variable "max_krabs" {
   default     = 3000
 }
 
+variable "origin_https" {
+  description = "CloudFront reaches the instance over HTTPS at origin.<domain> (step 2 in origin_tls.tf)."
+  type        = bool
+  default     = false
+}
+
+variable "origin_http_open" {
+  description = "Port 80 stays open to CloudFront; close it once origin_https has served traffic (step 3 in origin_tls.tf)."
+  type        = bool
+  default     = true
+}
+
 variable "table_caps" {
   description = "On-demand maximum throughput (units per second) for the table and each index; the launch stage of PLAN.md section 4.1."
   type = object({

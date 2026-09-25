@@ -280,12 +280,12 @@ resource "aws_cloudfront_distribution" "site" {
 
   origin {
     origin_id   = local.origin_id
-    domain_name = aws_elastic_beanstalk_environment.prod.cname
+    domain_name = var.origin_https ? aws_route53_record.origin.fqdn : aws_elastic_beanstalk_environment.prod.cname
 
     custom_origin_config {
       http_port              = 80
       https_port             = 443
-      origin_protocol_policy = "http-only"
+      origin_protocol_policy = var.origin_https ? "https-only" : "http-only"
       origin_ssl_protocols   = ["TLSv1.2"]
     }
 

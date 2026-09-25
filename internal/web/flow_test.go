@@ -2536,6 +2536,23 @@ func TestSystemKrab(t *testing.T) {
 	}
 }
 
+// A run that stopped after creating @system (in prod, GSI2 hadn't caught up
+// when it went to activate it) is finished by the next one.
+func TestSystemKrabFinishesSetup(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	if _, err := h.store.CreateCrab(ctx, systemName, systemEmail, []byte("x")); err != nil {
+		t.Fatal(err)
+	}
+	c, err := h.app.systemKrab(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !c.Activated || !c.Verified || c.DisplayName != "Krabber System" {
+		t.Errorf("system krab: %+v", c)
+	}
+}
+
 func TestMoltMenuEndsTheActionBar(t *testing.T) {
 	h := newHarness(t)
 	h.signupAndActivate("karen", "karen@krabber.test", "computer-wife!")

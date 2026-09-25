@@ -444,15 +444,22 @@ func (s *Store) ListCrabs(ctx context.Context, limit int) ([]Crab, map[string]bo
 	return out, gone, nil
 }
 
-// ActivateCrab marks an account as activated.
+// ActivateCrab marks an account as activated. It finds the account through
+// GSI2, which lags a moment behind writes: right after CreateCrab, use
+// ActivateCrabKey.
 func (s *Store) ActivateCrab(ctx context.Context, crabID string) error {
 	c, err := s.CrabByID(ctx, crabID)
 	if err != nil {
 		return err
 	}
-	_, err = s.db.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+	return s.ActivateCrabKey(ctx, c.PK, c.SK)
+}
+
+// ActivateCrabKey marks the account at this table key as activated.
+func (s *Store) ActivateCrabKey(ctx context.Context, pk, sk string) error {
+	_, err := s.db.UpdateItem(ctx, &dynamodb.UpdateItemInput{
 		TableName:                 s.tableName(),
-		Key:                       keyOf(c.PK, c.SK),
+		Key:                       keyOf(pk, sk),
 		UpdateExpression:          aws.String("SET activated = :t"),
 		ConditionExpression:       aws.String("attribute_exists(PK)"),
 		ExpressionAttributeValues: map[string]types.AttributeValue{":t": boolean(true)},

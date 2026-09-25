@@ -128,6 +128,14 @@ data "aws_iam_policy_document" "eb_instance_app" {
       values   = ["ssm.${var.region}.amazonaws.com"]
     }
   }
+
+  # The origin certificate for nginx (infra/prod/origin_tls.tf). Only
+  # exportable certificates can be exported; the CloudFront one isn't.
+  statement {
+    sid       = "OriginCertificate"
+    actions   = ["acm:ExportCertificate"]
+    resources = ["arn:aws:acm:${var.region}:${local.account_id}:certificate/*"]
+  }
 }
 
 resource "aws_iam_role_policy" "eb_instance_app" {

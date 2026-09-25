@@ -74,6 +74,7 @@ data "aws_iam_policy_document" "gha_plan_extra" {
       "dynamodb:GetItem", "dynamodb:BatchGetItem", "dynamodb:Query", "dynamodb:Scan",
       "dynamodb:ExportTableToPointInTime", "dynamodb:GetRecords",
       "logs:GetLogEvents", "logs:FilterLogEvents", "logs:StartQuery", "logs:GetQueryResults",
+      "acm:ExportCertificate",
     ]
     resources = ["*"]
   }
