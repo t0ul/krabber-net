@@ -3,6 +3,7 @@
 package web
 
 import (
+	"cmp"
 	"html/template"
 	"log/slog"
 	"net/http"
@@ -50,6 +51,9 @@ type App struct {
 	// trophiesHeld skips award attempts for trophies a krab already has.
 	trophiesHeld *heldTrophies
 	strangersSea *seaForStrangers
+
+	version string    // the build's commit, for @system's molts
+	started time.Time // for @system's uptime
 }
 
 // Deps are the collaborators App needs.
@@ -61,6 +65,7 @@ type Deps struct {
 	Fanout   FanoutQueue
 	Notifier Notifier
 	Cards    CardQueue
+	Version  string // the build's commit; "dev" when unset
 }
 
 // New builds the App, parsing templates and configuring sessions.
@@ -107,5 +112,7 @@ func New(d Deps) (*App, error) {
 
 		trophiesHeld: &heldTrophies{},
 		strangersSea: &seaForStrangers{},
+		version:      cmp.Or(d.Version, "dev"),
+		started:      time.Now(),
 	}, nil
 }

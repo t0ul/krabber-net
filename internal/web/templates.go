@@ -233,6 +233,7 @@ var templateFuncs = template.FuncMap{
 	"join":           strings.Join,
 	"commas":         commas,
 	"trophy":         trophyByID,
+	"krab":           richtext.Krabify,
 	"manualTrophies": trophies.Manual,
 	"modActionLabel": modActionLabel,
 	"reportLabel":    store.ReportLabel,

@@ -368,8 +368,11 @@ func (app *App) renderActions(w http.ResponseWriter, r *http.Request, m *store.M
 		app.serverError(w, r, err)
 		return
 	}
-	data := templateData{IsAuthenticated: true, CSRFToken: csrfToken(r), CrabID: currentCrab(r).ID}
-	app.renderTemplate(w, r, http.StatusOK, fragmentPage, "molt-actions", map[string]any{"M": fresh, "D": data})
+	c := currentCrab(r)
+	data := templateData{IsAuthenticated: true, CSRFToken: csrfToken(r), CrabID: c.ID, IsModerator: c.IsModerator()}
+	// The bar holds the "…" menu, whose delete leaves the thread page when on it.
+	thread := strings.Contains(r.Header.Get("HX-Current-URL"), "/molt/view/"+fresh.ID)
+	app.renderTemplate(w, r, http.StatusOK, fragmentPage, "molt-actions", map[string]any{"M": fresh, "D": data, "Thread": thread})
 }
 
 // freshMolt re-reads m with the viewer's like and remolt filled in.

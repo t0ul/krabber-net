@@ -21,7 +21,7 @@
         {{ range .Sidebar.Trending }}
         <a href="/krabtag/{{ .Name }}">
             <div class="trending-tag">
-                <span class="text-primary">%{{ .Name }}</span>
+                <span class="text-primary">%{{ krab .Name }}</span>
                 <small class="text-muted">Used by {{ .Crabs }} krab{{ if ne .Crabs 1 }}s{{ end }} recently.</small>
             </div>
         </a>

@@ -23,6 +23,9 @@ import (
 	"github.com/t0ul/krabber-net/internal/web"
 )
 
+// version is the commit the binary was built from (make build sets it).
+var version = "dev"
+
 func main() {
 	log := platform.NewLogger(slog.LevelInfo)
 	if err := run(log); err != nil {
@@ -75,6 +78,7 @@ func run(log *slog.Logger) error {
 		Fanout:   runner,
 		Notifier: runner,
 		Cards:    runner,
+		Version:  version,
 	})
 	if err != nil {
 		return err
@@ -83,7 +87,10 @@ func run(log *slog.Logger) error {
 	jobsCtx, stopJobs := context.WithCancel(context.Background())
 	defer stopJobs()
 	runner.Start(jobsCtx)
-	go app.WarmUp(jobsCtx)
+	go func() {
+		app.WarmUp(jobsCtx)
+		app.RunSystemKrab(jobsCtx)
+	}()
 
 	srv := &http.Server{
 		Addr:              cfg.Addr,

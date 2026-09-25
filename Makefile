@@ -4,7 +4,8 @@ DYNAMO_ENDPOINT ?= http://localhost:8000
 TABLE_NAME      ?= krabber-dev
 # macOS AirPlay Receiver holds :5000, so local dev uses :5050 (Beanstalk uses :5000).
 PORT            ?= 5050
-GO_BUILD        := CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags="-s -w"
+VERSION         := $(shell git rev-parse --short HEAD 2>/dev/null || echo dev)
+GO_BUILD        := CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags="-s -w -X main.version=$(VERSION)"
 
 .PHONY: help dev db db-down seed run test test-unit lint vet fmt vuln build bundle clean plan apply deploy
 

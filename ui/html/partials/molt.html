@@ -67,7 +67,6 @@
                 <a class="mini-molt-timestamp zindex-front" href="/molt/view/{{ $m.ID }}">· {{ template "time" $m.CreatedAt }}</a>
                 {{ if $m.NSFW }}{{ template "nsfw-badge" }}{{ end }}
             </div>
-            {{ template "molt-menu" . }}
         </div>
         <div class="mini-molt-content">
             {{ if $m.Veiled }}
@@ -133,7 +132,7 @@
      and the parent's action bar so its reply count updates. */}}
 {{define "reply-created"}}
 {{ template "molt" . }}
-<div id="thread-actions" hx-swap-oob="true">{{ template "molt-actions" (dict "M" .Parent "D" .D) }}</div>
+<div id="thread-actions" hx-swap-oob="true">{{ template "molt-actions" (dict "M" .Parent "D" .D "Thread" true) }}</div>
 {{end}}
 
 {{/* The "…" menu. Pass "Thread" true on the thread page so deleting moves on. */}}
@@ -253,6 +252,7 @@
             <span class="mini-molt-action-counter ml-1">{{ $m.LikeCount }}</span>
         </button>
     </form>
+    {{ template "molt-menu" . }}
     {{ else }}
     <span class="mini-molt-action remolt" title="Remolts">
         <svg class="mini-molt-action-icon" width="19" height="19"><use href="{{ asset "img/sprites.svg" }}#repeat"></use></svg>

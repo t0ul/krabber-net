@@ -32,7 +32,6 @@
                 <span class="mini-molt-username">@{{ .Author }}</span>
                 {{ if .NSFW }}{{ template "nsfw-badge" }}{{ end }}
             </div>
-            {{ template "molt-menu" (dict "M" . "D" $d "Thread" true) }}
         </div>
         {{ if .Veiled }}
         <details class="kb-nsfw mb-2">
@@ -55,7 +54,7 @@
             {{ if .LikeCount }}<a href="/molt/likes/view/{{ .ID }}" class="text-muted mr-3"><span class="text-light font-weight-bold">{{ .LikeCount }}</span> Like{{ if ne .LikeCount 1 }}s{{ end }}</a>{{ end }}
         </div>
         {{ end }}
-        <div id="thread-actions">{{ template "molt-actions" (dict "M" . "D" $d) }}</div>
+        <div id="thread-actions">{{ template "molt-actions" (dict "M" . "D" $d "Thread" true) }}</div>
     </div>
 
     {{ if $d.IsAuthenticated }}

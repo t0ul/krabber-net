@@ -22,9 +22,41 @@ const (
 )
 
 var (
-	token = regexp.MustCompile(`(?:^|\s)(?:@([A-Za-z0-9_]{1,32})\b|%([\p{L}\p{N}_]+)|((?i:https?)://[^\s<>"]+))`)
-	tagRe = regexp.MustCompile(`^[\p{L}\p{N}_]+$`)
+	token  = regexp.MustCompile(`(?:^|\s)(?:@([A-Za-z0-9_]{1,32})\b|%([\p{L}\p{N}_]+)|((?i:https?)://[^\s<>"]+))`)
+	tagRe  = regexp.MustCompile(`^[\p{L}\p{N}_]+$`)
+	crabRe = regexp.MustCompile(`[cC][rR][aA][bB]`)
 )
+
+// Krabify spells every "crab" in s as "krab", keeping the case of each
+// letter (Crab → Krab, CRAB → KRAB, crabs → krabs, Crabber → Krabber).
+// Molts are stored as written and changed only when shown, so it can be
+// undone, and mentions (usernames) and links aren't touched.
+func Krabify(s string) string {
+	return crabRe.ReplaceAllStringFunc(s, func(w string) string {
+		if w[0] == 'C' {
+			return "K" + w[1:]
+		}
+		return "k" + w[1:]
+	})
+}
+
+// urlLike finds addresses in plain text that aren't linked (say, one in
+// parentheses), which must keep their spelling.
+var urlLike = regexp.MustCompile(`(?i)https?://[^\s<>"]+`)
+
+// text escapes a plain stretch of molt text for HTML, with crab spelled krab
+// outside anything that looks like an address.
+func text(s string) string {
+	var b strings.Builder
+	last := 0
+	for _, m := range urlLike.FindAllStringIndex(s, -1) {
+		b.WriteString(html.EscapeString(Krabify(s[last:m[0]])))
+		b.WriteString(html.EscapeString(s[m[0]:m[1]]))
+		last = m[1]
+	}
+	b.WriteString(html.EscapeString(Krabify(s[last:])))
+	return b.String()
+}
 
 // linkEnd trims punctuation that usually ends the sentence, not the link,
 // from the link at s[start:end], and returns the new end.
@@ -146,8 +178,9 @@ func collect(s string, group int, ok func(string) bool) []string {
 	return out
 }
 
-// HTML escapes s and links its crabtags, web links, and the mentions that
-// known resolves to a crab (it returns the crab's username as stored).
+// HTML escapes s (crab spelled krab, see Krabify) and links its krabtags,
+// web links, and the mentions that
+// known resolves to a krab (it returns the krab's username as stored).
 func HTML(s string, known func(lowerName string) (string, bool)) template.HTML {
 	var b strings.Builder
 	last := 0
@@ -159,7 +192,7 @@ func HTML(s string, known func(lowerName string) (string, bool)) template.HTML {
 				continue
 			}
 			at := m[2] - 1
-			b.WriteString(html.EscapeString(s[last:at]))
+			b.WriteString(text(s[last:at]))
 			b.WriteString(`<a href="/krabs/` + url.PathEscape(name) + `" class="mention zindex-front">`)
 			b.WriteString(html.EscapeString(s[at:m[3]]))
 			b.WriteString(`</a>`)
@@ -170,9 +203,9 @@ func HTML(s string, known func(lowerName string) (string, bool)) template.HTML {
 				continue
 			}
 			pct := m[4] - 1
-			b.WriteString(html.EscapeString(s[last:pct]))
+			b.WriteString(text(s[last:pct]))
 			b.WriteString(`<a href="/krabtag/` + url.PathEscape(strings.ToLower(name)) + `" class="crabtag zindex-front">`)
-			b.WriteString(html.EscapeString(s[pct:m[5]]))
+			b.WriteString(text(s[pct:m[5]]))
 			b.WriteString(`</a>`)
 			last = m[5]
 		case m[6] >= 0:
@@ -181,13 +214,13 @@ func HTML(s string, known func(lowerName string) (string, bool)) template.HTML {
 			if err != nil || u.Host == "" {
 				continue
 			}
-			b.WriteString(html.EscapeString(s[last:m[6]]))
+			b.WriteString(text(s[last:m[6]]))
 			b.WriteString(`<a href="` + html.EscapeString(s[m[6]:end]) + `" class="mention zindex-front" target="_blank" rel="nofollow ugc noopener noreferrer">`)
 			b.WriteString(html.EscapeString(linkText(s[m[6]:end])))
 			b.WriteString(`</a>`)
 			last = end
 		}
 	}
-	b.WriteString(html.EscapeString(s[last:]))
+	b.WriteString(text(s[last:]))
 	return template.HTML(b.String()) //nolint:gosec // every piece of s is escaped above
 }

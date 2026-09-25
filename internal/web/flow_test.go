@@ -2460,6 +2460,69 @@ func TestInviteCodes(t *testing.T) {
 	}
 }
 
+func TestSystemKrab(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	h.signupAndActivate("karen", "karen@krabber.test", "computer-wife!")
+	h.app.version = "abc1234"
+
+	c, err := h.app.systemKrab(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if again, err := h.app.systemKrab(ctx); err != nil || again.ID != c.ID {
+		t.Fatalf("second load made another krab: %v", err)
+	}
+	if !c.Verified || c.DisplayName != "Krabber System" {
+		t.Errorf("system krab: %+v", c)
+	}
+
+	// Two servers posting the same molt: only one gets through.
+	for range 2 {
+		h.app.systemMolt(ctx, c, "system#version#abc1234", time.Hour, func() string { return "new version abc1234" })
+	}
+	h.app.systemMolt(ctx, c, "system#daily#test", time.Hour, func() string { return h.app.dailyReport(ctx, time.Now().UTC()) })
+	molts, err := h.store.MoltsByOwner(ctx, c.ID, 10)
+	if err != nil || len(molts) != 2 {
+		t.Fatalf("system molts: %d %v", len(molts), err)
+	}
+	report := molts[0].Content
+	for _, want := range []string{"all systems nominal", "2 krabs (2 new)", "abc1234", "%status"} {
+		if !strings.Contains(report, want) {
+			t.Errorf("daily report %q lacks %q", report, want)
+		}
+	}
+	if len([]rune(report)) > store.MaxMoltLength {
+		t.Errorf("daily report is %d characters", len([]rune(report)))
+	}
+	if _, body, _ := h.get("/krabs/system"); !strings.Contains(body, "Krabber System") || !strings.Contains(body, `aria-label="Verified"`) {
+		t.Error("@system's profile should show the name and the badge")
+	}
+}
+
+func TestMoltMenuEndsTheActionBar(t *testing.T) {
+	h := newHarness(t)
+	h.signupAndActivate("karen", "karen@krabber.test", "computer-wife!")
+	karen, _ := h.store.CrabByUsername(context.Background(), "karen")
+	m, err := h.store.CreateMolt(context.Background(), karen, "menu check")
+	if err != nil {
+		t.Fatal(err)
+	}
+	h.login("karen@krabber.test", "computer-wife!")
+	for _, path := range []string{"/sea", "/molt/view/" + m.ID} {
+		_, body, _ := h.get(path)
+		bar := body[strings.Index(body, m.ID):]
+		bar = bar[strings.Index(bar, `class="mini-molt-actions`):]
+		if i := strings.Index(bar[1:], `class="mini-molt-actions`); i > 0 {
+			bar = bar[:i]
+		}
+		if strings.Count(body, `aria-label="More options"`) != 1 || !strings.Contains(bar, `aria-label="More options"`) {
+			t.Errorf("%s: the … menu should be the action bar's last item, once (%d menus, in bar: %v)", path,
+				strings.Count(body, `aria-label="More options"`), strings.Contains(bar, `aria-label="More options"`))
+		}
+	}
+}
+
 func TestStrangersSeeTheFirstPageOnly(t *testing.T) {
 	h := newHarness(t)
 	ctx := context.Background()

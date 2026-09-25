@@ -34,6 +34,33 @@ func TestHTML(t *testing.T) {
 	}
 }
 
+func TestKrabify(t *testing.T) {
+	for in, want := range map[string]string{
+		"crab":                    "krab",
+		"Crab CRAB cRaB":          "Krab KRAB kRaB",
+		"crabs love Crabber":      "krabs love Krabber",
+		"scrabble, crabcakes":     "skrabble, krabcakes",
+		"no crustaceans here":     "no crustaceans here",
+		"cab rab":                 "cab rab",
+		"king crab 🦀 and a crab!": "king krab 🦀 and a krab!",
+	} {
+		if got := Krabify(in); got != want {
+			t.Errorf("Krabify(%q) = %q, want %q", in, got, want)
+		}
+	}
+
+	// Plain text and a tag's text change; mentions and links don't, and the
+	// tag still links to what was typed.
+	known := func(name string) (string, bool) { return "crabman", name == "crabman" }
+	got := string(HTML("a crab @crabman %crabrave https://en.wikipedia.org/wiki/Crab", known))
+	want := `a krab <a href="/krabs/crabman" class="mention zindex-front">@crabman</a> ` +
+		`<a href="/krabtag/crabrave" class="crabtag zindex-front">%krabrave</a> ` +
+		`<a href="https://en.wikipedia.org/wiki/Crab" class="mention zindex-front" target="_blank" rel="nofollow ugc noopener noreferrer">en.wikipedia.org/wiki/Crab</a>`
+	if got != want {
+		t.Errorf("HTML =\n%s\nwant\n%s", got, want)
+	}
+}
+
 func TestLinks(t *testing.T) {
 	none := func(string) (string, bool) { return "", false }
 	got := string(HTML(`see https://krabber.net/krabs/bob?a=1&b="2". and (https://en.wikipedia.org/wiki/Crab_(disambiguation)) ok`, none))

@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/t0ul/krabber-net/internal/richtext"
 	"github.com/t0ul/krabber-net/internal/store"
 )
 
@@ -133,9 +134,11 @@ func (app *App) search(r *http.Request, q string) ([]crabRow, []store.Molt) {
 			}
 		}
 	}
+	// Molts show crab as krab, so search matches the way they read.
+	shown := strings.ToLower(richtext.Krabify(q))
 	var molts []store.Molt
 	for _, m := range recent {
-		if !m.Remolt && strings.Contains(strings.ToLower(m.Content), needle) {
+		if !m.Remolt && strings.Contains(strings.ToLower(richtext.Krabify(m.Content)), shown) {
 			molts = append(molts, m)
 			if len(molts) == searchResultLimit {
 				break

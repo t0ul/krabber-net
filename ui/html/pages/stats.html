@@ -48,7 +48,7 @@
         </div>
 
         {{ template "stats-heading" (dict "Title" "Trendy" "Why" "The krabtag the most krabs used this week") }}
-        {{ with .Trendy }}<div class="trendy-tag"><h2 class="text-center"><a class="text-primary" href="/krabtag/{{ . }}">%{{ . }}</a></h2></div>{{ end }}
+        {{ with .Trendy }}<div class="trendy-tag"><h2 class="text-center"><a class="text-primary" href="/krabtag/{{ . }}">%{{ krab . }}</a></h2></div>{{ end }}
         <div class="trendy-tag-molts neue-card neue-card-media p-1">
             {{ range .TrendyMolts }}{{ template "molt" (dict "M" . "D" $d) }}{{ else }}<div class="p-5 text-muted text-center">Nothing here.</div>{{ end }}
         </div>
