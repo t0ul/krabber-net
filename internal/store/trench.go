@@ -71,6 +71,41 @@ func (s *Store) AddToTrenches(ctx context.Context, m *Molt, followerIDs []string
 	return nil
 }
 
+// BackfillTrench puts molts (a newly followed krab's latest) into one
+// crab's trench, in one batch, so following someone shows their molts right
+// away rather than only what they post next.
+func (s *Store) BackfillTrench(ctx context.Context, crabID string, molts []Molt) error {
+	expires := s.now().Add(trenchRetention).Unix()
+	var writes []types.WriteRequest
+	for i := range molts {
+		m := &molts[i]
+		if m.Remolt || m.ReplyTo != "" || len(writes) == 25 {
+			continue
+		}
+		item, err := marshal(trenchEntry{PK: trenchPK(crabID), SK: trenchSK(m.ID), MoltPK: m.PK, MoltSK: m.SK, ExpiresAt: expires})
+		if err != nil {
+			return err
+		}
+		writes = append(writes, types.WriteRequest{PutRequest: &types.PutRequest{Item: item}})
+	}
+	if len(writes) == 0 {
+		return nil
+	}
+	req := map[string][]types.WriteRequest{s.table: writes}
+	err := retryUnprocessed(ctx, 8, func() (int, error) {
+		res, err := s.db.BatchWriteItem(ctx, &dynamodb.BatchWriteItemInput{RequestItems: req})
+		if err != nil {
+			return 0, err
+		}
+		req = res.UnprocessedItems
+		return len(req[s.table]), nil
+	})
+	if err != nil {
+		return fmt.Errorf("backfill trench: %w", err)
+	}
+	return nil
+}
+
 // Trench returns the newest molts from the crabs that crabID follows.
 func (s *Store) Trench(ctx context.Context, crabID string, limit int) ([]Molt, error) {
 	p, err := s.TrenchPage(ctx, crabID, "", limit)

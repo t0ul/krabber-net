@@ -132,8 +132,36 @@ func (app *App) sea(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *App) trench(w http.ResponseWriter, r *http.Request) {
-	p, err := app.store.TrenchPage(r.Context(), currentCrab(r).ID, afterParam(r), pageSize)
-	app.renderFeed(w, r, "trench.html", p, err, "Your trench is empty. Molt something, or follow some krabs.")
+	c := currentCrab(r)
+	p, err := app.store.TrenchPage(r.Context(), c.ID, afterParam(r), pageSize)
+	data := app.newTemplateData(r)
+	if !app.setPage(w, r, &data, p, err) {
+		return
+	}
+	// Someone who follows nobody yet gets a few krabs to start with.
+	if c.FollowingCount == 0 && afterParam(r) == "" {
+		data.CrabRows = app.starterKrabs(r, onboardingPicks)
+	}
+	app.finishFeed(w, r, "trench.html", data, "Your trench is empty. Molt something, or follow some krabs.")
+}
+
+const onboardingPicks = 6
+
+// starterKrabs are the most followed krabs, from the directory (free),
+// leaving out the viewer, @system and anyone hidden from them.
+func (app *App) starterKrabs(r *http.Request, n int) []crabRow {
+	me := currentCrab(r).ID
+	hidden := app.hidden(r)
+	var rows []crabRow
+	for _, c := range app.dirData(r).crabs {
+		if len(rows) == n {
+			break
+		}
+		if c.ID != me && c.UserName != systemName && !hidden(c.ID) {
+			rows = append(rows, crabRow{Crab: c})
+		}
+	}
+	return rows
 }
 
 // notifications lists the crab's notifications and clears the unread badge.
@@ -366,6 +394,23 @@ func (app *App) unfollowPost(w http.ResponseWriter, r *http.Request) {
 	app.setFollow(w, r, false)
 }
 
+// backfillMolts is how many of a newly followed krab's molts go straight
+// into the follower's Trench (one batch write).
+const backfillMolts = 10
+
+// backfill puts followee's latest molts in the viewer's Trench, which
+// otherwise only gets what they post from now on. It's a bonus, so a
+// failure is only logged.
+func (app *App) backfill(r *http.Request, followee *store.Crab) {
+	molts, err := app.store.MoltsByOwner(r.Context(), followee.ID, backfillMolts)
+	if err == nil {
+		err = app.store.BackfillTrench(r.Context(), currentCrab(r).ID, molts)
+	}
+	if err != nil {
+		app.log.Warn("trench backfill", "err", err, "followee", followee.ID)
+	}
+}
+
 // setFollow follows or unfollows, then returns the updated button.
 func (app *App) setFollow(w http.ResponseWriter, r *http.Request, follow bool) {
 	followee, ok := app.crabFromPath(w, r)
@@ -378,6 +423,7 @@ func (app *App) setFollow(w http.ResponseWriter, r *http.Request, follow bool) {
 		if err == nil {
 			app.notify(r, followee.ID, store.NotifyFollow, "", "")
 			app.awardFollow(r.Context(), currentCrab(r), followee, true)
+			app.backfill(r, followee)
 		}
 		if errors.Is(err, store.ErrBlocked) {
 			follow = false

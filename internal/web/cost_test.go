@@ -188,7 +188,7 @@ func TestCostProfile(t *testing.T) {
 		{"POST reply", [2]float64{8, 11}, func() {
 			h.post("/molt/reply/"+molts[7].ID, url.Values{"csrf_token": {tok}, "content": {"nice"}}, "HX-Request", "true")
 		}},
-		{"POST follow", [2]float64{4, 13}, func() {
+		{"POST follow (+ up to 10 backfilled molts)", [2]float64{4, 25}, func() {
 			h.post("/follow/"+krabs[22].ID, url.Values{"csrf_token": {tok}}, "HX-Request", "true")
 		}},
 		{"POST unfollow", [2]float64{5, 8}, func() {

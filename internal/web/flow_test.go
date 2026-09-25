@@ -2468,6 +2468,34 @@ func TestInviteCodes(t *testing.T) {
 	}
 }
 
+func TestOnboardingAndBackfill(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	h.signupAndActivate("karen", "karen@krabber.test", "computer-wife!")
+	sandy, err := h.store.CreateCrab(ctx, "sandy", "sandy@krabber.test", []byte("h"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := h.store.ActivateCrab(ctx, sandy.ID); err != nil {
+		t.Fatal(err)
+	}
+	sandy, _ = h.store.CrabByKey(ctx, sandy.PK, sandy.SK)
+	if _, err := h.store.CreateMolt(ctx, sandy, "hi-yah! karate time"); err != nil {
+		t.Fatal(err)
+	}
+
+	h.login("karen@krabber.test", "computer-wife!")
+	_, body, _ := h.get("/trench")
+	if !strings.Contains(body, `id="onboarding"`) || !strings.Contains(body, "/krabs/sandy") || strings.Contains(body, "karate time") {
+		t.Fatal("a krab who follows nobody should see starter krabs and an empty Trench")
+	}
+	h.post("/follow/"+sandy.ID, url.Values{"csrf_token": {h.csrf("/trench")}}, "HX-Request", "true")
+	_, body, _ = h.get("/trench")
+	if strings.Contains(body, `id="onboarding"`) || !strings.Contains(body, "karate time") {
+		t.Error("after following, the welcome goes away and sandy's earlier molt is in the Trench")
+	}
+}
+
 func TestSystemKrab(t *testing.T) {
 	h := newHarness(t)
 	ctx := context.Background()

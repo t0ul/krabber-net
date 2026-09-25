@@ -3,6 +3,14 @@
 {{define "page"}}
 {{ template "shell-top" . }}
     {{ template "heading" "What your krab friends are saying... 🫧" }}
+    {{ with .CrabRows }}
+    <div class="kb-onboarding border-bottom border-dark px-3 pt-3 pb-2" id="onboarding">
+        <h5 class="mb-1">Welcome to the reef, @{{ $.CrabName }}!</h5>
+        <p class="text-muted small mb-2">Your Trench shows molts from the krabs you follow. Here are a few to start with; their latest molts land here as soon as you follow.</p>
+        {{ range . }}{{ template "crab-row" (dict "C" .Crab "D" $ "Following" .Following) }}{{ end }}
+        <p class="small text-muted mt-2 mb-0">Or wander <a href="/sea">the Sea</a>, or look through <a href="/krabs">every krab</a>. <a href="/trench">Refresh</a> once you've followed a few.</p>
+    </div>
+    {{ end }}
     {{ template "compose" . }}
     {{ if .FeedPath }}{{ template "new-molts" . }}{{ end }}
     {{ template "molt-list" . }}
