@@ -17,6 +17,7 @@ type statsPage struct {
 	WeekMolts   int
 	WeekMore    bool // the week has more molts than the snapshot holds
 	King        *store.Crab
+	Starter     *store.Crab // most invites; nil until someone joins with a code
 	Baby        *store.Crab
 	BabyDays    int
 	Best        *store.Molt
@@ -43,6 +44,9 @@ func (app *App) statsPage(w http.ResponseWriter, r *http.Request) {
 		}
 		if st.Baby == nil || c.CreatedAt.After(st.Baby.CreatedAt) {
 			st.Baby = c
+		}
+		if c.Invites > 0 && (st.Starter == nil || c.Invites > st.Starter.Invites) {
+			st.Starter = c
 		}
 	}
 	if st.Baby != nil {

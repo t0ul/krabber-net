@@ -58,6 +58,13 @@ func (s *Store) DeleteAccount(ctx context.Context, c *Crab) (*Crab, error) {
 			Key:       keyOf(avatarPK(c.Avatar), avatarSK()),
 		}})
 	}
+	if c.InviteCode != "" {
+		// The code points at the account item, which is going away.
+		items = append(items, types.TransactWriteItem{Delete: &types.Delete{
+			TableName: s.tableName(),
+			Key:       keyOf(invitePK(c.InviteCode), inviteSK()),
+		}})
+	}
 	err = s.transact(ctx, items...)
 	switch {
 	case cancelledAt(err, 0), cancelledAt(err, 1):

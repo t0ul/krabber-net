@@ -29,6 +29,7 @@
             <dt>Bio</dt><dd class="kb-bio">{{ or $c.Bio "—" }}</dd>
             <dt>Location</dt><dd>{{ or $c.Location "—" }}</dd>
             <dt>Website</dt><dd>{{ or $c.Website "—" }}</dd>
+            <dt>Invites</dt><dd>{{ with .InvitedBy }}Invited by <a href="/krabmin/krabs/{{ . }}">@{{ . }}</a> · {{ end }}invited {{ $c.Invites }}{{ with $c.InviteCode }} · code {{ . }}{{ if $.InviteDisabled }} (disabled){{ end }}{{ end }}</dd>
             {{ with $c.FunFacts }}{{ if not .Empty }}
             <dt>Fun facts</dt>
             <dd class="kb-bio">{{ with .Age }}Age: {{ . }}
@@ -75,6 +76,11 @@
             {{ if $c.Location }}<button type="submit" name="action" value="clear_location" class="btn btn-sm btn-outline-secondary rounded-pill mr-2 mb-2">Clear location</button>{{ end }}
             {{ if $c.Website }}<button type="submit" name="action" value="clear_website" class="btn btn-sm btn-outline-secondary rounded-pill mr-2 mb-2">Clear website</button>{{ end }}
             {{ if not $c.FunFacts.Empty }}<button type="submit" name="action" value="clear_fun_facts" class="btn btn-sm btn-outline-secondary rounded-pill mr-2 mb-2">Clear fun facts</button>{{ end }}
+            {{ if $c.InviteCode }}{{ if .InviteDisabled }}
+            <button type="submit" name="action" value="enable_invites" class="btn btn-sm btn-outline-light rounded-pill mr-2 mb-2">Re-enable invite code</button>
+            {{ else }}
+            <button type="submit" name="action" value="disable_invites" class="btn btn-sm btn-outline-secondary rounded-pill mr-2 mb-2">Disable invite code</button>
+            {{ end }}{{ end }}
             {{ if $.IsAdmin }}
                 {{ if $c.Verified }}
                 <button type="submit" name="action" value="unverify" class="btn btn-sm btn-outline-secondary rounded-pill mr-2 mb-2">Unverify</button>

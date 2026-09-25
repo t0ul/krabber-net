@@ -5,6 +5,12 @@
 {{ template "header" .}}
     <body class="bg-dark text-light">
     {{ with .Flash }}<div class="alert alert-info m-4 flash" role="status">{{ . }}</div>{{ end }}
+    {{ if eq .SignupMode "closed" }}
+    <div class="w-75 m-4" id="signup-closed">
+      <h1>Registration is temporarily closed.</h1>
+      <p class="text-muted mb-5">Check back soon. Already have an account? <a href="/krab/login">Log in</a></p>
+    </div>
+    {{ else }}
     <form action="/krab/signup" name="sign-up-form" class="w-75 m-4" method="POST" novalidate>
         <!-- Include the CSRF token -->
         <input type='hidden' name='csrf_token' value='{{.CSRFToken}}'>
@@ -48,6 +54,16 @@
         </div>
       </div>
 
+      <!-- Invite code -->
+      <div class="form-group cool-input">
+        <label for="invite-code">Invite code{{ if ne .SignupMode "invite" }} <span class="text-muted">(optional)</span>{{ end }}</label>
+        {{with .Form.FieldErrors.code}}
+            <label class='error'>{{.}}</label>
+        {{end}}
+        <input name="code" value="{{.Form.Code}}" type="text" class="form-control" id="invite-code" autocomplete="off" maxlength="16"{{ if eq .SignupMode "invite" }} required aria-required{{ end }}>
+        {{ if eq .SignupMode "invite" }}<small class="form-text text-muted">Krabber is invite-only for now. Ask a krab for their code.</small>{{ end }}
+      </div>
+
       {{ if .TurnstileSiteKey }}
         <div class="cf-turnstile mt-3" data-sitekey="{{ .TurnstileSiteKey }}" data-theme="dark"></div>
         <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
@@ -62,6 +78,7 @@
       </div>
       <button type="submit" class="btn btn-primary rounded-pill">Create account</button>
     </form>
+    {{ end }}
         <div class="text-muted text-center my-5" id="cookie-footer">
           <small>
             Krabber uses one cookie, to keep you signed in.

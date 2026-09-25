@@ -97,6 +97,25 @@
         <button type="submit" class="btn btn-outline-light rounded-pill">Save</button>
     </form>
 
+    {{ with .Form }}{{ if .InviteCode }}
+    <div class="px-3 py-3 border-bottom border-dark kb-settings" id="invites">
+        <h2 class="h6 font-weight-bold mb-3">Invite friends</h2>
+        {{ if .InviteDisabled }}
+        <p class="small text-muted mb-0">Your invite code has been disabled by a moderator.</p>
+        {{ else }}
+        <div class="input-group mb-2">
+            <div class="input-group-prepend"><label class="input-group-text kb-fun-label" for="invite-code">Invite code</label></div>
+            <input type="text" id="invite-code" class="form-control" value="{{ .InviteCode }}" readonly>
+        </div>
+        <div class="input-group mb-2">
+            <div class="input-group-prepend"><label class="input-group-text kb-fun-label" for="invite-link">Invite link</label></div>
+            <input type="text" id="invite-link" class="form-control" value="{{ .InviteLink }}" readonly>
+        </div>
+        <small class="form-text text-muted">{{ if .Invites }}{{ .Invites }} krab{{ if ne .Invites 1 }}s have{{ else }} has{{ end }} joined with your code.{{ else }}Nobody has joined with your code yet.{{ end }}</small>
+        {{ end }}
+    </div>
+    {{ end }}{{ end }}
+
     <form class="px-3 py-3 border-bottom border-dark kb-settings" method="POST" action="/settings/appearance">
         <input type='hidden' name='csrf_token' value='{{ .CSRFToken }}'>
         <h2 class="h6 font-weight-bold mb-3">Appearance</h2>

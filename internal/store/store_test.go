@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -1151,6 +1152,54 @@ func TestChangeUsername(t *testing.T) {
 	}
 	if c, err := s.CrabByUsername(ctx, "COMPUTER"); err != nil || c.UserName != "computer" {
 		t.Fatalf("after case change: %+v %v", c, err)
+	}
+}
+
+func TestInviteCodes(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+	karen := mustCrab(t, s, "karen")
+	code, err := s.EnsureInviteCode(ctx, karen)
+	if err != nil || len(code) != inviteCodeLen {
+		t.Fatalf("code %q %v", code, err)
+	}
+	if again, _ := s.EnsureInviteCode(ctx, karen); again != code {
+		t.Fatalf("a second call made a new code: %q", again)
+	}
+
+	sandy, err := s.CreateCrab(ctx, "sandy", "sandy@krabber.test", []byte("h"), " "+strings.ToUpper(code)+" ")
+	if err != nil || sandy.InvitedBy != karen.ID {
+		t.Fatalf("signup with code: %+v %v", sandy, err)
+	}
+	if fresh, _ := s.CrabByID(ctx, karen.ID); fresh.Invites != 1 {
+		t.Fatalf("invites = %d", fresh.Invites)
+	}
+	if _, err := s.CreateCrab(ctx, "gary", "gary@krabber.test", []byte("h"), "nope1234"); !errors.Is(err, ErrInvalidInvite) {
+		t.Fatalf("unknown code: %v", err)
+	}
+	if _, err := s.CrabByUsername(ctx, "gary"); !errors.Is(err, ErrNotFound) {
+		t.Fatal("a failed invite still created the account")
+	}
+
+	if err := s.SetInviteCodeDisabled(ctx, karen, true); err != nil {
+		t.Fatal(err)
+	}
+	if off, _ := s.InviteCodeDisabled(ctx, karen); !off {
+		t.Fatal("not disabled")
+	}
+	if _, err := s.CreateCrab(ctx, "gary", "gary@krabber.test", []byte("h"), code); !errors.Is(err, ErrInvalidInvite) {
+		t.Fatalf("disabled code: %v", err)
+	}
+	if err := s.SetInviteCodeDisabled(ctx, karen, false); err != nil {
+		t.Fatal(err)
+	}
+
+	fresh, _ := s.CrabByID(ctx, karen.ID)
+	if _, err := s.DeleteAccount(ctx, fresh); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.CreateCrab(ctx, "gary", "gary@krabber.test", []byte("h"), code); !errors.Is(err, ErrInvalidInvite) {
+		t.Fatalf("a deleted crab's code: %v", err)
 	}
 }
 

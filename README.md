@@ -63,6 +63,7 @@ Tests that need DynamoDB Local are skipped when `KRABBER_TEST_DYNAMO_ENDPOINT` i
 | `MAIL_FROM`, `MAIL_DAILY_CAP`, `MAIL_CONFIGURATION_SET` | Email sender, daily limit (500), SES configuration set |
 | `CONTACT_EMAIL` | Address shown on the terms and privacy pages and in ban emails; left out when unset |
 | `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET` | Cloudflare Turnstile on signup and resend; off when unset |
+| `SIGNUP_MODE` | `open` (default; an invite code is optional), `invite` (a krab's invite code is required) or `closed` |
 | `DYNAMO_ENDPOINT` | DynamoDB Local URL; dev only |
 | `PORT` | Listen port, 5000 by default (Beanstalk's) |
 

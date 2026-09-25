@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/t0ul/krabber-net/internal/auth"
+	"github.com/t0ul/krabber-net/internal/config"
 	"github.com/t0ul/krabber-net/internal/mail"
 	"github.com/t0ul/krabber-net/internal/store"
 	"github.com/t0ul/krabber-net/internal/validator"
@@ -27,6 +28,7 @@ type signupForm struct {
 	Name                string `form:"name"`
 	Email               string `form:"email"`
 	Password            string `form:"password"`
+	Code                string `form:"code"` // invite code
 	Turnstile           string `form:"cf-turnstile-response"`
 	validator.Validator `form:"-"`
 }
@@ -50,7 +52,7 @@ type resendForm struct {
 
 func (app *App) signupPage(w http.ResponseWriter, r *http.Request) {
 	data := app.newTemplateData(r)
-	data.Form = signupForm{}
+	data.Form = signupForm{Code: store.NormalizeInviteCode(r.URL.Query().Get("code"))}
 	app.render(w, r, http.StatusOK, "signup.html", data)
 }
 
@@ -61,12 +63,18 @@ func (app *App) signupPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	f.Email = store.NormalizeEmail(f.Email)
+	f.Code = store.NormalizeInviteCode(f.Code)
 
 	rerender := func(status int) {
 		f.Password = ""
 		data := app.newTemplateData(r)
 		data.Form = f
 		app.render(w, r, status, "signup.html", data)
+	}
+	if app.cfg.SignupMode == config.SignupClosed {
+		f.AddNonFieldError("Registration is temporarily closed.")
+		rerender(http.StatusUnprocessableEntity)
+		return
 	}
 
 	if ok, err := app.underLimit(r, "signup-ip", clientIP(r), signupIPLimit, time.Hour); err != nil {
@@ -83,6 +91,9 @@ func (app *App) signupPost(w http.ResponseWriter, r *http.Request) {
 	f.CheckField(validator.Matches(f.Email, validator.EmailRX), "email", "This field must be a valid email address")
 	f.CheckField(validator.MinChars(f.Password, auth.MinPasswordLength), "password", "This field must be at least 8 characters long")
 	f.CheckField(validator.MaxBytes(f.Password, auth.MaxPasswordLength), "password", "This field must be at most 72 bytes long")
+	if app.cfg.SignupMode == config.SignupInvite {
+		f.CheckField(f.Code != "", "code", "You need an invite code from a krab to join right now")
+	}
 	if !f.Valid() {
 		rerender(http.StatusUnprocessableEntity)
 		return
@@ -101,8 +112,12 @@ func (app *App) signupPost(w http.ResponseWriter, r *http.Request) {
 		app.serverError(w, r, err)
 		return
 	}
-	crab, err := app.store.CreateCrab(r.Context(), f.Name, f.Email, hash)
+	crab, err := app.store.CreateCrab(r.Context(), f.Name, f.Email, hash, f.Code)
 	switch {
+	case errors.Is(err, store.ErrInvalidInvite):
+		f.AddFieldError("code", "That invite code doesn't work")
+		rerender(http.StatusUnprocessableEntity)
+		return
 	case errors.Is(err, store.ErrDuplicateEmail):
 		f.AddFieldError("email", "Email address is already in use")
 		rerender(http.StatusUnprocessableEntity)
@@ -116,6 +131,12 @@ func (app *App) signupPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if crab.InvitedBy != "" {
+		// Stats and the directory show the inviter's new count straight away.
+		if inviter, err := app.store.CrabByID(r.Context(), crab.InvitedBy); err == nil {
+			app.dir.putCrab(*inviter)
+		}
+	}
 	flash := "Your account is ready. Check your email for the activation link."
 	if err := app.sendActivation(r, crab); err != nil {
 		app.log.Warn("activation email not sent", "err", err, "crab", crab.ID)

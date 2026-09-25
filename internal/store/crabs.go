@@ -47,6 +47,10 @@ type Crab struct {
 
 	UsernameChangedAt int64 `dynamodbav:"username_changed_at,omitempty"` // Unix seconds of the last rename
 
+	InviteCode string `dynamodbav:"invite_code,omitempty"` // this crab's code for inviting others
+	InvitedBy  string `dynamodbav:"invited_by,omitempty"`  // ID of the crab whose code they signed up with
+	Invites    int    `dynamodbav:"invites,omitempty"`     // crabs who signed up with this crab's code
+
 	// The molt shown at the top of the crab's profile, if any.
 	PinnedMoltID string `dynamodbav:"pinned_molt_id,omitempty"`
 	PinnedMoltPK string `dynamodbav:"pinned_molt_pk,omitempty"`
@@ -273,7 +277,15 @@ func (c *Crab) CanSignIn() bool { return c.Activated && !c.Banned && !c.Deleted 
 
 // CreateCrab registers a new, not yet activated account. Email and username
 // are each unique; the username marker item enforces the latter.
-func (s *Store) CreateCrab(ctx context.Context, username, email string, passwordHash []byte) (*Crab, error) {
+func (s *Store) CreateCrab(ctx context.Context, username, email string, passwordHash []byte, invite ...string) (*Crab, error) {
+	var inviteItems []types.TransactWriteItem
+	invitedBy := ""
+	if len(invite) > 0 && invite[0] != "" {
+		var err error
+		if inviteItems, invitedBy, err = s.inviteWrites(ctx, NormalizeInviteCode(invite[0])); err != nil {
+			return nil, err
+		}
+	}
 	id := newID()
 	c := &Crab{
 		PK:           crabPK(email),
@@ -285,6 +297,7 @@ func (s *Store) CreateCrab(ctx context.Context, username, email string, password
 		Email:        normalizeEmail(email),
 		PasswordHash: passwordHash,
 		CreatedAt:    s.now(),
+		InvitedBy:    invitedBy,
 	}
 	nameItem, err := marshal(usernameMarker{PK: usernamePK(username), SK: usernameSK(), CrabID: id})
 	if err != nil {
@@ -304,7 +317,7 @@ func (s *Store) CreateCrab(ctx context.Context, username, email string, password
 		if err != nil {
 			return nil, err
 		}
-		err = s.transact(ctx, s.putNew(crabItem), s.putUsername(nameItem, id, false), s.putNew(avItem))
+		err = s.transact(ctx, append([]types.TransactWriteItem{s.putNew(crabItem), s.putUsername(nameItem, id, false), s.putNew(avItem)}, inviteItems...)...)
 		switch {
 		case cancelledAt(err, 0):
 			return nil, ErrDuplicateEmail
@@ -312,6 +325,8 @@ func (s *Store) CreateCrab(ctx context.Context, username, email string, password
 			return nil, ErrDuplicateUsername
 		case cancelledAt(err, 2):
 			continue
+		case cancelledAt(err, 3), cancelledAt(err, 4):
+			return nil, ErrInvalidInvite
 		case err != nil:
 			return nil, fmt.Errorf("create crab: %w", err)
 		}
@@ -378,9 +393,10 @@ func (s *Store) ListCrabs(ctx context.Context, limit int) ([]Crab, map[string]bo
 	p := dynamodb.NewScanPaginator(s.db, &dynamodb.ScanInput{
 		TableName:            s.tableName(),
 		IndexName:            aws.String(gsiCrabByID),
-		ProjectionExpression: aws.String("#id, #un, #frc, #fgc, #mc, #act, #ban, #del, #ca, #dn, #bio, #av, #ver"),
+		ProjectionExpression: aws.String("#id, #un, #frc, #fgc, #mc, #act, #ban, #del, #ca, #dn, #bio, #av, #ver, #inv"),
 		ExpressionAttributeNames: map[string]string{
 			"#ver": "verified",
+			"#inv": "invites",
 			"#dn":  "display_name",
 			"#bio": "bio",
 			"#ca":  "created_at",

@@ -86,6 +86,15 @@ func (app *App) crabminCrab(w http.ResponseWriter, r *http.Request) {
 	data.Profile = c
 	data.Molts = molts[:min(len(molts), pageSize)]
 	data.CanModerate = app.canModerate(currentCrab(r), c) == nil
+	if c.InvitedBy != "" {
+		if inviter, err := app.store.CrabByID(r.Context(), c.InvitedBy); err == nil {
+			data.InvitedBy = inviter.UserName
+		}
+	}
+	if data.InviteDisabled, err = app.store.InviteCodeDisabled(r.Context(), c); err != nil {
+		app.serverError(w, r, err)
+		return
+	}
 	app.render(w, r, http.StatusOK, "crabmin-crab.html", data)
 }
 
@@ -218,6 +227,16 @@ func (app *App) crabminCrabPost(w http.ResponseWriter, r *http.Request) {
 		p.FunFacts = store.FunFacts{}
 		err = app.store.UpdateProfile(ctx, target, p)
 		msg = "Cleared @" + target.UserName + "'s fun facts."
+	case "disable_invites", "enable_invites":
+		off := f.Action == "disable_invites"
+		if err = app.store.SetInviteCodeDisabled(ctx, target, off); errors.Is(err, store.ErrNotFound) {
+			done("@" + target.UserName + " has no invite code yet.")
+			return
+		}
+		msg = "@" + target.UserName + "'s invite code is back on."
+		if off {
+			msg = "@" + target.UserName + "'s invite code is disabled."
+		}
 	case "verify", "unverify":
 		if !mod.IsAdmin() {
 			entry.Action = "attempted_" + f.Action

@@ -40,7 +40,19 @@ type Config struct {
 
 	TurnstileSiteKey string
 	TurnstileSecret  string
+
+	// SignupMode is who can create an account: SignupOpen (anyone; an
+	// invite code is optional), SignupInvite (only with a krab's invite
+	// code) or SignupClosed.
+	SignupMode string
 }
+
+// Signup modes.
+const (
+	SignupOpen   = "open"
+	SignupInvite = "invite"
+	SignupClosed = "closed"
+)
 
 // IsDev reports whether the server runs locally over plain HTTP.
 func (c *Config) IsDev() bool { return c.Env == "dev" }
@@ -114,6 +126,7 @@ func parse(env map[string]string) (*Config, error) {
 		ContactEmail:      strings.TrimSpace(env["CONTACT_EMAIL"]),
 		TurnstileSiteKey:  env["TURNSTILE_SITE_KEY"],
 		TurnstileSecret:   env["TURNSTILE_SECRET"],
+		SignupMode:        strings.ToLower(valueOr(env["SIGNUP_MODE"], SignupOpen)),
 		OriginVerifySecrets: nonEmpty(
 			env["ORIGIN_VERIFY_SECRET"],
 			env["ORIGIN_VERIFY_SECRET_PREVIOUS"],
@@ -165,6 +178,12 @@ func parse(env map[string]string) (*Config, error) {
 		if c.MailSender != "ses" {
 			errs = append(errs, errors.New("MAIL_SENDER must be ses in prod"))
 		}
+	}
+
+	switch c.SignupMode {
+	case SignupOpen, SignupInvite, SignupClosed:
+	default:
+		errs = append(errs, fmt.Errorf("SIGNUP_MODE must be open, invite or closed, got %q", c.SignupMode))
 	}
 
 	if (c.TurnstileSiteKey == "") != (c.TurnstileSecret == "") {

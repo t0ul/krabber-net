@@ -35,6 +35,7 @@ type templateData struct {
 	store.Appearance
 	CSRFToken        string
 	TurnstileSiteKey string
+	SignupMode       string // config.SignupOpen, SignupInvite or SignupClosed
 	Form             any
 	Query            string
 	CurrentPath      string
@@ -64,13 +65,16 @@ type templateData struct {
 	Blocked     []store.Crab
 	ModLog      []store.ModAction
 	CanModerate bool
-	Reports     []store.Report
-	Report      *store.Report
-	ReportRows  []store.ReportRow
-	Gone        map[string]bool // banned and deleted crabs, for Crabmin
-	CrabRows    []crabRow
-	ListTitle   string
-	ListBack    string
+	// Krabmin's crab page: who invited them, and whether their code is off.
+	InvitedBy      string
+	InviteDisabled bool
+	Reports        []store.Report
+	Report         *store.Report
+	ReportRows     []store.ReportRow
+	Gone           map[string]bool // banned and deleted crabs, for Crabmin
+	CrabRows       []crabRow
+	ListTitle      string
+	ListBack       string
 
 	Stats *statsPage
 
@@ -138,6 +142,8 @@ var modActions = map[string][2]string{ // action: {done, tried to}
 	"clear_location":     {"cleared the location of", "clear the location of"},
 	"clear_website":      {"cleared the website of", "clear the website of"},
 	"clear_fun_facts":    {"cleared the fun facts of", "clear the fun facts of"},
+	"disable_invites":    {"disabled the invite code of", "disable the invite code of"},
+	"enable_invites":     {"re-enabled the invite code of", "re-enable the invite code of"},
 	"verify":             {"verified", "verify"},
 	"unverify":           {"removed the verified badge from", "remove the verified badge from"},
 	"make_moderator":     {"made a moderator:", "make a moderator:"},
@@ -301,6 +307,7 @@ func (app *App) newTemplateData(r *http.Request) templateData {
 		Flash:            app.sessions.PopString(r.Context(), sessionFlash),
 		CSRFToken:        csrfToken(r),
 		TurnstileSiteKey: app.cfg.TurnstileSiteKey,
+		SignupMode:       app.cfg.SignupMode,
 		CurrentPath:      r.URL.Path,
 	}
 	if c := currentCrab(r); c != nil {

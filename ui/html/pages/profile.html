@@ -50,6 +50,9 @@
             <span>
                 <svg width="14" height="14"><use href="/static/img/sprites.svg?version=1704178675#calendar"></use></svg> Joined {{ monthYear $p.CreatedAt }}
             </span>
+            {{ with $p.Invites }}<span class="ml-3">
+                <svg width="14" height="14"><use href="{{ asset "img/sprites.svg" }}#birthday-cake-f"></use></svg> Invited {{ . }} krab{{ if ne . 1 }}s{{ end }} to Krabber
+            </span>{{ end }}
         </div>
         <div class="mt-3 kb-profile-stats">
             <span><strong>{{ $p.MoltCount }}</strong> <span class="text-muted">molts</span></span>

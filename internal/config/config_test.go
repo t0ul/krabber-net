@@ -39,7 +39,18 @@ func TestParseDevDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !c.IsDev() || c.MailSender != "console" || c.TurnstileEnabled() {
+	if !c.IsDev() || c.MailSender != "console" || c.TurnstileEnabled() || c.SignupMode != SignupOpen {
 		t.Fatalf("dev defaults: %+v", c)
+	}
+}
+
+func TestSignupMode(t *testing.T) {
+	env := map[string]string{"APP_ENV": "dev", "TABLE_NAME": "krabber-dev", "BASE_URL": "http://localhost:5000", "SIGNUP_MODE": "Invite"}
+	if c, err := parse(env); err != nil || c.SignupMode != SignupInvite {
+		t.Fatalf("invite: %+v %v", c, err)
+	}
+	env["SIGNUP_MODE"] = "vip"
+	if _, err := parse(env); err == nil || !strings.Contains(err.Error(), "SIGNUP_MODE") {
+		t.Fatalf("bad mode: %v", err)
 	}
 }

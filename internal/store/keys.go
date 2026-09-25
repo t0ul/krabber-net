@@ -42,6 +42,7 @@ import (
 //	Report queue      R#<moltID>             R#                   GSI8 Q#report / <ksuid> (while open)
 //	Report            R#<moltID>             R#by#<reporterID>
 //	Link card         LC#<sha256 hex of URL> LC#                  (expires: 30 days, or 1 day after a failed fetch)
+//	Invite code       IC#<code>              IC#                  (holds the owner's crab keys and disabled)
 //
 // Molt and other generated IDs are KSUIDs, so sorting by SK sorts by time.
 // Replies use their own SK prefix so a crab's molts and replies are each one
@@ -118,6 +119,8 @@ func reportPK(moltID string) string              { return "R#" + moltID }
 func reportSummarySK() string                    { return "R#" }
 func reportRowSK(reporterID string) string       { return "R#by#" + reporterID }
 func linkCardSK() string                         { return "LC#" }
+func invitePK(code string) string                { return "IC#" + code }
+func inviteSK() string                           { return "IC#" }
 func linkCardPK(url string) string {
 	sum := sha256.Sum256([]byte(url))
 	return "LC#" + hex.EncodeToString(sum[:])

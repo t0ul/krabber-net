@@ -99,6 +99,11 @@ type settingsForms struct {
 	// NextRename is when the crab may change their username again, as a
 	// date; empty when they may now.
 	NextRename string
+
+	InviteCode     string
+	InviteLink     string
+	InviteDisabled bool
+	Invites        int
 }
 
 func (app *App) settings(w http.ResponseWriter, r *http.Request) {
@@ -107,8 +112,20 @@ func (app *App) settings(w http.ResponseWriter, r *http.Request) {
 
 func (app *App) renderSettings(w http.ResponseWriter, r *http.Request, status int, f settingsForms) {
 	f.Password.Current, f.Password.New, f.Password.Confirm, f.Delete.Password = "", "", "", ""
-	if next := app.store.NextUsernameChange(currentCrab(r)); !next.IsZero() {
+	me := currentCrab(r)
+	if next := app.store.NextUsernameChange(me); !next.IsZero() {
 		f.NextRename = next.UTC().Format("January 2, 2006")
+	}
+	if code, err := app.store.EnsureInviteCode(r.Context(), me); err != nil {
+		app.log.Warn("invite code", "err", err, "crab", me.ID)
+	} else {
+		f.InviteCode, f.Invites = code, me.Invites
+		link := *app.cfg.BaseURL.JoinPath("/krab/signup")
+		link.RawQuery = url.Values{"code": {code}}.Encode()
+		f.InviteLink = link.String()
+		if f.InviteDisabled, err = app.store.InviteCodeDisabled(r.Context(), me); err != nil {
+			app.log.Warn("invite code status", "err", err, "crab", me.ID)
+		}
 	}
 	data := app.newTemplateData(r)
 	data.Form = f

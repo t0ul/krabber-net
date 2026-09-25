@@ -79,6 +79,7 @@ type harness struct {
 	store  *store.Store
 	mail   *capturedMail
 	cards  *cardRecorder
+	app    *App
 	client *http.Client
 }
 
@@ -143,7 +144,7 @@ func newHarness(t *testing.T) *harness {
 	}
 	srv.Config.Handler = app.Routes()
 
-	h := &harness{t: t, srv: srv, store: st, mail: captured, cards: cards}
+	h := &harness{t: t, srv: srv, store: st, mail: captured, cards: cards, app: app}
 	h.client = h.newClient()
 	return h
 }
@@ -2229,6 +2230,92 @@ func TestAppearance(t *testing.T) {
 	h.post("/krab/logout", url.Values{"csrf_token": {h.csrf("/sea")}})
 	if _, body, _ := h.get("/sea"); strings.Contains(body, "dyslexic_mode.css") {
 		t.Error("signed-out visitors get the default theme")
+	}
+}
+
+func TestInviteCodes(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	h.signupAndActivate("karen", "karen@krabber.test", "computer-wife!")
+	h.login("karen@krabber.test", "computer-wife!")
+	_, body, _ := h.get("/settings")
+	m := regexp.MustCompile(`id="invite-code" class="form-control" value="([a-z0-9]{8})"`).FindStringSubmatch(body)
+	if m == nil || !strings.Contains(body, "/krab/signup?code="+m[1]) || !strings.Contains(body, "Nobody has joined") {
+		t.Fatalf("settings has no invite code and link")
+	}
+	code := m[1]
+	h.client = h.newClient()
+
+	ip := 0
+	signup := func(name, invite string) (int, string) {
+		ip++ // a new visitor each time, under the per-IP signup limit
+		tok := h.csrf("/krab/login")
+		status, body, _ := h.post("/krab/signup", url.Values{"csrf_token": {tok}, "name": {name}, "email": {name + "@krabber.test"}, "password": {"shell-polish-1"}, "code": {invite}},
+			"CloudFront-Viewer-Address", fmt.Sprintf("198.51.100.%d:443", ip))
+		return status, body
+	}
+	if _, body, _ := h.get("/krab/signup?code=" + strings.ToUpper(code)); !strings.Contains(body, `value="`+code+`"`) || !strings.Contains(body, "(optional)") {
+		t.Error("the invite link should fill in the code, optional in open mode")
+	}
+	if status, body := signup("gary", "wrongcode"); status != http.StatusUnprocessableEntity || !strings.Contains(body, "invite code doesn&#39;t work") {
+		t.Errorf("bad code: %d", status)
+	}
+	if status, _ := signup("sandy", code); status != http.StatusSeeOther {
+		t.Fatalf("signup with code: %d", status)
+	}
+	if status, _ := signup("patrick", ""); status != http.StatusSeeOther {
+		t.Fatalf("open mode without a code: %d", status)
+	}
+	sandy, _ := h.store.CrabByUsername(ctx, "sandy")
+	karen, _ := h.store.CrabByUsername(ctx, "karen")
+	if sandy.InvitedBy != karen.ID || karen.Invites != 1 {
+		t.Fatalf("invited_by %q, invites %d", sandy.InvitedBy, karen.Invites)
+	}
+	if _, body, _ := h.get("/krabs/karen"); !strings.Contains(body, "Invited 1 krab to Krabber") {
+		t.Error("profile doesn't show the invite count")
+	}
+	if _, body, _ := h.get("/stats"); !strings.Contains(body, ">Party Starter</h1>") || !strings.Contains(body, "1 invite<") {
+		t.Error("stats have no Party Starter")
+	}
+
+	h.app.cfg.SignupMode = config.SignupInvite
+	if status, body := signup("gary", ""); status != http.StatusUnprocessableEntity || !strings.Contains(body, "need an invite code") {
+		t.Errorf("invite mode without a code: %d", status)
+	}
+	if status, _ := signup("gary", code); status != http.StatusSeeOther {
+		t.Errorf("invite mode with a code: %d", status)
+	}
+
+	hash, _ := auth.HashPassword("secret-boss")
+	boss, _ := h.store.CreateCrab(ctx, "boss", "boss@krabber.test", hash)
+	if err := h.store.ActivateCrab(ctx, boss.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.store.SetRole(ctx, boss, store.RoleModerator); err != nil {
+		t.Fatal(err)
+	}
+	h.login("boss@krabber.test", "secret-boss")
+	if _, body, _ := h.get("/krabmin/krabs/sandy"); !strings.Contains(body, `Invited by <a href="/krabmin/krabs/karen">@karen</a>`) {
+		t.Error("krabmin doesn't show who invited sandy")
+	}
+	tok := h.csrf("/krabmin/krabs/karen")
+	h.post("/krabmin/krabs/"+karen.ID, url.Values{"csrf_token": {tok}, "action": {"disable_invites"}})
+	h.client = h.newClient()
+	if status, _ := signup("squidward", code); status != http.StatusUnprocessableEntity {
+		t.Errorf("disabled code: %d", status)
+	}
+	h.login("karen@krabber.test", "computer-wife!")
+	if _, body, _ := h.get("/settings"); !strings.Contains(body, "disabled by a moderator") {
+		t.Error("karen should see her code is disabled")
+	}
+
+	h.app.cfg.SignupMode = config.SignupClosed
+	h.client = h.newClient()
+	if _, body, _ := h.get("/krab/signup"); !strings.Contains(body, "Registration is temporarily closed") || strings.Contains(body, `action="/krab/signup"`) {
+		t.Error("closed signup should show the notice, not the form")
+	}
+	if status, _ := signup("squidward", ""); status != http.StatusUnprocessableEntity {
+		t.Errorf("closed signup post: %d", status)
 	}
 }
 
