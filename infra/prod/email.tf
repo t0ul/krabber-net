@@ -81,6 +81,13 @@ resource "aws_sesv2_configuration_set_event_destination" "alerts" {
   }
 }
 
+# While SES is in the sandbox it only delivers to verified addresses, so
+# your own signup and the launch checks can get their emails. AWS sends a
+# link to confirm it.
+resource "aws_sesv2_email_identity" "alert_email" {
+  email_identity = var.alert_email
+}
+
 resource "aws_sesv2_account_suppression_attributes" "account" {
   suppressed_reasons = ["BOUNCE", "COMPLAINT"]
 }
