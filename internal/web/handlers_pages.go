@@ -5,8 +5,11 @@ import (
 	"io/fs"
 	"net/http"
 	"net/url"
+	"slices"
 	"sort"
 	"strings"
+	"sync"
+	"time"
 	"unicode/utf8"
 
 	"github.com/t0ul/krabber-net/internal/store"
@@ -30,14 +33,50 @@ func (app *App) renderFeed(w http.ResponseWriter, r *http.Request, page string, 
 	if !app.setPage(w, r, &data, p, err) {
 		return
 	}
+	app.finishFeed(w, r, page, data, empty)
+}
+
+// finishFeed renders a feed whose molts are ready. Only signed-in krabs get
+// the "new molts" poller.
+func (app *App) finishFeed(w http.ResponseWriter, r *http.Request, page string, data templateData, empty string) {
 	data.EmptyMessage = empty
-	if path := r.URL.Path; path == "/sea" || path == "/trench" {
+	if path := r.URL.Path; (path == "/sea" || path == "/trench") && data.IsAuthenticated {
 		data.FeedPath = path
 		if len(data.Molts) > 0 {
 			data.Since = data.Molts[0].FeedID()
 		}
 	}
 	app.renderMolts(w, r, page, data)
+}
+
+// seaForStrangers is the signed-out Sea, which is the same for every
+// visitor: its first page is kept for a minute, so crawlers and passers-by
+// cost nothing after the first view.
+type seaForStrangers struct {
+	mu    sync.Mutex
+	at    time.Time
+	molts []store.Molt
+	more  bool
+}
+
+const seaForStrangersTTL = time.Minute
+
+func (c *seaForStrangers) get() ([]store.Molt, bool, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.molts == nil || time.Since(c.at) > seaForStrangersTTL {
+		return nil, false, false
+	}
+	return c.molts, c.more, true
+}
+
+func (c *seaForStrangers) put(molts []store.Molt, more bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.molts, c.more, c.at = slices.Clone(molts), more, time.Now()
+	if c.molts == nil {
+		c.molts = []store.Molt{}
+	}
 }
 
 const newMoltsCap = 99
@@ -70,9 +109,26 @@ func (app *App) renderNewMolts(w http.ResponseWriter, r *http.Request, feed stri
 	app.renderTemplate(w, r, http.StatusOK, fragmentPage, "new-molts-poll", data)
 }
 
+const seaEmpty = "The sea is calm. Nobody has molted this week."
+
 func (app *App) sea(w http.ResponseWriter, r *http.Request) {
-	p, err := app.store.SeaPage(r.Context(), afterParam(r), pageSize)
-	app.renderFeed(w, r, "sea.html", p, err, "The sea is calm. Nobody has molted this week.")
+	if currentCrab(r) != nil {
+		p, err := app.store.SeaPage(r.Context(), afterParam(r), pageSize)
+		app.renderFeed(w, r, "sea.html", p, err, seaEmpty)
+		return
+	}
+	// Signed out: always the first page (firstPageSignedOut).
+	data := app.newTemplateData(r)
+	if molts, more, ok := app.strangersSea.get(); ok {
+		data.Molts, data.MoreForMembers = molts, more
+	} else {
+		p, err := app.store.SeaPage(r.Context(), "", pageSize)
+		if !app.setPage(w, r, &data, p, err) {
+			return
+		}
+		app.strangersSea.put(data.Molts, data.MoreForMembers)
+	}
+	app.finishFeed(w, r, "sea.html", data, seaEmpty)
 }
 
 func (app *App) trench(w http.ResponseWriter, r *http.Request) {

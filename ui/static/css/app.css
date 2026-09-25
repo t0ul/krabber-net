@@ -594,9 +594,11 @@
   resize: none;
 }
 
-/* The page itself does not grow with the feed. The middle column is a
-   fixed-height flex box and #content-body is the scroll box, as in Crabber. */
-body,
+/* On the three-column pages the page itself does not grow with the feed.
+   The middle column is a fixed-height flex box and #content-body is the
+   scroll box, as in Crabber. Other pages (welcome, login, signup) scroll
+   normally. */
+body.kb-shell,
 .master-container {
   overflow: hidden;
   height: 100vh;

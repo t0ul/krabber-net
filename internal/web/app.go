@@ -49,6 +49,7 @@ type App struct {
 	writes    *writeLimiter
 	// trophiesHeld skips award attempts for trophies a krab already has.
 	trophiesHeld *heldTrophies
+	strangersSea *seaForStrangers
 }
 
 // Deps are the collaborators App needs.
@@ -105,5 +106,6 @@ func New(d Deps) (*App, error) {
 		writes:    &writeLimiter{},
 
 		trophiesHeld: &heldTrophies{},
+		strangersSea: &seaForStrangers{},
 	}, nil
 }

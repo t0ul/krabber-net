@@ -57,9 +57,12 @@ type templateData struct {
 	Likes        []store.Like
 	EmptyMessage string
 	LoadMore     string // ?after= cursor URL; empty when this is the last page
-	FeedPath     string // /sea or /trench, for the new-molts poller
-	Since        string // newest molt on the page; the poller asks for newer than this
-	NewCount     int    // new molts since Since; 0 hides the banner
+	// MoreForMembers: there are more molts, but signed-out visitors only get
+	// the first page.
+	MoreForMembers bool
+	FeedPath       string // /sea or /trench, for the new-molts poller
+	Since          string // newest molt on the page; the poller asks for newer than this
+	NewCount       int    // new molts since Since; 0 hides the banner
 
 	Profile     *store.Crab
 	Pinned      *store.Molt // shown above the profile's Molts tab

@@ -339,12 +339,12 @@ Other changes in the same pass:
 - **Friends of friends** are cached for an hour for up to 20,000 viewers (the 2,000-viewer limit would have kept recomputing at 10,000 daily active krabs).
 - **Fan-out** writes 25 trench entries a second, so a krab with many followers can't trip the table's write cap and get everyone else throttled.
 - **Guards:** `MAX_KRABS` and the per-krab hourly write limits (section 7.2).
+- **Strangers** (signed out) get the first page of the Sea, krabtags, profiles and quote lists, then "Log in or join" instead of Load more; a signed-out `?after=` goes to the login page before anything is read, so the site can't be paged through without an account. The signed-out Sea is the same for everyone, so its first page is kept for a minute (0 units per view after the first), and signed-out pages don't poll.
 
 **Levers left, if the bill ever needs them** (at 10,000 daily active krabs):
 - Serve feed molts from the directory's recent molts instead of reading each (about 10 of a feed page's 17 units; about $5/month), once like and reply counts are kept current in memory.
 - Likes without a transaction (5 → 3 write units; about $4/month), at the risk of a count drifting if the second write fails.
 - Read big accounts' molts at view time instead of fanning them out (only matters once someone has thousands of followers).
-- Cache the signed-out Sea's first page for 30 seconds (it costs 12.5 units and is what crawlers hit).
 - Poll every two minutes (about a quarter fewer requests, for CloudFront's allowance).
 
 ---

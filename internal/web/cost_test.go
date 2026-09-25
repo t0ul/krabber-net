@@ -196,9 +196,9 @@ func TestCostProfile(t *testing.T) {
 		}},
 	}
 	signedOut := []row{
-		{"signed out GET /sea", [2]float64{16, 0}, func() { h.get("/sea") }},
+		{"signed out GET /sea (shared for a minute)", [2]float64{0, 0}, func() { h.get("/sea") }},
+		{"signed out GET /sea?after= (to login)", [2]float64{0, 0}, func() { h.get("/sea?after=" + url.QueryEscape(next.Next)) }},
 		{"signed out GET /krabs/{name}", [2]float64{4, 0}, func() { h.get("/krabs/krab05") }},
-		{"signed out poll /sea/new", [2]float64{1, 0}, func() { h.get("/sea/new?since="+since, "HX-Request", "true") }},
 	}
 
 	h.login("viewer@krabber.test", "secret-viewer")

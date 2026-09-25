@@ -1696,6 +1696,17 @@ func TestNewMolts(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Strangers get no poller, and polling needs an account.
+	if _, body, _ := h.get("/sea"); strings.Contains(body, `id="new-molts"`) {
+		t.Error("the signed-out Sea polls")
+	}
+	for _, path := range []string{"/sea/new", "/trench/new"} {
+		if status, _, _ := h.get(path); status != http.StatusSeeOther {
+			t.Errorf("%s signed out: %d", path, status)
+		}
+	}
+
+	h.login("karen@krabber.test", "computer-wife!")
 	status, body, _ := h.get("/sea")
 	if status != http.StatusOK || !strings.Contains(body, `id="new-molts"`) ||
 		!strings.Contains(body, `/sea/new?since=`+first.ID) || strings.Contains(body, "click to refresh") {
@@ -1717,11 +1728,6 @@ func TestNewMolts(t *testing.T) {
 		t.Fatalf("none newer: %d %s", status, body)
 	}
 
-	if status, _, _ := h.get("/trench/new"); status != http.StatusSeeOther {
-		t.Errorf("trench poller signed out: %d", status)
-	}
-
-	h.login("karen@krabber.test", "computer-wife!")
 	if err := h.store.AddToTrenches(context.Background(), first, []string{c.ID}); err != nil {
 		t.Fatal(err)
 	}
@@ -2451,6 +2457,40 @@ func TestInviteCodes(t *testing.T) {
 	h.app.cfg.MaxKrabs++
 	if _, body, _ := h.get("/krab/signup"); !strings.Contains(body, `action="/krab/signup"`) {
 		t.Error("signup should reopen below the cap")
+	}
+}
+
+func TestStrangersSeeTheFirstPageOnly(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	h.signupAndActivate("karen", "karen@krabber.test", "computer-wife!")
+	karen, _ := h.store.CrabByUsername(ctx, "karen")
+	for i := range pageSize + 5 {
+		if _, err := h.store.CreateMolt(ctx, karen, fmt.Sprintf("molt %d %%krabs", i)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, path := range []string{"/sea", "/krabs/karen", "/krabtag/krabs"} {
+		_, body, _ := h.get(path)
+		if strings.Contains(body, `id="load-more"`) || !strings.Contains(body, `id="members-more"`) {
+			t.Errorf("%s signed out should end in the join prompt, not Load more", path)
+		}
+		if status, _, hdr := h.get(path + "?after=anything"); status != http.StatusSeeOther || hdr.Get("Location") != "/krab/login" {
+			t.Errorf("%s?after= signed out: %d %s", path, status, hdr.Get("Location"))
+		}
+	}
+	// Strangers share the Sea for a minute: a molt written meanwhile shows up later.
+	if _, err := h.store.CreateMolt(ctx, karen, "brand new"); err != nil {
+		t.Fatal(err)
+	}
+	if _, body, _ := h.get("/sea"); strings.Contains(body, "brand new") {
+		t.Error("the strangers' Sea wasn't kept")
+	}
+
+	h.login("karen@krabber.test", "computer-wife!")
+	_, body, _ := h.get("/sea")
+	if !strings.Contains(body, "brand new") || !strings.Contains(body, `id="load-more"`) || strings.Contains(body, `id="members-more"`) {
+		t.Error("signed in, the Sea should be current and page on")
 	}
 }
 

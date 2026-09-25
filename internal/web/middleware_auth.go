@@ -102,6 +102,19 @@ func (app *App) requireAuthentication(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
+// firstPageSignedOut lets signed-out visitors see a list's first page only,
+// so strangers and scrapers can't page through every molt. Later pages send
+// them to log in before anything is read.
+func (app *App) firstPageSignedOut(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if currentCrab(r) == nil && afterParam(r) != "" {
+			redirect(w, r, "/krab/login")
+			return
+		}
+		next(w, r)
+	}
+}
+
 // requireModerator hides Crabmin (404) from everyone who isn't a moderator or
 // admin.
 func (app *App) requireModerator(next http.HandlerFunc) http.HandlerFunc {

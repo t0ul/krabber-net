@@ -304,6 +304,12 @@
 <nav class="kb-load-more py-4 text-center" id="load-more" aria-label="More molts">
     <a class="btn btn-outline-light rounded-pill px-4" href="{{ .LoadMore }}" hx-get="{{ .LoadMore }}" hx-target="#load-more" hx-swap="outerHTML">Load more</a>
 </nav>
+{{ else if .MoreForMembers }}
+<nav class="kb-load-more py-4 text-center" id="members-more" aria-label="More molts">
+    <p class="text-muted mb-3">There's more down here, for krabs only.</p>
+    <a class="btn btn-primary rounded-pill px-4" href="/krab/signup">Join Krabber</a>
+    <a class="btn btn-outline-light rounded-pill px-4 ml-2" href="/krab/login">Log in</a>
+</nav>
 {{ end }}
 {{end}}
 

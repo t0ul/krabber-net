@@ -4,7 +4,7 @@
 {{ template "shell-top" . }}
     {{ template "heading" "What your krab friends are saying... 🫧" }}
     {{ template "compose" . }}
-    {{ template "new-molts" . }}
+    {{ if .FeedPath }}{{ template "new-molts" . }}{{ end }}
     {{ template "molt-list" . }}
 {{ template "shell-bottom" . }}
 {{end}}

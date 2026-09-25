@@ -38,7 +38,11 @@ func (app *App) setPage(w http.ResponseWriter, r *http.Request, data *templateDa
 		return false
 	}
 	data.Molts = withoutMuted(r, p.Molts)
-	if p.Next != "" {
+	switch {
+	case p.Next == "":
+	case currentCrab(r) == nil:
+		data.MoreForMembers = true
+	default:
 		data.LoadMore = loadMoreURL(r, p.Next)
 	}
 	return true
