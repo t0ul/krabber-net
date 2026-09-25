@@ -1,0 +1,3 @@
+# Copy to terraform.tfvars (git-ignored). CI sets TF_VAR_alert_email from the
+# ALERT_EMAIL repository variable instead.
+alert_email = "you@example.com"

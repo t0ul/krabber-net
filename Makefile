@@ -6,7 +6,7 @@ TABLE_NAME      ?= krabber-dev
 PORT            ?= 5050
 GO_BUILD        := CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags="-s -w"
 
-.PHONY: help dev db db-down seed run test test-unit lint vet fmt vuln build bundle clean
+.PHONY: help dev db db-down seed run test test-unit lint vet fmt vuln build bundle clean plan apply deploy
 
 help: ## Show targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-10s %s\n", $$1, $$2}'
@@ -54,3 +54,17 @@ bundle: build ## Beanstalk source bundle (bin/application + Procfile + .platform
 
 clean: ## Remove build output
 	rm -rf bin dist
+
+TF_PROD := terraform -chdir=infra/prod
+
+plan: ## Plan prod (AWS_PROFILE=krabber-admin after aws login); writes infra/prod/prod.tfplan
+	$(TF_PROD) init -input=false
+	$(TF_PROD) plan -input=false -out=prod.tfplan
+
+apply: ## Apply the plan you reviewed (make plan first)
+	$(TF_PROD) apply -input=false prod.tfplan
+
+deploy: bundle ## Ship dist/krabber.zip to krabber-prod and wait until it's healthy
+	go run ./cmd/deploy \
+		-bucket $$($(TF_PROD) output -raw artifacts_bucket) \
+		-distribution $$($(TF_PROD) output -raw distribution_id)

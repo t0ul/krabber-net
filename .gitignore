@@ -45,6 +45,8 @@ override.tf.json
 *_override.tf.json
 # Bootstrap is applied locally and its variables include contact details.
 infra/bootstrap/terraform.tfvars
+# Prod's too; CI passes the alert address as TF_VAR_alert_email.
+infra/prod/terraform.tfvars
 
 # Editor/IDE/OS
 .idea/
