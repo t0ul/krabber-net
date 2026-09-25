@@ -183,6 +183,19 @@ data "aws_iam_policy_document" "mail_forward" {
       "arn:aws:logs:${var.region}:${local.account_id}:log-group:/aws/lambda/krabber-mail-forward:*",
     ]
   }
+
+  # Its daily forward counter, and nothing else in the table.
+  statement {
+    sid       = "DailyCap"
+    actions   = ["dynamodb:UpdateItem"]
+    resources = [local.table_arn]
+
+    condition {
+      test     = "ForAllValues:StringEquals"
+      variable = "dynamodb:LeadingKeys"
+      values   = ["RL#mail-forward#daily"]
+    }
+  }
 }
 
 resource "aws_iam_role_policy" "mail_forward" {

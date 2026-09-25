@@ -93,11 +93,29 @@ func Load(ctx context.Context, newSSM func(region string) (SSMGetter, error)) (*
 			return nil, err
 		}
 		for k, v := range params {
-			env[strings.ToUpper(k)] = v
+			if name := strings.ToUpper(k); fromSSM[name] {
+				env[name] = v
+			}
 		}
 	}
 
 	return parse(env)
+}
+
+// fromSSM are the settings SSM may provide: secrets and a few values that
+// change without a deploy. Anything else there (APP_ENV, TABLE_NAME,
+// DYNAMO_ENDPOINT, …) is ignored, so a stray parameter can't turn off the
+// production checks.
+var fromSSM = map[string]bool{
+	"ORIGIN_VERIFY_SECRET":          true,
+	"ORIGIN_VERIFY_SECRET_PREVIOUS": true,
+	"MAIL_FROM":                     true,
+	"MAIL_DAILY_CAP":                true,
+	"CONTACT_EMAIL":                 true,
+	"TURNSTILE_SITE_KEY":            true,
+	"TURNSTILE_SECRET":              true,
+	"SIGNUP_MODE":                   true,
+	"MAX_KRABS":                     true,
 }
 
 func loadSSM(ctx context.Context, client SSMGetter, prefix string) (map[string]string, error) {

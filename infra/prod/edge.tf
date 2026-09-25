@@ -118,8 +118,13 @@ resource "aws_wafv2_web_acl" "site" {
             field_to_match {
               uri_path {}
             }
+            # Decoded first: the app routes /%6Brab/login to /krab/login.
             text_transformation {
               priority = 0
+              type     = "URL_DECODE"
+            }
+            text_transformation {
+              priority = 1
               type     = "LOWERCASE"
             }
           }

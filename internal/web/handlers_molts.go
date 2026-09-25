@@ -303,7 +303,7 @@ func (app *App) moltNSFWPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	m, ok := app.moltFromPath(w, r)
-	if !ok {
+	if !ok || !app.underWriteLimit(w, r, "edit") {
 		return
 	}
 	if m.AuthorID != currentCrab(r).ID {
@@ -450,6 +450,10 @@ func (app *App) moltView(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *App) moltLikesView(w http.ResponseWriter, r *http.Request) {
+	// The molt's own checks (removed, deleted, author blocking the viewer) apply.
+	if _, ok := app.moltFromPath(w, r); !ok {
+		return
+	}
 	likes, err := app.store.LikesOn(r.Context(), r.PathValue("id"), 100)
 	if err != nil {
 		app.serverError(w, r, err)

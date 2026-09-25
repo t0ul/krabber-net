@@ -34,6 +34,25 @@ func (s *Store) Hit(ctx context.Context, action, key string, window time.Duratio
 	return counterValue(res.Attributes["n"])
 }
 
+// Unhit gives back one Hit, for an attempt that was counted up front (so
+// concurrent requests can't all slip under the limit) but turned out fine.
+func (s *Store) Unhit(ctx context.Context, action, key string, window time.Duration) error {
+	start := s.now().Truncate(window)
+	_, err := s.db.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+		TableName:                 s.tableName(),
+		Key:                       keyOf(rateLimitPK(action, key), rateLimitSK(start)),
+		UpdateExpression:          aws.String("ADD #n :minus"),
+		ConditionExpression:       aws.String("#n > :zero"),
+		ExpressionAttributeNames:  map[string]string{"#n": "n"},
+		ExpressionAttributeValues: map[string]types.AttributeValue{":minus": num(-1), ":zero": num(0)},
+	})
+	var gone *types.ConditionalCheckFailedException
+	if err != nil && !errors.As(err, &gone) {
+		return fmt.Errorf("rate limit %s: %w", action, err)
+	}
+	return nil
+}
+
 // Count returns a fixed-window counter's current value without changing it.
 func (s *Store) Count(ctx context.Context, action, key string, window time.Duration) (int, error) {
 	start := s.now().Truncate(window)

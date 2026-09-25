@@ -7,6 +7,7 @@ import (
 	"math/rand/v2"
 	"net"
 	"net/http"
+	"net/netip"
 	"strings"
 	"time"
 
@@ -140,6 +141,17 @@ func viewerIP(v string) string {
 func clientIP(r *http.Request) string {
 	ip, _ := r.Context().Value(ctxClientIP).(string)
 	return ip
+}
+
+// clientNet is the viewer's network for per-IP rate limits: the address for
+// IPv4, its /64 for IPv6, since one home connection or server gets a whole
+// /64 and could otherwise use a new address for every request.
+func clientNet(r *http.Request) string {
+	ip, err := netip.ParseAddr(clientIP(r))
+	if err != nil || ip.Is4() || ip.Is4In6() {
+		return clientIP(r)
+	}
+	return netip.PrefixFrom(ip, 64).Masked().String()
 }
 
 // securityHeaders sets the browser hardening headers on every response.

@@ -4,7 +4,10 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
+
+	"github.com/aws/smithy-go"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
@@ -30,7 +33,11 @@ func queryPage[T any](ctx context.Context, db *dynamodb.Client, in *dynamodb.Que
 	}
 	in.Limit = pageLimit(limit)
 	res, err := db.Query(ctx, in)
-	if err != nil {
+	var bad smithy.APIError
+	switch {
+	case err != nil && after != "" && errors.As(err, &bad) && bad.ErrorCode() == "ValidationException":
+		return nil, "", ErrNotFound // a cursor that isn't one of ours
+	case err != nil:
 		return nil, "", err
 	}
 	var items []T

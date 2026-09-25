@@ -1,5 +1,7 @@
-# Every push to main: test, apply Terraform, and deploy the app (PLAN.md
+# Every push to main: test, then apply Terraform and deploy the app (PLAN.md
 # section 9). To pause deploys, disable this workflow in GitHub's Actions tab.
+# Tests run in a job without AWS access, so test-time code can't mint a token
+# for the deploy role.
 name: deploy
 
 on:
@@ -9,27 +11,22 @@ on:
 
 permissions:
   contents: read
-  id-token: write
 
 concurrency:
   group: deploy
   cancel-in-progress: false
 
 jobs:
-  deploy:
-    # The krabber environment holds ALERT_EMAIL; limit it to main in the
-    # repository's environment settings. (A job-level if can't read
-    # environment variables, so there's no on/off variable here.)
-    environment: krabber
+  test:
     runs-on: ubuntu-latest
     services:
       dynamodb:
-        image: amazon/dynamodb-local:latest
+        image: amazon/dynamodb-local:3.3.1
         ports:
           - 8000:8000
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go.mod
       - name: Test
@@ -38,16 +35,31 @@ jobs:
           AWS_ACCESS_KEY_ID: local
           AWS_SECRET_ACCESS_KEY: local
         run: go test -race -count=1 ./...
-      - uses: hashicorp/setup-terraform@v3
+
+  deploy:
+    needs: test
+    # The krabber environment holds ALERT_EMAIL, and the deploy role trusts
+    # only this environment: limit it to main in the repository's settings.
+    environment: krabber
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go.mod
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
         with:
           terraform_version: 1.16.4
           terraform_wrapper: false
-      - uses: aws-actions/configure-aws-credentials@v4
+      - name: Lambda bundles
+        run: make lambdas
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
         with:
           role-to-assume: arn:aws:iam::381466680812:role/krabber-gha-deploy
           aws-region: us-east-2
-      - name: Lambda bundles
-        run: make lambdas
       - name: Terraform apply
         working-directory: infra/prod
         env:

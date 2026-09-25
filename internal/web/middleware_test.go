@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"io"
 	"log/slog"
 	"net/http"
@@ -132,6 +133,22 @@ func TestTemplatesParse(t *testing.T) {
 	for _, fragment := range []string{"molt", "molt-actions", "follow-button", "quote-modal", "quote-form", "edit-modal", "edit-form", "molt-more", "load-more", "new-molts", "new-molts-poll", "notification-badge"} {
 		if cache[fragmentPage].Lookup(fragment) == nil {
 			t.Errorf("%s must define the %s fragment used by htmx responses", fragmentPage, fragment)
+		}
+	}
+}
+
+func TestClientNet(t *testing.T) {
+	for ip, want := range map[string]string{
+		"203.0.113.9":          "203.0.113.9",
+		"2001:db8:1:2:3:4:5:6": "2001:db8:1:2::/64",
+		"2001:db8:1:2:ffff::1": "2001:db8:1:2::/64",
+		"::ffff:203.0.113.9":   "::ffff:203.0.113.9",
+		"":                     "",
+	} {
+		r := httptest.NewRequest(http.MethodGet, "/", nil)
+		r = r.WithContext(context.WithValue(r.Context(), ctxClientIP, ip))
+		if got := clientNet(r); got != want {
+			t.Errorf("clientNet(%q) = %q, want %q", ip, got, want)
 		}
 	}
 }

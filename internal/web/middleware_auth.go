@@ -56,7 +56,10 @@ func (app *App) authenticate(next http.Handler) http.Handler {
 		case err != nil:
 			app.serverError(w, r, err)
 			return
-		case !c.CanSignIn() || app.sessions.GetInt64(ctx, sessionAuthAt) < c.SessionsValidAfter:
+		// The ID check matters after a deletion: the email's key is free again,
+		// and a new account there mustn't inherit the old one's sessions.
+		case !c.CanSignIn() || app.sessions.GetInt64(ctx, sessionAuthAt) < c.SessionsValidAfter ||
+			c.ID != app.sessions.GetString(ctx, sessionCrabID):
 			app.endSession(r)
 		default:
 			if !avatar.Valid(c.Avatar) {

@@ -140,6 +140,13 @@ func (s *Store) inviteWrites(ctx context.Context, code string) ([]types.Transact
 	if ic.Disabled {
 		return nil, "", ErrInvalidInvite
 	}
+	// A banned or deleted krab's code stops working.
+	if inviter, err := s.CrabByKey(ctx, ic.CrabPK, ic.CrabSK); err != nil || !inviter.CanSignIn() {
+		if err != nil && !errors.Is(err, ErrNotFound) {
+			return nil, "", fmt.Errorf("invite code: %w", err)
+		}
+		return nil, "", ErrInvalidInvite
+	}
 	return []types.TransactWriteItem{
 		{ConditionCheck: &types.ConditionCheck{
 			TableName:                 s.tableName(),

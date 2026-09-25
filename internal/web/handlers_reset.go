@@ -52,7 +52,7 @@ func (app *App) forgotPost(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/krab/reset", http.StatusSeeOther)
 	}
 
-	ipOK, err := app.underLimit(r, "reset-ip", clientIP(r), resetIPLimit, time.Hour)
+	ipOK, err := app.underLimit(r, "reset-ip", clientNet(r), resetIPLimit, time.Hour)
 	if err != nil {
 		app.serverError(w, r, err)
 		return
@@ -144,7 +144,9 @@ func (app *App) resetPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	crab, err := app.store.CrabByID(r.Context(), tok.CrabID)
-	if err == nil && !crab.CanSignIn() {
+	// A password change or reset after the link was sent retires it (and any
+	// other links still in someone's mailbox).
+	if err == nil && (!crab.CanSignIn() || tok.IssuedAt < crab.SessionsValidAfter) {
 		err = store.ErrNotFound
 	}
 	if errors.Is(err, store.ErrNotFound) {

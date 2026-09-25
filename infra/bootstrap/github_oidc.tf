@@ -61,6 +61,32 @@ data "aws_iam_policy_document" "gha_plan_extra" {
       values   = ["ssm.${var.region}.amazonaws.com"]
     }
   }
+
+  # ReadOnlyAccess includes reading data, which a plan never needs: the
+  # table's items (emails, password hashes), stored mail, app bundles and
+  # logs. (The Terraform state holds the origin secret, so the plan role can
+  # still read that; a pull request can run any workflow, so only people you
+  # trust should have push access.)
+  statement {
+    sid    = "NoData"
+    effect = "Deny"
+    actions = [
+      "dynamodb:GetItem", "dynamodb:BatchGetItem", "dynamodb:Query", "dynamodb:Scan",
+      "dynamodb:ExportTableToPointInTime", "dynamodb:GetRecords",
+      "logs:GetLogEvents", "logs:FilterLogEvents", "logs:StartQuery", "logs:GetQueryResults",
+    ]
+    resources = ["*"]
+  }
+
+  statement {
+    sid     = "NoStoredMail"
+    effect  = "Deny"
+    actions = ["s3:GetObject", "s3:GetObjectVersion"]
+    resources = [
+      "arn:aws:s3:::krabber-inbound-mail-${local.account_id}/*",
+      "arn:aws:s3:::${local.artifacts_bucket}/*",
+    ]
+  }
 }
 
 resource "aws_iam_role_policy" "gha_plan_extra" {
@@ -90,16 +116,14 @@ data "aws_iam_policy_document" "gha_deploy_trust" {
       values   = ["sts.amazonaws.com"]
     }
 
-    # A job that uses a GitHub environment gets the environment subject instead
-    # of the branch, so both forms of "main only" are accepted.
+    # Only the krabber environment's jobs. The subject doesn't say which
+    # branch ran, so the environment must be limited to main in the
+    # repository's settings (Settings > Environments > krabber > Deployment
+    # branches); any other environment name would be unprotected.
     condition {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values = [
-        "repo:${var.github_repo}:ref:refs/heads/main",
-        "repo:${var.github_repo}:environment:prod",
-        "repo:${var.github_repo}:environment:krabber",
-      ]
+      values   = ["repo:${var.github_repo}:environment:krabber"]
     }
   }
 }
@@ -312,12 +336,30 @@ data "aws_iam_policy_document" "gha_deploy_iam_and_guards" {
   }
 
   statement {
-    sid     = "ProtectStateBucket"
-    effect  = "Deny"
-    actions = ["s3:DeleteBucket", "s3:PutBucketPolicy", "s3:DeleteBucketPolicy", "s3:PutBucketVersioning", "s3:PutLifecycleConfiguration"]
-    resources = [
-      aws_s3_bucket.state.arn,
+    sid    = "ProtectStateBucket"
+    effect = "Deny"
+    actions = [
+      "s3:DeleteBucket", "s3:PutBucketPolicy", "s3:DeleteBucketPolicy", "s3:PutBucketVersioning",
+      "s3:PutLifecycleConfiguration", "s3:PutBucketAcl", "s3:PutBucketOwnershipControls",
+      "s3:PutBucketPublicAccessBlock", "s3:DeleteBucketPublicAccessBlock",
     ]
+    resources = [aws_s3_bucket.state.arn]
+  }
+
+  # Old versions are the state's history; deleting them isn't a deploy's job.
+  statement {
+    sid       = "KeepStateHistory"
+    effect    = "Deny"
+    actions   = ["s3:DeleteObjectVersion", "s3:PutObjectAcl", "s3:PutObjectVersionAcl"]
+    resources = ["${aws_s3_bucket.state.arn}/*"]
+  }
+
+  # Sharing a disk snapshot or image with another account would copy data out.
+  statement {
+    sid       = "NoSharingOut"
+    effect    = "Deny"
+    actions   = ["ec2:ModifySnapshotAttribute", "ec2:ModifyImageAttribute", "ec2:ModifyFpgaImageAttribute"]
+    resources = ["*"]
   }
 }
 

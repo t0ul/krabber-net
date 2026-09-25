@@ -15,7 +15,7 @@ func TestRewrite(t *testing.T) {
 		"Content-Type: text/plain; charset=utf-8\r\n" +
 		"\r\n" +
 		"Hi,\r\n\r\nI can't log in.\r\n"
-	got, err := rewrite([]byte(raw), "Krabber support <support@krabber.net>")
+	got, err := rewrite([]byte(raw), "Krabber support <support@krabber.net>", "[support] ")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,8 +39,8 @@ func TestRewrite(t *testing.T) {
 	}
 
 	// A Reply-To the sender set wins over their From.
-	got, _ = rewrite([]byte("From: a@x.test\nReply-To: b@x.test\n\nhi\n"), "Krabber support <support@krabber.net>")
-	if !strings.Contains(string(got), "Reply-To: b@x.test") || !strings.Contains(string(got), "Subject: [support] (no subject)") {
+	got, _ = rewrite([]byte("From: a@x.test\nReply-To: b@x.test\n\nhi\n"), "Krabber support <support@krabber.net>", "[support] [unverified] ")
+	if !strings.Contains(string(got), "Reply-To: b@x.test") || !strings.Contains(string(got), "Subject: [support] [unverified] (no subject)") {
 		t.Errorf("reply-to or subject: %s", got)
 	}
 }

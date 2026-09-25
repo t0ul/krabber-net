@@ -374,11 +374,13 @@ func (app *App) settingsDeletePost(w http.ResponseWriter, r *http.Request) {
 // change. Wrong guesses are limited per crab: when ok is false, status is
 // 429 once the limit is reached and 422 for a wrong password.
 func (app *App) confirmPassword(r *http.Request, c *store.Crab, password string) (ok bool, status int, err error) {
-	failures, err := app.store.Count(r.Context(), "password-change", c.ID, passwordChangeWindow)
+	// Counted before bcrypt so concurrent guesses can't all slip under the
+	// limit; given back when the password is right.
+	tries, err := app.store.Hit(r.Context(), "password-change", c.ID, passwordChangeWindow)
 	if err != nil {
 		return false, 0, err
 	}
-	if failures >= passwordChangeLimit {
+	if tries > passwordChangeLimit {
 		return false, http.StatusTooManyRequests, nil
 	}
 	match := false
@@ -388,10 +390,10 @@ func (app *App) confirmPassword(r *http.Request, c *store.Crab, password string)
 		}
 	}
 	if !match {
-		if _, err := app.store.Hit(r.Context(), "password-change", c.ID, passwordChangeWindow); err != nil {
-			return false, 0, err
-		}
 		return false, http.StatusUnprocessableEntity, nil
+	}
+	if err := app.store.Unhit(r.Context(), "password-change", c.ID, passwordChangeWindow); err != nil {
+		app.log.Warn("password-change limit", "err", err)
 	}
 	return true, 0, nil
 }

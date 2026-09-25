@@ -76,6 +76,9 @@ func (app *App) unblockPost(w http.ResponseWriter, r *http.Request) {
 
 // setBlock blocks or unblocks, then reloads the page so every list reflects it.
 func (app *App) setBlock(w http.ResponseWriter, r *http.Request, block bool) {
+	if !app.underWriteLimit(w, r, "block") {
+		return
+	}
 	other, err := app.store.CrabByID(r.Context(), r.PathValue("id"))
 	if errors.Is(err, store.ErrNotFound) {
 		app.notFound(w, r)

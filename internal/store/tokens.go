@@ -29,6 +29,7 @@ type Token struct {
 	SK        string `dynamodbav:"SK"`
 	Scope     string `dynamodbav:"scope"`
 	CrabID    string `dynamodbav:"crab_id"`
+	IssuedAt  int64  `dynamodbav:"issued_at"` // Unix seconds
 	ExpiresAt int64  `dynamodbav:"expires_at"`
 }
 
@@ -48,6 +49,7 @@ func (s *Store) NewToken(ctx context.Context, crabID, scope string, ttl time.Dur
 		SK:        tokenSK(scope),
 		Scope:     scope,
 		CrabID:    crabID,
+		IssuedAt:  s.now().Unix(),
 		ExpiresAt: s.now().Add(ttl).Unix(),
 	})
 	if err != nil {

@@ -11,7 +11,7 @@ import (
 // reloads the profile so the pin moves to the top.
 func (app *App) pinPost(w http.ResponseWriter, r *http.Request) {
 	m, ok := app.moltFromPath(w, r)
-	if !ok {
+	if !ok || !app.underWriteLimit(w, r, "edit") {
 		return
 	}
 	c := currentCrab(r)
@@ -28,6 +28,9 @@ func (app *App) pinPost(w http.ResponseWriter, r *http.Request) {
 
 // unpinPost clears the viewer's pin, if it's still the molt in the URL.
 func (app *App) unpinPost(w http.ResponseWriter, r *http.Request) {
+	if !app.underWriteLimit(w, r, "edit") {
+		return
+	}
 	c := currentCrab(r)
 	if err := app.store.Unpin(r.Context(), c, r.PathValue("id")); err != nil && !errors.Is(err, store.ErrNotFound) {
 		app.serverError(w, r, err)

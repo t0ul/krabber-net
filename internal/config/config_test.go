@@ -1,8 +1,13 @@
 package config
 
 import (
+	"context"
 	"strings"
 	"testing"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/ssm"
+	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
 )
 
 func TestParseProdRequiresSecrets(t *testing.T) {
@@ -52,5 +57,38 @@ func TestSignupMode(t *testing.T) {
 	env["SIGNUP_MODE"] = "vip"
 	if _, err := parse(env); err == nil || !strings.Contains(err.Error(), "SIGNUP_MODE") {
 		t.Fatalf("bad mode: %v", err)
+	}
+}
+
+type fakeSSM map[string]string
+
+func (f fakeSSM) GetParametersByPath(_ context.Context, in *ssm.GetParametersByPathInput, _ ...func(*ssm.Options)) (*ssm.GetParametersByPathOutput, error) {
+	out := &ssm.GetParametersByPathOutput{}
+	for k, v := range f {
+		out.Parameters = append(out.Parameters, types.Parameter{Name: aws.String(*in.Path + "/" + k), Value: aws.String(v)})
+	}
+	return out, nil
+}
+
+func TestSSMOnlySetsKnownSettings(t *testing.T) {
+	t.Setenv("SSM_PREFIX", "/krabber/prod")
+	t.Setenv("TABLE_NAME", "krabber-prod")
+	t.Setenv("APP_ENV", "")
+	params := fakeSSM{
+		"origin_verify_secret": "secret",
+		"mail_from":            "Krabber <hi@krabber.net>",
+		"app_env":              "dev",
+		"table_name":           "somebody-elses",
+		"dynamo_endpoint":      "http://evil.test",
+	}
+	c, err := Load(context.Background(), func(string) (SSMGetter, error) { return params, nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.IsDev() || c.TableName != "krabber-prod" || c.DynamoEndpoint != "" {
+		t.Errorf("SSM changed settings it shouldn't: env %q table %q endpoint %q", c.Env, c.TableName, c.DynamoEndpoint)
+	}
+	if c.MailFrom != "Krabber <hi@krabber.net>" || len(c.OriginVerifySecrets) != 1 {
+		t.Errorf("SSM settings not applied: %+v", c)
 	}
 }

@@ -32,12 +32,12 @@ func (app *App) writeGeneratedSVG(w http.ResponseWriter, r *http.Request, render
 
 func (app *App) settingsAvatarPost(w http.ResponseWriter, r *http.Request) {
 	c := currentCrab(r)
-	n, err := app.store.Count(r.Context(), "avatar-reroll", c.ID, 24*time.Hour)
+	n, err := app.store.Hit(r.Context(), "avatar-reroll", c.ID, 24*time.Hour)
 	if err != nil {
 		app.serverError(w, r, err)
 		return
 	}
-	if n >= avatarRerollLimit {
+	if n > avatarRerollLimit {
 		forms := settingsForms{
 			Profile:     profileFormFor(c.Profile),
 			AvatarError: "That's enough rerolls for today. Come back tomorrow.",
@@ -48,9 +48,6 @@ func (app *App) settingsAvatarPost(w http.ResponseWriter, r *http.Request) {
 	if _, err := app.store.RerollAvatar(r.Context(), c); err != nil {
 		app.serverError(w, r, err)
 		return
-	}
-	if _, err := app.store.Hit(r.Context(), "avatar-reroll", c.ID, 24*time.Hour); err != nil {
-		app.log.Warn("avatar reroll count", "err", err)
 	}
 	fresh, err := app.store.CrabByKey(r.Context(), c.PK, c.SK)
 	if err != nil {

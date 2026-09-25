@@ -91,6 +91,7 @@ resource "aws_lambda_function" "mail_forward" {
       PREFIX     = "support/"
       FROM       = "Krabber support <support@${var.domain}>"
       FORWARD_TO = var.alert_email
+      TABLE_NAME = aws_dynamodb_table.main.name
     }
   }
 

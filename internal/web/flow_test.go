@@ -1488,6 +1488,14 @@ func TestLoginRules(t *testing.T) {
 	if status, body := h.login("karen@krabber.test", "computer-wife"); status != http.StatusTooManyRequests || !strings.Contains(body, "Too many attempts") {
 		t.Fatalf("after %d failures: %d", loginFailureLimit, status)
 	}
+
+	// Someone else's wrong guesses don't lock karen out from her own network.
+	tok = h.csrf("/krab/login")
+	status, _, _ := h.post("/krab/login", url.Values{"csrf_token": {tok}, "email": {"karen@krabber.test"}, "password": {"computer-wife"}},
+		"CloudFront-Viewer-Address", "[2001:db8:77::1]:443")
+	if status != http.StatusSeeOther {
+		t.Fatalf("karen from another network: %d", status)
+	}
 }
 
 func TestBanEndsSessions(t *testing.T) {

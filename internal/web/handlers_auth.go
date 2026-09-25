@@ -17,11 +17,14 @@ const (
 	activationTTL = 3 * 24 * time.Hour
 
 	loginIPLimit      = 20 // attempts per IP per window
-	loginFailureLimit = 5  // failed passwords per email per window
-	loginWindow       = 15 * time.Minute
-	signupIPLimit     = 3 // accounts per IP per hour
-	resendIPLimit     = 5 // resend requests per IP per hour
-	resendEmailLimit  = 3 // resends per email per day
+	loginFailureLimit = 5  // failed passwords per email and network per window
+	// loginEmailFailureLimit caps guesses at one email from everywhere, high
+	// enough that a stranger can't lock the owner out with a few tries.
+	loginEmailFailureLimit = 50
+	loginWindow            = 15 * time.Minute
+	signupIPLimit          = 3 // accounts per IP per hour
+	resendIPLimit          = 5 // resend requests per IP per hour
+	resendEmailLimit       = 3 // resends per email per day
 )
 
 type signupForm struct {
@@ -90,7 +93,7 @@ func (app *App) signupPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if ok, err := app.underLimit(r, "signup-ip", clientIP(r), signupIPLimit, time.Hour); err != nil {
+	if ok, err := app.underLimit(r, "signup-ip", clientNet(r), signupIPLimit, time.Hour); err != nil {
 		app.serverError(w, r, err)
 		return
 	} else if !ok {
@@ -225,7 +228,7 @@ func (app *App) resendPost(w http.ResponseWriter, r *http.Request) {
 	email := store.NormalizeEmail(f.Email)
 	const done = "If that account exists and isn't active yet, we've sent a new activation email."
 
-	ipOK, err := app.underLimit(r, "resend-ip", clientIP(r), resendIPLimit, time.Hour)
+	ipOK, err := app.underLimit(r, "resend-ip", clientNet(r), resendIPLimit, time.Hour)
 	if err != nil {
 		app.serverError(w, r, err)
 		return
@@ -285,7 +288,7 @@ func (app *App) loginPost(w http.ResponseWriter, r *http.Request) {
 	const tooMany = "Too many attempts. Please wait a few minutes and try again."
 	const incorrect = "Email or password is incorrect"
 
-	if ok, err := app.underLimit(r, "login-ip", clientIP(r), loginIPLimit, loginWindow); err != nil {
+	if ok, err := app.underLimit(r, "login-ip", clientNet(r), loginIPLimit, loginWindow); err != nil {
 		app.serverError(w, r, err)
 		return
 	} else if !ok {
@@ -301,14 +304,31 @@ func (app *App) loginPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	failures, err := app.store.Count(r.Context(), "login-fail", f.Email, loginWindow)
+	// Wrong passwords are counted per email and network, so someone else
+	// can't lock an account out, and per email overall at a much higher
+	// limit. Each attempt is counted before bcrypt runs, so concurrent
+	// guesses can't all get in under the limit, and given back if right.
+	perNet := f.Email + " " + clientNet(r)
+	tries, err := app.store.Hit(r.Context(), "login-fail", perNet, loginWindow)
 	if err != nil {
 		app.serverError(w, r, err)
 		return
 	}
-	if failures >= loginFailureLimit {
+	anywhere, err := app.store.Hit(r.Context(), "login-fail-email", f.Email, loginWindow)
+	if err != nil {
+		app.serverError(w, r, err)
+		return
+	}
+	if tries > loginFailureLimit || anywhere > loginEmailFailureLimit {
 		fail(http.StatusTooManyRequests, tooMany)
 		return
+	}
+	forgive := func() {
+		for action, key := range map[string]string{"login-fail": perNet, "login-fail-email": f.Email} {
+			if err := app.store.Unhit(r.Context(), action, key, loginWindow); err != nil {
+				app.log.Warn("login limit", "err", err)
+			}
+		}
 	}
 
 	crab, err := app.store.CrabByEmail(r.Context(), f.Email)
@@ -327,13 +347,10 @@ func (app *App) loginPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !match {
-		if _, err := app.store.Hit(r.Context(), "login-fail", f.Email, loginWindow); err != nil {
-			app.serverError(w, r, err)
-			return
-		}
 		fail(http.StatusUnprocessableEntity, incorrect)
 		return
 	}
+	forgive()
 	switch {
 	case crab.Banned || crab.Deleted:
 		fail(http.StatusUnprocessableEntity, "This account is unavailable.")
