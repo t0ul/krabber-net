@@ -652,3 +652,95 @@ body.kb-shell,
   z-index: 20;
   background-color: var(--dark);
 }
+
+/* Page titles in Krabber red, as Twitter's were in its blue. */
+#content-heading h6 > strong {
+  color: var(--primary);
+}
+
+/* "•••" only exists on phones, where the sidebar is a tab bar. */
+.kb-nav-more {
+  display: none;
+}
+
+/* Phones: the sidebar becomes a tab bar along the bottom (Trench, Sea,
+   Notifications, Profile, "•••"), Molt floats above it, and the feed
+   column stops short of the bar. */
+@media (max-width: 575.98px) {
+  #nav-panel {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1040;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-around;
+    width: 100%;
+    max-width: none !important;
+    flex: none;
+    padding: 4px 8px calc(4px + env(safe-area-inset-bottom)) !important;
+    background: var(--dark);
+    border-top: 1px solid #2f3336;
+  }
+
+  #nav-panel .kb-nav-logo,
+  #nav-panel .kb-nav-wide,
+  #nav-panel .kb-nav-extras {
+    display: none;
+  }
+
+  #nav-panel .nav-link-btn {
+    margin: 0 !important;
+    padding: 8px 10px;
+  }
+
+  .kb-nav-more {
+    display: block;
+  }
+
+  .kb-nav-sheet {
+    top: auto;
+    bottom: calc(100% + 10px);
+    right: 0;
+    min-width: 210px;
+  }
+
+  .kb-nav-sheet .kb-menu-item[aria-current="page"] {
+    color: var(--primary);
+    fill: var(--primary);
+  }
+
+  #molt-btn {
+    position: fixed;
+    right: 16px;
+    bottom: calc(72px + env(safe-area-inset-bottom));
+    z-index: 1041;
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    height: 56px;
+    margin: 0 !important;
+    padding: 0;
+    border-radius: 50% !important;
+  }
+
+  #molt-btn .btn-icon {
+    fill: #fff;
+  }
+
+  #nav-panel .kb-nav-auth {
+    flex: 1;
+    margin: 0 6px !important;
+  }
+
+  #main-panel {
+    height: calc(100vh - 57px - env(safe-area-inset-bottom));
+    height: calc(100dvh - 57px - env(safe-area-inset-bottom));
+    max-height: none;
+    border-left: 0 !important;
+    border-right: 0 !important;
+  }
+}

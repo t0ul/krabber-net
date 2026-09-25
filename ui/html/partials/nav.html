@@ -2,9 +2,12 @@
    along (OOB); elsewhere it polls itself on app.js's kb:poll tick. */}}
 {{define "notification-badge"}}<span class="kb-badge-slot" id="kb-badge-slot"{{ if .Poll }} hx-get="/notifications/badge" hx-trigger="kb:poll from:body" hx-swap="outerHTML"{{ end }}{{ if .OOB }} hx-swap-oob="true"{{ end }}>{{ if gt .N 0 }}<span class="kb-badge" aria-label="{{ .N }} unread">{{ if gt .N 99 }}99+{{ else }}{{ .N }}{{ end }}</span>{{ end }}</span>{{end}}
 
+{{/* The left sidebar. On phones (app.css) it becomes a tab bar along the
+   bottom: Trench, Sea, Notifications, Profile and "•••", which opens the
+   rest; Molt floats above it. */}}
 {{define "nav"}}{{ $p := .CurrentPath }}
-<div class="col-1 col-lg-3 p-1" id="nav-panel">
-    <a href="/" aria-label="Krabber home">
+<nav class="col-1 col-lg-3 p-1" id="nav-panel" aria-label="Main">
+    <a href="/" class="kb-nav-logo" aria-label="Krabber home">
         <img class="mt-2 d-block mx-auto d-lg-inline logo" src="/static/img/krabber_logo.svg" alt="Krabber" width="32" height="32">
     </a>
     {{ if .IsAuthenticated }}
@@ -23,7 +26,7 @@
         {{ template "notification-badge" (dict "N" .Unread "Poll" (not .FeedPath)) }}
         <strong class="d-none d-lg-inline-block ml-2">Notifications</strong>
     </a>
-    <a href="/bookmarks" class="btn rounded-pill mx-auto mx-lg-0 mt-2 nav-link-btn"{{ if eq $p "/bookmarks" }} id="nav-active" aria-current="page"{{ end }}>
+    <a href="/bookmarks" class="btn rounded-pill mx-auto mx-lg-0 mt-2 nav-link-btn kb-nav-wide"{{ if eq $p "/bookmarks" }} id="nav-active" aria-current="page"{{ end }}>
         <svg class="btn-icon" width="28" height="28"><use href="{{ asset "img/sprites.svg" }}#anchor"></use></svg>
         <strong class="d-none d-lg-inline-block ml-2">Bookmarks</strong>
     </a>
@@ -32,15 +35,58 @@
         <img class="rounded-circle profile-picture kb-nav-avatar" src="{{ avatarSrc .Avatar }}" width="28" height="28" alt="">
         <strong class="d-none d-lg-inline-block ml-2">Profile</strong>
     </a>
-    <a href="/trench" data-open-modal="compose-modal" id="molt-btn" class="btn btn-primary mx-auto mx-lg-0 subtle-shadow rounded-pill w-md-75 mt-4 d-block">
+    <details class="kb-menu kb-nav-more">
+        <summary class="btn rounded-pill nav-link-btn" aria-label="More">
+            <svg class="btn-icon" width="28" height="28"><use href="{{ asset "img/sprites.svg" }}#more-horizontal"></use></svg>
+        </summary>
+        <div class="kb-menu-items kb-nav-sheet">
+            <a href="/bookmarks" class="kb-menu-item"{{ if eq $p "/bookmarks" }} aria-current="page"{{ end }}>
+                <svg class="btn-icon" width="22" height="22"><use href="{{ asset "img/sprites.svg" }}#anchor"></use></svg>Bookmarks
+            </a>
+            {{ template "nav-extras" (dict "P" $p "Menu" true "Page" .) }}
+        </div>
+    </details>
+    <a href="/trench" data-open-modal="compose-modal" id="molt-btn" class="btn btn-primary mx-auto mx-lg-0 subtle-shadow rounded-pill w-md-75 mt-4 d-block" aria-label="Molt">
         <svg class="btn-icon d-lg-none" width="28" height="28"><use href="{{ asset "img/sprites.svg" }}#write"></use></svg>
         <strong class="d-none d-lg-inline-block">Molt</strong>
     </a>
+    <div class="kb-nav-extras">
+        {{ template "nav-extras" (dict "P" $p "Menu" false "Page" .) }}
+    </div>
+    {{ else }}
+    <a href="/krab/login" class="btn btn-primary rounded-pill mx-auto mx-lg-0 mt-4 d-block kb-nav-auth"><strong>Log in</strong></a>
+    <a href="/krab/signup" class="btn btn-secondary rounded-pill mx-auto mx-lg-0 mt-2 d-block kb-nav-auth"><strong>Sign up</strong></a>
+    {{ end }}
+</nav>
+{{end}}
+
+{{/* Stats, Krabmin, Settings and Log out: the muted group under Molt in the
+   sidebar, and the "•••" sheet on phones (Menu). */}}
+{{define "nav-extras"}}{{ $p := .P }}{{ $d := .Page }}
+{{ if .Menu }}
+    <a href="/stats" class="kb-menu-item"{{ if eq $p "/stats" }} aria-current="page"{{ end }}>
+        <svg class="btn-icon" width="22" height="22"><use href="{{ asset "img/sprites.svg" }}#dashboard"></use></svg>Stats
+    </a>
+    {{ if $d.IsModerator }}
+    <a href="/krabmin" class="kb-menu-item"{{ if hasPrefix $p "/krabmin" }} aria-current="page"{{ end }}>
+        <svg class="btn-icon" width="22" height="22"><use href="{{ asset "img/sprites.svg" }}#lifebuoy"></use></svg>Krabmin
+    </a>
+    {{ end }}
+    <a href="/settings" class="kb-menu-item"{{ if eq $p "/settings" }} aria-current="page"{{ end }}>
+        <svg class="btn-icon" width="22" height="22"><use href="{{ asset "img/sprites.svg" }}#cog"></use></svg>Settings
+    </a>
+    <form action="/krab/logout" method="POST" data-confirm="Are you sure you want to log out?">
+        <input type='hidden' name='csrf_token' value='{{ $d.CSRFToken }}'>
+        <button type="submit" class="kb-menu-item">
+            <svg class="btn-icon" width="22" height="22"><use href="{{ asset "img/sprites.svg" }}#log-out"></use></svg>Log out
+        </button>
+    </form>
+{{ else }}
     <a href="/stats" class="btn rounded-pill mx-auto mx-lg-0 mt-2 extra-navs"{{ if eq $p "/stats" }} id="nav-active" aria-current="page"{{ end }}>
         <svg class="btn-icon text-muted" width="28" height="28"><use href="{{ asset "img/sprites.svg" }}#{{ if eq $p "/stats" }}dashboard-f{{ else }}dashboard{{ end }}"></use></svg>
         <strong class="d-none d-lg-inline-block ml-2">Stats</strong>
     </a>
-    {{ if .IsModerator }}
+    {{ if $d.IsModerator }}
     <a href="/krabmin" class="btn rounded-pill mx-auto mx-lg-0 mt-2 extra-navs"{{ if hasPrefix $p "/krabmin" }} id="nav-active" aria-current="page"{{ end }}>
         <svg class="btn-icon text-muted" width="28" height="28"><use href="{{ asset "img/sprites.svg" }}#lifebuoy"></use></svg>
         <strong class="d-none d-lg-inline-block ml-2">Krabmin</strong>
@@ -51,15 +97,11 @@
         <strong class="d-none d-lg-inline-block ml-2">Settings</strong>
     </a>
     <form action="/krab/logout" method="POST" data-confirm="Are you sure you want to log out?">
-        <input type='hidden' name='csrf_token' value='{{ .CSRFToken }}'>
+        <input type='hidden' name='csrf_token' value='{{ $d.CSRFToken }}'>
         <button type="submit" class="btn rounded-pill mx-auto mx-lg-0 mt-2 extra-navs">
             <svg class="btn-icon text-muted" width="28" height="28"><use href="{{ asset "img/sprites.svg" }}#log-out"></use></svg>
             <strong class="d-none d-lg-inline-block ml-2">Log out</strong>
         </button>
     </form>
-    {{ else }}
-    <a href="/krab/login" class="btn btn-primary rounded-pill mx-auto mx-lg-0 mt-4 d-block"><strong>Log in</strong></a>
-    <a href="/krab/signup" class="btn btn-secondary rounded-pill mx-auto mx-lg-0 mt-2 d-block"><strong>Sign up</strong></a>
-    {{ end }}
-</div>
+{{ end }}
 {{end}}
