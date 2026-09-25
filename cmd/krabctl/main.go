@@ -1,10 +1,10 @@
-// Command crabctl runs account operations that must not be possible from the
+// Command krabctl runs account operations that must not be possible from the
 // web, such as appointing admins. Point it at a table with TABLE_NAME (and
 // DYNAMO_ENDPOINT for DynamoDB Local); prod uses the caller's AWS profile:
 //
-//	AWS_PROFILE=krabber-admin TABLE_NAME=krabber-prod go run ./cmd/crabctl role <username> admin
-//	AWS_PROFILE=krabber-admin TABLE_NAME=krabber-prod go run ./cmd/crabctl verify <username> on
-//	AWS_PROFILE=krabber-admin TABLE_NAME=krabber-prod go run ./cmd/crabctl trophy <username> contributor
+//	AWS_PROFILE=krabber-admin TABLE_NAME=krabber-prod go run ./cmd/krabctl role <username> admin
+//	AWS_PROFILE=krabber-admin TABLE_NAME=krabber-prod go run ./cmd/krabctl verify <username> on
+//	AWS_PROFILE=krabber-admin TABLE_NAME=krabber-prod go run ./cmd/krabctl trophy <username> contributor
 package main
 
 import (
@@ -19,9 +19,9 @@ import (
 	"github.com/t0ul/krabber-net/internal/trophies"
 )
 
-const usage = `usage: crabctl role <username> <admin|moderator|none>
-       crabctl verify <username> <on|off>
-       crabctl trophy <username> <trophy-id>`
+const usage = `usage: krabctl role <username> <admin|moderator|none>
+       krabctl verify <username> <on|off>
+       krabctl trophy <username> <trophy-id>`
 
 func main() {
 	if len(os.Args) != 4 {
@@ -53,7 +53,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("find %q in %q: %v", name, table, err) //nolint:gosec // the operator's own arguments, printed to their terminal
 	}
-	entry := store.ModAction{Moderator: "crabctl", CrabID: c.ID, Crab: c.UserName}
+	entry := store.ModAction{Moderator: "krabctl", CrabID: c.ID, Crab: c.UserName}
 	grant := ""
 	switch cmd {
 	case "role":

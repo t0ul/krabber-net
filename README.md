@@ -16,11 +16,11 @@ Sign in as `mrkrabs@krabber.test`, `spongebob@krabber.test` or `plankton@krabber
 with password `crabcakes123`. Emails (activation links) print to the server log.
 `spongebob` is an admin and `mrkrabs` a moderator, so both see Krabmin (`/krabmin`).
 
-Roles live on the account and can only be granted with `crabctl`, never from the site.
+Roles live on the account and can only be granted with `krabctl`, never from the site.
 For example, this makes you the admin in prod:
 
 ```bash
-AWS_PROFILE=krabber-admin TABLE_NAME=krabber-prod go run ./cmd/crabctl role <username> admin
+AWS_PROFILE=krabber-admin TABLE_NAME=krabber-prod go run ./cmd/krabctl role <username> admin
 ```
 
 Moderators can then be added or removed by an admin in Krabmin.
@@ -49,7 +49,7 @@ python3 scripts/cost_model.py 1000 5000 10000   # daily active krabs
 |---|---|
 | `cmd/web` | The website (Beanstalk runs this) |
 | `cmd/devseed` | Dev only: create the table in DynamoDB Local and add sample krabs |
-| `cmd/crabctl` | Operator commands run from your machine (set a krab's role, verify a krab) |
+| `cmd/krabctl` | Operator commands run from your machine (set a krab's role, verify a krab) |
 | `scripts/create_table.py` | Create the DynamoDB table with boto3 (`--local` for DynamoDB Local, `--print` for the JSON definition); a Go test keeps it matching `internal/store/schema.go` |
 | `internal/store` | All DynamoDB access; every key format is in `keys.go` |
 | `internal/web` | Routes, handlers, templates, security middleware |

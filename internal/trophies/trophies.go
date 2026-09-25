@@ -11,7 +11,7 @@ import (
 )
 
 // Trophy is one entry in the catalog. Manual trophies are only handed out by
-// moderators (or crabctl); the rest are earned automatically.
+// moderators (or krabctl); the rest are earned automatically.
 type Trophy struct {
 	ID          string
 	Title       string

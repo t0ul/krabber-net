@@ -17,7 +17,7 @@ const (
 	// directoryTTL is how often the snapshot is read again from the table.
 	// Changes made through this server are applied to it as they happen;
 	// the reload catches up counts (followers, molts) and anything done
-	// elsewhere (crabctl, another instance during a deploy).
+	// elsewhere (krabctl, another instance during a deploy).
 	directoryTTL = time.Hour
 	// directoryRetry is how soon a failed reload is tried again.
 	directoryRetry = time.Minute
