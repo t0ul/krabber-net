@@ -32,11 +32,11 @@
     {{ else }}
     <div class="d-flex border-bottom border-dark px-3 py-2 kb-notification">
         <div class="kb-notification-icon kb-notification-{{ .Type }} mr-3">
-            {{ if eq .Type "like" }}<svg width="22" height="22"><use href="/static/img/sprites.svg?version=1704178675#heart-f"></use></svg>
-            {{ else if eq .Type "remolt" }}<svg width="22" height="22"><use href="/static/img/sprites.svg?version=1704178675#repeat"></use></svg>
-            {{ else if eq .Type "reply" }}<svg width="22" height="22"><use href="/static/img/sprites.svg?version=1704178675#message-f"></use></svg>
-            {{ else if eq .Type "quote" }}<svg width="22" height="22"><use href="/static/img/sprites.svg?version=1704178675#pencil"></use></svg>
-            {{ else if eq .Type "mention" }}<svg width="22" height="22"><use href="/static/img/sprites.svg?version=1704178675#message-writing-f"></use></svg>
+            {{ if eq .Type "like" }}<svg width="22" height="22"><use href="{{ asset "img/sprites.svg" }}#heart-f"></use></svg>
+            {{ else if eq .Type "remolt" }}<svg width="22" height="22"><use href="{{ asset "img/sprites.svg" }}#repeat"></use></svg>
+            {{ else if eq .Type "reply" }}<svg width="22" height="22"><use href="{{ asset "img/sprites.svg" }}#message-f"></use></svg>
+            {{ else if eq .Type "quote" }}<svg width="22" height="22"><use href="{{ asset "img/sprites.svg" }}#pencil"></use></svg>
+            {{ else if eq .Type "mention" }}<svg width="22" height="22"><use href="{{ asset "img/sprites.svg" }}#message-writing-f"></use></svg>
             {{ else }}<svg width="22" height="22"><use href="{{ asset "img/sprites.svg" }}#crab"></use></svg>{{ end }}
         </div>
         <div class="flex-grow-1 min-w-0">

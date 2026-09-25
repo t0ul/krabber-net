@@ -9,10 +9,11 @@ import (
 )
 
 const (
-	suggestionTTL      = 10 * time.Minute
-	suggestionSample   = 20   // follows whose own follows are read
-	suggestionParallel = 5    // queries in flight at once
-	suggestionEntries  = 2000 // viewers cached before the cache starts over
+	suggestionTTL      = time.Hour // a viewer's own follow or unfollow clears it sooner
+	suggestionSample   = 20        // follows whose own follows are read
+	suggestionParallel = 5         // queries in flight at once
+	suggestionEntries  = 20_000    // viewers cached before the cache starts over
+	suggestionKept     = 50        // ranked krabs kept per viewer
 )
 
 // suggestions caches each viewer's friends-of-friends ranking, as Crabber
@@ -110,6 +111,7 @@ func (app *App) friendsOfFriends(r *http.Request, viewerID string, followed map[
 		}
 		return ranked[i] < ranked[j]
 	})
+	ranked = ranked[:min(len(ranked), suggestionKept)]
 	app.fof.put(viewerID, ranked)
 	return ranked
 }

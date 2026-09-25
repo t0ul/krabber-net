@@ -19,7 +19,7 @@
         <span class="card-title">{{ .Title }}</span>
         {{ with .Description }}<span class="card-description text-muted">{{ . }}</span>{{ end }}
         <span class="card-address text-muted">
-            <svg class="mini-molt-action-icon" width="14" height="14"><use href="/static/img/sprites.svg?version=1704178675#link"></use></svg>
+            <svg class="mini-molt-action-icon" width="14" height="14"><use href="{{ asset "img/sprites.svg" }}#link"></use></svg>
             {{ .Host }}
         </span>
     </span>
@@ -55,7 +55,7 @@
         {{ end }}
         {{ if $m.Remolt }}
         <small class="mini-molt-remolt text-muted zindex-front">
-            <svg class="mini-molt-action-icon remolt-icon" width="12" height="12"><use href="/static/img/sprites.svg?version=1704178675#repeat"></use></svg>
+            <svg class="mini-molt-action-icon remolt-icon" width="12" height="12"><use href="{{ asset "img/sprites.svg" }}#repeat"></use></svg>
             <a href="/krabs/{{ $m.RemoltedBy }}">{{ or $m.RemoltedByName $m.RemoltedBy }}</a> Remolted</small>
         {{ end }}
         {{ if and $m.ReplyTo (not .InThread) }}{{ template "replying-to" . }}{{ end }}
@@ -125,7 +125,7 @@
 {{/* "replying to" line; takes (dict "M" <reply> "D" <page data>). */}}
 {{define "replying-to"}}{{ $m := .M }}
 <small class="mini-molt-remolt text-muted zindex-front">
-    <svg class="mini-molt-action-icon remolt-icon" width="12" height="12"><use href="/static/img/sprites.svg?version=1704178675#message"></use></svg>
+    <svg class="mini-molt-action-icon remolt-icon" width="12" height="12"><use href="{{ asset "img/sprites.svg" }}#message"></use></svg>
     replying to <a href="/molt/view/{{ $m.ReplyTo }}">{{ if and $m.ReplyToAuthorID (eq $m.ReplyToAuthorID .D.CrabID) }}you{{ else }}{{ or $m.ReplyToName $m.ReplyToAuthor }}{{ end }}</a></small>
 {{end}}
 
@@ -142,7 +142,7 @@
 {{ $own := eq $m.AuthorID $d.CrabID }}
 <details class="kb-menu zindex-front">
     <summary class="mini-molt-action reply rounded-circle" title="More" aria-label="More options">
-        <svg class="mini-molt-action-icon" width="19" height="19"><use href="/static/img/sprites.svg?version=1704178675#more-horizontal"></use></svg>
+        <svg class="mini-molt-action-icon" width="19" height="19"><use href="{{ asset "img/sprites.svg" }}#more-horizontal"></use></svg>
     </summary>
     <div class="kb-menu-items">
         {{ if $own }}
@@ -163,14 +163,14 @@
             <input type='hidden' name='csrf_token' value='{{ $d.CSRFToken }}'>
             {{ if not $m.NSFW }}<input type="hidden" name="nsfw" value="true">{{ end }}
             <button type="submit" class="kb-menu-item">
-                <svg width="19" height="19"><use href="/static/img/sprites.svg?version=1704178675#{{ if $m.NSFW }}eye{{ else }}eye-close{{ end }}"></use></svg>
+                <svg width="19" height="19"><use href="{{ asset "img/sprites.svg" }}#{{ if $m.NSFW }}eye{{ else }}eye-close{{ end }}"></use></svg>
                 {{ if $m.NSFW }}Remove NSFW label{{ else }}Label NSFW{{ end }}
             </button>
         </form>
         <form hx-post="/molt/delete/{{ $m.ID }}{{ if .Thread }}?from=thread{{ end }}" hx-swap="none" hx-confirm="Delete this molt? This can't be undone.">
             <input type='hidden' name='csrf_token' value='{{ $d.CSRFToken }}'>
             <button type="submit" class="kb-menu-item kb-menu-danger">
-                <svg width="19" height="19"><use href="/static/img/sprites.svg?version=1704178675#trash"></use></svg>
+                <svg width="19" height="19"><use href="{{ asset "img/sprites.svg" }}#trash"></use></svg>
                 Delete molt
             </button>
         </form>
@@ -209,17 +209,17 @@
 <div class="mini-molt-actions d-flex flex-row justify-content-between mr-md-5">
     {{ if and $d.IsAuthenticated (eq $m.AuthorID $d.CrabID) (editable $m) }}
     <a class="mini-molt-action edit rounded-circle zindex-front" href="/molt/edit/{{ $m.ID }}" hx-get="/molt/edit/{{ $m.ID }}" hx-target="#molt-modal-content" title="Edit">
-        <svg class="mini-molt-action-icon" width="19" height="19"><use href="/static/img/sprites.svg?version=1704178675#pencil"></use></svg>
+        <svg class="mini-molt-action-icon" width="19" height="19"><use href="{{ asset "img/sprites.svg" }}#pencil"></use></svg>
     </a>
     {{ end }}
     <a class="mini-molt-action reply rounded-circle zindex-front" href="/molt/view/{{ $m.ID }}" title="Reply">
-        <svg class="mini-molt-action-icon" width="19" height="19"><use href="/static/img/sprites.svg?version=1704178675#message"></use></svg>
+        <svg class="mini-molt-action-icon" width="19" height="19"><use href="{{ asset "img/sprites.svg" }}#message"></use></svg>
         <span class="mini-molt-action-counter ml-1">{{ $m.ReplyCount }}</span>
     </a>
     {{ if $d.IsAuthenticated }}
     <details class="kb-menu kb-remolt-menu zindex-front">
         <summary class="mini-molt-action remolt{{ if $m.RemoltedAs }} active-remolt{{ end }}" title="Remolt" aria-label="Remolt options">
-            <svg class="mini-molt-action-icon" width="19" height="19"><use href="/static/img/sprites.svg?version=1704178675#repeat"></use></svg>
+            <svg class="mini-molt-action-icon" width="19" height="19"><use href="{{ asset "img/sprites.svg" }}#repeat"></use></svg>
             <span class="mini-molt-action-counter ml-1">{{ $m.RemoltCount }}</span>
         </summary>
         <div class="kb-menu-items">
@@ -227,7 +227,7 @@
             <form hx-post="/unremolt/{{ $m.ID }}" hx-target="closest .mini-molt-actions" hx-swap="outerHTML">
                 <input type='hidden' name='csrf_token' value='{{ $d.CSRFToken }}'>
                 <button type="submit" class="kb-menu-item kb-menu-danger">
-                    <svg width="19" height="19"><use href="/static/img/sprites.svg?version=1704178675#repeat"></use></svg>
+                    <svg width="19" height="19"><use href="{{ asset "img/sprites.svg" }}#repeat"></use></svg>
                     Undo Remolt
                 </button>
             </form>
@@ -235,13 +235,13 @@
             <form hx-post="/remolt/{{ $m.ID }}" hx-target="closest .mini-molt-actions" hx-swap="outerHTML">
                 <input type='hidden' name='csrf_token' value='{{ $d.CSRFToken }}'>
                 <button type="submit" class="kb-menu-item">
-                    <svg width="19" height="19"><use href="/static/img/sprites.svg?version=1704178675#repeat"></use></svg>
+                    <svg width="19" height="19"><use href="{{ asset "img/sprites.svg" }}#repeat"></use></svg>
                     Remolt
                 </button>
             </form>
             {{ end }}
             <a class="kb-menu-item" href="/molt/quote/{{ $m.ID }}" hx-get="/molt/quote/{{ $m.ID }}" hx-target="#molt-modal-content">
-                <svg width="19" height="19"><use href="/static/img/sprites.svg?version=1704178675#pencil"></use></svg>
+                <svg width="19" height="19"><use href="{{ asset "img/sprites.svg" }}#pencil"></use></svg>
                 Quote Molt
             </a>
         </div>
@@ -249,17 +249,17 @@
     <form hx-post="/molt/like/{{ $m.ID }}" hx-target="closest .mini-molt-actions" hx-swap="outerHTML">
         <input type='hidden' name='csrf_token' value='{{ $d.CSRFToken }}'>
         <button class="mini-molt-action like zindex-front action-button{{ if $m.Liked }} liked{{ end }}" type="submit" title="{{ if $m.Liked }}Unlike{{ else }}Like{{ end }}">
-            <svg class="mini-molt-action-icon" width="19" height="19"><use href="/static/img/sprites.svg?version=1704178675#{{ if $m.Liked }}heart-f{{ else }}heart{{ end }}"></use></svg>
+            <svg class="mini-molt-action-icon" width="19" height="19"><use href="{{ asset "img/sprites.svg" }}#{{ if $m.Liked }}heart-f{{ else }}heart{{ end }}"></use></svg>
             <span class="mini-molt-action-counter ml-1">{{ $m.LikeCount }}</span>
         </button>
     </form>
     {{ else }}
     <span class="mini-molt-action remolt" title="Remolts">
-        <svg class="mini-molt-action-icon" width="19" height="19"><use href="/static/img/sprites.svg?version=1704178675#repeat"></use></svg>
+        <svg class="mini-molt-action-icon" width="19" height="19"><use href="{{ asset "img/sprites.svg" }}#repeat"></use></svg>
         <span class="mini-molt-action-counter ml-1">{{ $m.RemoltCount }}</span>
     </span>
     <span class="mini-molt-action like" title="Likes">
-        <svg class="mini-molt-action-icon" width="19" height="19"><use href="/static/img/sprites.svg?version=1704178675#heart"></use></svg>
+        <svg class="mini-molt-action-icon" width="19" height="19"><use href="{{ asset "img/sprites.svg" }}#heart"></use></svg>
         <span class="mini-molt-action-counter ml-1">{{ $m.LikeCount }}</span>
     </span>
     {{ end }}
@@ -269,7 +269,7 @@
 {{define "new-molts"}}
 <div id="new-molts" class="{{ if .NewCount }}p-2 border-bottom border-dark clickable hoverable-light text-primary text-center{{ else }}d-none{{ end }}"
     hx-get="{{ .FeedPath }}/new{{ if .Since }}?since={{ .Since }}{{ end }}"
-    hx-trigger="every 30s"
+    hx-trigger="kb:poll from:body"
     hx-swap="outerHTML">
     {{ if .NewCount }}
     <a href="{{ .FeedPath }}" class="kb-new-molts-link">
@@ -278,6 +278,9 @@
     {{ end }}
 </div>
 {{end}}
+
+{{/* The feed's poll answer: the banner, plus the nav badge out of band. */}}
+{{define "new-molts-poll"}}{{ template "new-molts" . }}{{ if .IsAuthenticated }}{{ template "notification-badge" (dict "N" .Unread "OOB" true) }}{{ end }}{{end}}
 
 {{define "molt-list"}}
 <div id="molt-list">
@@ -308,7 +311,7 @@
 <form hx-post="/{{ if .Blocking }}unblock{{ else }}block{{ end }}/{{ .ID }}"{{ if not .Blocking }} hx-confirm="Block @{{ .Name }}? You'll unfollow each other and stop seeing each other's molts."{{ end }} hx-swap="none">
     <input type='hidden' name='csrf_token' value='{{ .D.CSRFToken }}'>
     <button type="submit" class="kb-menu-item{{ if not .Blocking }} kb-menu-danger{{ end }}">
-        <svg width="19" height="19"><use href="/static/img/sprites.svg?version=1704178675#{{ if .Blocking }}eye{{ else }}eye-close{{ end }}"></use></svg>
+        <svg width="19" height="19"><use href="{{ asset "img/sprites.svg" }}#{{ if .Blocking }}eye{{ else }}eye-close{{ end }}"></use></svg>
         {{ if .Blocking }}Unblock{{ else }}Block{{ end }} @{{ .Name }}
     </button>
 </form>

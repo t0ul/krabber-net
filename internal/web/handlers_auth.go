@@ -53,7 +53,15 @@ type resendForm struct {
 func (app *App) signupPage(w http.ResponseWriter, r *http.Request) {
 	data := app.newTemplateData(r)
 	data.Form = signupForm{Code: store.NormalizeInviteCode(r.URL.Query().Get("code"))}
+	data.SignupFull = app.signupFull(r)
 	app.render(w, r, http.StatusOK, "signup.html", data)
+}
+
+// signupFull reports whether MAX_KRABS krabs can already sign in. It counts
+// the directory, so it's free, and a few activations past the cap (people
+// who signed up just before it) are fine.
+func (app *App) signupFull(r *http.Request) bool {
+	return app.cfg.MaxKrabs > 0 && app.activeKrabs(r) >= app.cfg.MaxKrabs
 }
 
 func (app *App) signupPost(w http.ResponseWriter, r *http.Request) {
@@ -73,6 +81,11 @@ func (app *App) signupPost(w http.ResponseWriter, r *http.Request) {
 	}
 	if app.cfg.SignupMode == config.SignupClosed {
 		f.AddNonFieldError("Registration is temporarily closed.")
+		rerender(http.StatusUnprocessableEntity)
+		return
+	}
+	if app.signupFull(r) {
+		f.AddNonFieldError("Krabber is full for now. Please check back soon.")
 		rerender(http.StatusUnprocessableEntity)
 		return
 	}

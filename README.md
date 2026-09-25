@@ -36,6 +36,13 @@ make vuln    # govulncheck
 
 Tests that need DynamoDB Local are skipped when `KRABBER_TEST_DYNAMO_ENDPOINT` isn't set.
 
+`TestCostProfile` (`internal/web/cost_test.go`) measures the DynamoDB read and write units of the main pages, polls and actions, and fails when one goes over its budget. To see the table, and to turn it into a monthly bill:
+
+```bash
+KRABBER_TEST_DYNAMO_ENDPOINT=http://localhost:8000 go test -run TestCostProfile -v ./internal/web/
+python3 scripts/cost_model.py 1000 5000 10000   # daily active krabs
+```
+
 ## Layout
 
 | Path | What |
@@ -65,6 +72,8 @@ Tests that need DynamoDB Local are skipped when `KRABBER_TEST_DYNAMO_ENDPOINT` i
 | `CONTACT_EMAIL` | Address shown on the terms and privacy pages and in ban emails; left out when unset |
 | `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET` | Cloudflare Turnstile on signup and resend; off when unset |
 | `SIGNUP_MODE` | `open` (default; an invite code is optional), `invite` (a krab's invite code is required) or `closed` |
+| `MAX_KRABS` | Close signups once this many krabs can sign in (0, the default, means no cap); see the cost table in PLAN.md section 2.2 |
+| `LOG_ALL_REQUESTS` | `true` logs every request with its DynamoDB read and write units, instead of 5% of successful ones (dev always logs all) |
 | `DYNAMO_ENDPOINT` | DynamoDB Local URL; dev only |
 | `PORT` | Listen port, 5000 by default (Beanstalk's) |
 

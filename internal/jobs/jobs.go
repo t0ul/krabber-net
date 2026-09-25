@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/t0ul/krabber-net/internal/linkcard"
+	"github.com/t0ul/krabber-net/internal/platform"
 	"github.com/t0ul/krabber-net/internal/store"
 	"github.com/t0ul/krabber-net/internal/trophies"
 )
@@ -258,6 +259,7 @@ func (r *Runner) sweepFanouts(ctx context.Context) {
 // retries; the writes are idempotent.
 func (r *Runner) fanout(ctx context.Context, m *store.Molt) {
 	start := time.Now()
+	ctx, meter := platform.WithMeter(ctx)
 	followers := 0
 	err := r.store.AddToTrenches(ctx, m, []string{m.OwnerID})
 	if err == nil {
@@ -275,7 +277,8 @@ func (r *Runner) fanout(ctx context.Context, m *store.Molt) {
 		}
 		return
 	}
-	r.log.Info("fanout done", "molt", m.ID, "followers", followers, "ms", time.Since(start).Milliseconds())
+	read, write, _ := meter.Units()
+	r.log.Info("fanout done", "molt", m.ID, "followers", followers, "ms", time.Since(start).Milliseconds(), "rru", read, "wru", write)
 }
 
 // every runs fn after an initial delay and then on each tick, with up to 10%

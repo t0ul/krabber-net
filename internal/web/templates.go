@@ -37,10 +37,12 @@ type templateData struct {
 	CSRFToken        string
 	TurnstileSiteKey string
 	SignupMode       string // config.SignupOpen, SignupInvite or SignupClosed
+	SignupFull       bool   // MAX_KRABS reached
 	Form             any
 	Query            string
 	CurrentPath      string
 	Unread           int
+	unreadKnown      bool // the handler set Unread; render doesn't read it again
 	Sidebar          sidebar
 
 	Notifications []store.Notification
@@ -198,9 +200,8 @@ func dict(kv ...any) (map[string]any, error) {
 }
 
 // assetVersion is a hash of the embedded static files. Asset URLs carry it as
-// ?v=..., so browsers fetch new CSS/JS after every release even though the
-// files are cached for a day. (CloudFront ignores the query string and is
-// invalidated on deploy.)
+// ?v=..., so they can be cached for good (see staticFiles) and still change
+// with every release that touches a static file.
 var assetVersion = func() string {
 	h := sha256.New()
 	_ = fs.WalkDir(ui.Files, "static", func(path string, d fs.DirEntry, err error) error {
@@ -284,9 +285,25 @@ func newTemplateCache() (map[string]*template.Template, error) {
 }
 
 // render executes a page into a buffer first, so a template error becomes a
-// clean 500 instead of a half-written page.
+// clean 500 instead of a half-written page. Only whole pages show the nav
+// badge and the sidebar, so only they read the unread count and build the
+// sidebar; htmx fragments skip both.
 func (app *App) render(w http.ResponseWriter, r *http.Request, status int, page string, data templateData) {
+	if data.IsAuthenticated {
+		if !data.unreadKnown {
+			data.Unread = app.unread(r)
+		}
+		data.Sidebar = app.sidebarFor(r)
+	}
 	app.renderTemplate(w, r, status, page, "base", data)
+}
+
+func (app *App) unread(r *http.Request) int {
+	n, err := app.store.UnreadNotifications(r.Context(), currentCrab(r).ID)
+	if err != nil {
+		app.log.Warn("unread notifications", "err", err)
+	}
+	return n
 }
 
 // renderTemplate executes one named template from a page's set (used for htmx
@@ -324,12 +341,6 @@ func (app *App) newTemplateData(r *http.Request) templateData {
 		d.ShowNSFW, d.MutedWords, d.Appearance = c.ShowNSFW, c.MutedWords, c.Appearance
 		d.IsAdmin = c.IsAdmin()
 		d.IsModerator = c.IsModerator()
-		n, err := app.store.UnreadNotifications(r.Context(), c.ID)
-		if err != nil {
-			app.log.Warn("unread notifications", "err", err)
-		}
-		d.Unread = n
-		d.Sidebar = app.sidebarFor(r)
 	}
 	return d
 }
@@ -341,13 +352,10 @@ func (app *App) newTemplateData(r *http.Request) templateData {
 // wrote (crabs the snapshot doesn't have yet keep the username stored on the
 // molt), and the text with crabtags and known crabs' mentions linked.
 func (app *App) withDisplay(r *http.Request, molts []store.Molt) {
-	crabs, byID, _ := app.snapshot(r)
-	names := make(map[string]string, len(crabs))
-	for _, c := range crabs {
-		names[strings.ToLower(c.UserName)] = c.UserName
-	}
+	dir := app.dirData(r)
+	byID := dir.byID
 	known := func(name string) (string, bool) {
-		n, ok := names[name]
+		n, ok := dir.names[name]
 		return n, ok
 	}
 	viewer, showNSFW := "", false

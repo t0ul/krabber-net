@@ -22,7 +22,7 @@ func (app *App) bookmarksPage(w http.ResponseWriter, r *http.Request) {
 // returns the toggled "…" menu item.
 func (app *App) bookmarkPost(w http.ResponseWriter, r *http.Request) {
 	m, ok := app.moltFromPath(w, r)
-	if !ok {
+	if !ok || !app.underWriteLimit(w, r, "bookmark") {
 		return
 	}
 	bookmarked, err := app.store.ToggleBookmark(r.Context(), currentCrab(r), m)

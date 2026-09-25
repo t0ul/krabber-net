@@ -1,6 +1,33 @@
 // Small behaviours that would otherwise be inline scripts, which the Content
 // Security Policy blocks.
 
+// The "new molts" banner and the notification badge poll on a kb:poll event,
+// sent once a minute while the tab is visible and someone has used the page
+// in the last five minutes. A tab left open in the background or on a
+// forgotten screen makes no requests; coming back polls right away.
+(function () {
+  var every = 60 * 1000;
+  var idleAfter = 5 * 60 * 1000;
+  var lastActive = Date.now();
+  var lastPoll = Date.now();
+  ["pointerdown", "pointermove", "keydown", "scroll", "touchstart"].forEach(function (name) {
+    document.addEventListener(name, function () { lastActive = Date.now(); }, { passive: true, capture: true });
+  });
+  function poll() {
+    lastPoll = Date.now();
+    document.body.dispatchEvent(new CustomEvent("kb:poll"));
+  }
+  setInterval(function () {
+    var now = Date.now();
+    if (document.visibilityState === "visible" && now - lastActive < idleAfter && now - lastPoll >= every) poll();
+  }, 5000);
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState !== "visible") return;
+    lastActive = Date.now();
+    if (Date.now() - lastPoll >= every) poll();
+  });
+})();
+
 // Forms marked data-reset-on-success clear after a successful htmx post.
 document.addEventListener("htmx:afterRequest", function (event) {
   var form = event.target.closest && event.target.closest("form[data-reset-on-success]");
@@ -38,6 +65,12 @@ function syncNewMoltsSince(list) {
   var base = q === -1 ? path : path.slice(0, q);
   box.setAttribute("hx-get", base + "?since=" + encodeURIComponent(first.getAttribute("data-molt-id")));
 }
+
+// A write refused for going too fast (429) says so instead of doing nothing.
+document.addEventListener("htmx:responseError", function (event) {
+  var xhr = event.detail.xhr;
+  if (xhr.status === 429) window.alert(xhr.responseText.trim());
+});
 
 // A rejected quote or edit (422) swaps in the re-filled form with its error.
 document.addEventListener("htmx:beforeSwap", function (event) {

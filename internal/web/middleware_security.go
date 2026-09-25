@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/justinas/nosurf"
+
+	"github.com/t0ul/krabber-net/internal/platform"
 )
 
 // recoverPanic turns a panic into a logged 500.
@@ -47,14 +49,16 @@ func (s *statusRecorder) Write(b []byte) (int, error) {
 
 func (s *statusRecorder) Unwrap() http.ResponseWriter { return s.ResponseWriter }
 
-// logRequests logs every error response and 5% of the rest, keeping CloudWatch
-// Logs cost bounded under heavy traffic. Query strings, cookies and form data
-// are never logged.
+// logRequests logs every error response and 5% of the rest (all of them in
+// dev), keeping CloudWatch Logs cost bounded under heavy traffic. Each line
+// has the DynamoDB read and write units the request used. Query strings,
+// cookies and form data are never logged.
 func (app *App) logRequests(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
+		ctx, meter := platform.WithMeter(r.Context())
 		rec := &statusRecorder{ResponseWriter: w}
-		next.ServeHTTP(rec, r)
+		next.ServeHTTP(rec, r.WithContext(ctx))
 
 		if strings.HasPrefix(r.URL.Path, "/static/") {
 			return
@@ -63,15 +67,20 @@ func (app *App) logRequests(next http.Handler) http.Handler {
 		if status == 0 {
 			status = http.StatusOK
 		}
-		if status < 400 && rand.Float64() >= 0.05 { //nolint:gosec // log sampling
+		logAll := app.cfg.IsDev() || app.cfg.LogAllRequests
+		if status < 400 && !logAll && rand.Float64() >= 0.05 { //nolint:gosec // log sampling
 			return
 		}
+		read, write, calls := meter.Units()
 		app.log.Info("request",
 			"method", r.Method,
 			"path", r.URL.Path,
 			"status", status,
 			"ms", time.Since(start).Milliseconds(),
 			"ip", clientIP(r),
+			"rru", read,
+			"wru", write,
+			"ddb_calls", calls,
 		)
 	})
 }

@@ -8,6 +8,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
@@ -64,6 +65,12 @@ func Snippet(content string) string {
 // AddNotification stores n and bumps the recipient's unread count. Likes,
 // remolts and follows are recorded once per actor and target, so toggling a
 // like or re-following doesn't notify again. Acting on yourself is ignored.
+//
+// Notifications are best effort (the queue drops them when full), so this is
+// three plain writes, not a transaction, which would bill each item twice and
+// bill a repeat like in full even though it's cancelled. The once marker goes
+// first: a repeat costs one write, and a crash after it loses one
+// notification rather than sending two.
 func (s *Store) AddNotification(ctx context.Context, n Notification) error {
 	if n.RecipientID == "" || n.RecipientID == n.ActorID {
 		return nil
@@ -78,9 +85,7 @@ func (s *Store) AddNotification(ctx context.Context, n Notification) error {
 		return err
 	}
 
-	once := n.Type == NotifyLike || n.Type == NotifyRemolt || n.Type == NotifyFollow
-	var items []types.TransactWriteItem
-	if once {
+	if n.Type == NotifyLike || n.Type == NotifyRemolt || n.Type == NotifyFollow {
 		marker, err := marshal(map[string]any{
 			"PK":         notificationOncePK(n.RecipientID),
 			"SK":         notificationOnceSK(n.Type, n.ActorID, n.MoltID),
@@ -89,22 +94,29 @@ func (s *Store) AddNotification(ctx context.Context, n Notification) error {
 		if err != nil {
 			return err
 		}
-		items = append(items, s.putNew(marker))
+		_, err = s.db.PutItem(ctx, &dynamodb.PutItemInput{
+			TableName:           s.tableName(),
+			Item:                marker,
+			ConditionExpression: aws.String("attribute_not_exists(PK)"),
+		})
+		var exists *types.ConditionalCheckFailedException
+		switch {
+		case errors.As(err, &exists):
+			return nil // already notified
+		case err != nil:
+			return fmt.Errorf("add notification: %w", err)
+		}
 	}
-	items = append(items,
-		types.TransactWriteItem{Put: &types.Put{TableName: s.tableName(), Item: item}},
-		types.TransactWriteItem{Update: &types.Update{
-			TableName:                 s.tableName(),
-			Key:                       keyOf(notificationCounterPK(n.RecipientID), notificationCounterSK()),
-			UpdateExpression:          aws.String("ADD unread :one"),
-			ExpressionAttributeValues: map[string]types.AttributeValue{":one": num(1)},
-		}},
-	)
-	err = s.transact(ctx, items...)
-	switch {
-	case once && cancelledAt(err, 0):
-		return nil // already notified
-	case err != nil:
+	if _, err := s.db.PutItem(ctx, &dynamodb.PutItemInput{TableName: s.tableName(), Item: item}); err != nil {
+		return fmt.Errorf("add notification: %w", err)
+	}
+	_, err = s.db.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+		TableName:                 s.tableName(),
+		Key:                       keyOf(notificationCounterPK(n.RecipientID), notificationCounterSK()),
+		UpdateExpression:          aws.String("ADD unread :one"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{":one": num(1)},
+	})
+	if err != nil {
 		return fmt.Errorf("add notification: %w", err)
 	}
 	return nil
@@ -126,12 +138,22 @@ func (s *Store) Notifications(ctx context.Context, crabID string, limit int) ([]
 }
 
 // UnreadNotifications returns how many notifications arrived since the crab
-// last opened the notifications page.
+// last opened the notifications page. It's read on every page and poll, so
+// it's an eventually consistent read (half the price); a badge a second
+// behind is fine.
 func (s *Store) UnreadNotifications(ctx context.Context, crabID string) (int, error) {
-	var c notificationCounter
-	err := s.getItem(ctx, notificationCounterPK(crabID), notificationCounterSK(), &c)
-	if err != nil && !errors.Is(err, ErrNotFound) {
+	res, err := s.db.GetItem(ctx, &dynamodb.GetItemInput{
+		TableName: s.tableName(),
+		Key:       keyOf(notificationCounterPK(crabID), notificationCounterSK()),
+	})
+	if err != nil {
 		return 0, fmt.Errorf("unread notifications: %w", err)
+	}
+	var c notificationCounter
+	if res.Item != nil {
+		if err := attributevalue.UnmarshalMap(res.Item, &c); err != nil {
+			return 0, fmt.Errorf("unread notifications: %w", err)
+		}
 	}
 	return max(c.Unread, 0), nil
 }

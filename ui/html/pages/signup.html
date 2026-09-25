@@ -10,6 +10,11 @@
       <h1>Registration is temporarily closed.</h1>
       <p class="text-muted mb-5">Check back soon. Already have an account? <a href="/krab/login">Log in</a></p>
     </div>
+    {{ else if .SignupFull }}
+    <div class="w-75 m-4" id="signup-full">
+      <h1>Krabber is full for now.</h1>
+      <p class="text-muted mb-5">It's a small reef while it grows, and every spot is taken. Check back soon. Already have an account? <a href="/krab/login">Log in</a></p>
+    </div>
     {{ else }}
     <form action="/krab/signup" name="sign-up-form" class="w-75 m-4" method="POST" novalidate>
         <!-- Include the CSRF token -->

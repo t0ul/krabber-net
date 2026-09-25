@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/t0ul/krabber-net/internal/store"
@@ -25,17 +26,50 @@ func trophyByID(id string) trophies.Trophy {
 	return trophies.Trophy{ID: id, Title: id}
 }
 
+// heldTrophies remembers which krabs have which trophies. Some triggers
+// repeat (a hidden krabtag used again, every profile save), and an award
+// that turns out to be a repeat still bills its whole transaction.
+type heldTrophies struct {
+	mu   sync.Mutex
+	held map[string]bool
+}
+
+const heldTrophiesMax = 200_000 // entries before the cache starts over
+
+func (h *heldTrophies) has(crabID, trophyID string) bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.held[crabID+"#"+trophyID]
+}
+
+func (h *heldTrophies) set(crabID, trophyID string, held bool) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.held == nil || len(h.held) >= heldTrophiesMax {
+		h.held = map[string]bool{}
+	}
+	if held {
+		h.held[crabID+"#"+trophyID] = true
+	} else {
+		delete(h.held, crabID+"#"+trophyID)
+	}
+}
+
 // award gives c each trophy it doesn't have yet, tells them about it, and
 // returns the ones it gave. Trophies are a bonus, so failures are logged,
 // never shown.
 func (app *App) award(ctx context.Context, c *store.Crab, ids ...string) []string {
 	var given []string
 	for _, id := range ids {
+		if app.trophiesHeld.has(c.ID, id) {
+			continue
+		}
 		ok, err := app.store.AwardTrophy(ctx, c, id)
 		if err != nil {
 			app.log.Warn("award trophy", "crab", c.ID, "trophy", id, "err", err)
 			continue
 		}
+		app.trophiesHeld.set(c.ID, id, true)
 		if !ok {
 			continue
 		}

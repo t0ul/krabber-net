@@ -224,7 +224,10 @@ func (app *App) crabminCrabPost(w http.ResponseWriter, r *http.Request) {
 			entry.Note, p.Website = p.Website, ""
 		}
 		err = app.store.UpdateProfile(ctx, target, p)
-		app.dir.invalidate()
+		if err == nil {
+			target.Profile = p
+			app.dir.putCrab(*target)
+		}
 		msg = "Cleared @" + target.UserName + "'s " + strings.ReplaceAll(field, "_", " ") + "."
 	case "clear_fun_facts":
 		p := target.Profile
@@ -290,6 +293,7 @@ func (app *App) crabminCrabPost(w http.ResponseWriter, r *http.Request) {
 				done("@" + target.UserName + " doesn't have " + t.Title + ".")
 				return
 			}
+			app.trophiesHeld.set(target.ID, t.ID, false)
 			msg = "Took " + t.Title + " back from @" + target.UserName + "."
 		}
 	default:
@@ -367,14 +371,18 @@ func (app *App) crabminMoltPost(w http.ResponseWriter, r *http.Request) {
 		msg = "Molt removed."
 	case "restore":
 		err = app.store.SetMoltRemoved(r.Context(), m, false)
-		app.dir.invalidate()
+		if err == nil && m.ReplyTo == "" {
+			m.Removed = false
+			app.dir.addMolt(*m)
+		}
 		msg = "Molt restored."
 	case "dismiss":
 		err = app.store.ResolveReports(r.Context(), m.ID, mod.UserName, "dismissed")
 		msg = "Reports on @" + m.Author + "'s molt dismissed."
 	case "nsfw", "sfw":
 		err = app.store.SetMoltNSFW(r.Context(), m, f.Action == "nsfw")
-		app.dir.invalidate()
+		m.NSFW = f.Action == "nsfw"
+		app.dir.replaceMolt(*m)
 		msg = "Molt marked " + strings.ToUpper(f.Action) + "."
 	}
 	if err != nil {

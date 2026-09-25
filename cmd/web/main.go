@@ -83,6 +83,7 @@ func run(log *slog.Logger) error {
 	jobsCtx, stopJobs := context.WithCancel(context.Background())
 	defer stopJobs()
 	runner.Start(jobsCtx)
+	go app.WarmUp(jobsCtx)
 
 	srv := &http.Server{
 		Addr:              cfg.Addr,

@@ -4,7 +4,7 @@
 {{ template "shell-top" . }}
     <div id="content-heading" class="border-dark border-bottom p-2">
         <h6 class="m-1"><a href="/molt/view/{{ .Molt.ID }}" class="text-primary mr-2" aria-label="Back">
-            <svg width="20" height="20"><use href="/static/img/sprites.svg?version=1704178675#arrow-left"></use></svg>
+            <svg width="20" height="20"><use href="{{ asset "img/sprites.svg" }}#arrow-left"></use></svg>
         </a><strong>Editing your own Molt</strong></h6>
     </div>
     <div class="mini-compose-box border-bottom border-dark px-3 py-2 d-flex flex-row focused">

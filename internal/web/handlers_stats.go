@@ -81,7 +81,7 @@ func (app *App) statsPage(w http.ResponseWriter, r *http.Request) {
 		picks = append(picks, originals[talked])
 	}
 	var trendyIDs []string
-	if tags := trendingTags(originals); len(tags) > 0 {
+	if tags := trendingTags(originals, nil); len(tags) > 0 {
 		st.Trendy = tags[0].Name
 		var tagged []store.Molt
 		for _, m := range originals {

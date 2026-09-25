@@ -46,6 +46,9 @@ type App struct {
 	turnstile *turnstile
 	dir       *directory
 	fof       *suggestions
+	writes    *writeLimiter
+	// trophiesHeld skips award attempts for trophies a krab already has.
+	trophiesHeld *heldTrophies
 }
 
 // Deps are the collaborators App needs.
@@ -99,5 +102,8 @@ func New(d Deps) (*App, error) {
 		turnstile: newTurnstile(d.Config.TurnstileSecret),
 		dir:       &directory{},
 		fof:       &suggestions{},
+		writes:    &writeLimiter{},
+
+		trophiesHeld: &heldTrophies{},
 	}, nil
 }

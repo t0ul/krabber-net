@@ -4,7 +4,7 @@
     {{ $d := . }}
     <form action="/search" method="GET">
         <div class="rounded-pill search-box mini-compose-box px-3 p-2 d-flex flex-row">
-            <svg class="mr-2" width="28" height="28"><use href="/static/img/sprites.svg?version=1704178675#search"></use></svg>
+            <svg class="mr-2" width="28" height="28"><use href="{{ asset "img/sprites.svg" }}#search"></use></svg>
             <input class="w-100" type="text" name="q" placeholder="Search Krabber" aria-label="Search Krabber" required>
         </div>
     </form>

@@ -20,7 +20,7 @@
                 {{ template "follow-button" (dict "C" $p "D" . "Following" .IsFollowing) }}
                 <details class="kb-menu zindex-front ml-2">
                     <summary class="mini-molt-action reply rounded-circle" title="More" aria-label="More options">
-                        <svg class="mini-molt-action-icon" width="19" height="19"><use href="/static/img/sprites.svg?version=1704178675#more-horizontal"></use></svg>
+                        <svg class="mini-molt-action-icon" width="19" height="19"><use href="{{ asset "img/sprites.svg" }}#more-horizontal"></use></svg>
                     </summary>
                     <div class="kb-menu-items">
                         {{ template "block-button" (dict "ID" $p.ID "Name" $p.UserName "D" .) }}
@@ -42,13 +42,13 @@
         {{ with $p.Bio }}<p class="mt-2 mb-1 kb-bio">{{ . }}</p>{{ end }}
         <div class="text-muted small mt-2 kb-profile-meta">
             {{ with $p.Location }}<span class="mr-3">
-                <svg width="14" height="14"><use href="/static/img/sprites.svg?version=1704178675#map-marker"></use></svg> {{ . }}
+                <svg width="14" height="14"><use href="{{ asset "img/sprites.svg" }}#map-marker"></use></svg> {{ . }}
             </span>{{ end }}
             {{ with $p.Website }}<a class="mr-3" href="{{ . }}" rel="nofollow ugc noopener noreferrer" target="_blank">
-                <svg width="14" height="14"><use href="/static/img/sprites.svg?version=1704178675#link"></use></svg> {{ websiteLabel . }}
+                <svg width="14" height="14"><use href="{{ asset "img/sprites.svg" }}#link"></use></svg> {{ websiteLabel . }}
             </a>{{ end }}
             <span>
-                <svg width="14" height="14"><use href="/static/img/sprites.svg?version=1704178675#calendar"></use></svg> Joined {{ monthYear $p.CreatedAt }}
+                <svg width="14" height="14"><use href="{{ asset "img/sprites.svg" }}#calendar"></use></svg> Joined {{ monthYear $p.CreatedAt }}
             </span>
             {{ with $p.Invites }}<span class="ml-3">
                 <svg width="14" height="14"><use href="{{ asset "img/sprites.svg" }}#birthday-cake-f"></use></svg> Invited {{ . }} krab{{ if ne . 1 }}s{{ end }} to Krabber

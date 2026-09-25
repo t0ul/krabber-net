@@ -393,9 +393,10 @@ func (s *Store) ListCrabs(ctx context.Context, limit int) ([]Crab, map[string]bo
 	var out []Crab
 	gone := map[string]bool{}
 	p := dynamodb.NewScanPaginator(s.db, &dynamodb.ScanInput{
-		TableName:            s.tableName(),
-		IndexName:            aws.String(gsiCrabByID),
-		ProjectionExpression: aws.String("#id, #un, #frc, #fgc, #mc, #act, #ban, #del, #ca, #dn, #bio, #av, #ver, #inv, #tr"),
+		TableName:              s.tableName(),
+		IndexName:              aws.String(gsiCrabByID),
+		ReturnConsumedCapacity: types.ReturnConsumedCapacityTotal,
+		ProjectionExpression:   aws.String("#id, #un, #frc, #fgc, #mc, #act, #ban, #del, #ca, #dn, #bio, #av, #ver, #inv, #tr"),
 		ExpressionAttributeNames: map[string]string{
 			"#ver": "verified",
 			"#inv": "invites",
@@ -429,6 +430,11 @@ func (s *Store) ListCrabs(ctx context.Context, limit int) ([]Crab, map[string]bo
 				gone[c.ID] = true
 			case c.CanSignIn():
 				out = append(out, c)
+			}
+		}
+		if p.HasMorePages() {
+			if err := pace(ctx, page.ConsumedCapacity); err != nil {
+				return nil, nil, fmt.Errorf("list crabs: %w", err)
 			}
 		}
 	}

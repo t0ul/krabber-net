@@ -4,7 +4,7 @@
 {{ template "shell-top" . }}
     <div id="content-heading" class="border-dark border-bottom p-2">
         <h6 class="m-1"><a href="/sea" class="text-primary mr-2" aria-label="Back">
-            <svg width="20" height="20"><use href="/static/img/sprites.svg?version=1704178675#arrow-left"></use></svg>
+            <svg width="20" height="20"><use href="{{ asset "img/sprites.svg" }}#arrow-left"></use></svg>
         </a><strong>Thread</strong></h6>
     </div>
 
@@ -20,7 +20,7 @@
     <div class="large-molt mini-molt border-bottom border-dark px-3 pt-3 pb-1" id="{{ .DOMID }}" data-molt-id="{{ .ID }}">
         {{ if .Remolt }}
         <small class="mini-molt-remolt text-muted d-block ml-4 mb-1">
-            <svg class="mini-molt-action-icon remolt-icon" width="12" height="12"><use href="/static/img/sprites.svg?version=1704178675#repeat"></use></svg>
+            <svg class="mini-molt-action-icon remolt-icon" width="12" height="12"><use href="{{ asset "img/sprites.svg" }}#repeat"></use></svg>
             <a href="/krabs/{{ .RemoltedBy }}">{{ or .RemoltedByName .RemoltedBy }}</a> Remolted</small>
         {{ end }}
         {{ if .ReplyTo }}<div class="ml-4 mb-1">{{ template "replying-to" (dict "M" . "D" $d) }}</div>{{ end }}

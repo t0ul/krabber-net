@@ -129,9 +129,24 @@ func TestTemplatesParse(t *testing.T) {
 			t.Errorf("missing template %s", page)
 		}
 	}
-	for _, fragment := range []string{"molt", "molt-actions", "follow-button", "quote-modal", "quote-form", "edit-modal", "edit-form", "molt-more", "load-more", "new-molts"} {
+	for _, fragment := range []string{"molt", "molt-actions", "follow-button", "quote-modal", "quote-form", "edit-modal", "edit-form", "molt-more", "load-more", "new-molts", "new-molts-poll", "notification-badge"} {
 		if cache[fragmentPage].Lookup(fragment) == nil {
 			t.Errorf("%s must define the %s fragment used by htmx responses", fragmentPage, fragment)
+		}
+	}
+}
+
+func TestStaticCaching(t *testing.T) {
+	files := staticFiles()
+	for path, want := range map[string]string{
+		asset("css/app.css"):             "public, max-age=31536000, immutable",
+		"/static/css/app.css":            "public, max-age=86400",
+		"/static/css/app.css?v=outdated": "public, max-age=86400",
+	} {
+		rec := httptest.NewRecorder()
+		files.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+		if rec.Code != http.StatusOK || rec.Header().Get("Cache-Control") != want {
+			t.Errorf("%s: %d %q, want %q", path, rec.Code, rec.Header().Get("Cache-Control"), want)
 		}
 	}
 }

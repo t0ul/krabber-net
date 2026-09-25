@@ -58,6 +58,16 @@ func newID() string {
 	return id.String()
 }
 
+// idTime is when a KSUID was made, to the second; ok is false for anything
+// that isn't one.
+func idTime(id string) (t time.Time, ok bool) {
+	k, err := ksuid.Parse(id)
+	if err != nil {
+		return time.Time{}, false
+	}
+	return k.Time(), true
+}
+
 // ksuidFloor is the smallest KSUID for a moment in time. KSUID strings sort in
 // time order, so comparing against it selects IDs created before t.
 func ksuidFloor(t time.Time) string {
@@ -179,6 +189,26 @@ func queryAll[T any](ctx context.Context, db *dynamodb.Client, in *dynamodb.Quer
 		}
 	}
 	return out, nil
+}
+
+// scanRate is the read rate (units a second) that full scans of the krab
+// index keep to, under the index's read cap (PLAN.md section 4.1). A scan
+// reads 1 MB (125 units) per page as fast as it can, which would trip the
+// cap and be throttled; paced, the hourly directory reload of 10,000 krabs
+// takes about 12 seconds.
+const scanRate = 100.0
+
+// pace waits long enough after a scan page to keep to scanRate.
+func pace(ctx context.Context, used *types.ConsumedCapacity) error {
+	if used == nil || used.CapacityUnits == nil {
+		return nil
+	}
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-time.After(time.Duration(*used.CapacityUnits / scanRate * float64(time.Second))):
+		return nil
+	}
 }
 
 // retryUnprocessed retries a batch operation with exponential backoff until

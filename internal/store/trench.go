@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
@@ -19,11 +20,25 @@ type trenchEntry struct {
 	ExpiresAt int64  `dynamodbav:"expires_at"`
 }
 
+// fanoutRate is how many trench entries a second AddToTrenches writes. A
+// krab with thousands of followers would otherwise write as fast as it can,
+// trip the table's write cap and get everyone's likes and molts throttled
+// with it. Keep it well under the cap (PLAN.md section 4.1).
+const fanoutRate = 25
+
 // AddToTrenches writes molt m into each follower's trench, 25 items per
-// request. Writes are idempotent, so retrying a partly done fan-out is safe.
+// request and fanoutRate a second. Writes are idempotent, so retrying a
+// partly done fan-out is safe.
 func (s *Store) AddToTrenches(ctx context.Context, m *Molt, followerIDs []string) error {
 	expires := s.now().Add(trenchRetention).Unix()
 	for start := 0; start < len(followerIDs); start += 25 {
+		if start > 0 {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(time.Second * 25 / fanoutRate):
+			}
+		}
 		end := min(start+25, len(followerIDs))
 		var writes []types.WriteRequest
 		for _, id := range followerIDs[start:end] {

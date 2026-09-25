@@ -5,11 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"sort"
-	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
@@ -112,76 +109,4 @@ func (s *Store) BookmarksPage(ctx context.Context, crabID, after string, limit i
 	}
 	sort.SliceStable(molts, func(i, j int) bool { return rank[molts[i].SK] < rank[molts[j].SK] })
 	return Page{Molts: molts, Next: next}, nil
-}
-
-// Marks is what a crab has done to a molt: liked it, remolted it (as the
-// remolt with ID RemoltedAs), or bookmarked it.
-type Marks struct {
-	Liked      bool
-	RemoltedAs string
-	Bookmarked bool
-}
-
-// MarksOn reports the crab's marks on each of moltIDs, in one batch read of
-// their like, remolt and bookmark markers. Molts with no marks are absent.
-func (s *Store) MarksOn(ctx context.Context, crabID string, moltIDs []string) (map[string]Marks, error) {
-	var keys []map[string]types.AttributeValue
-	seen := map[string]bool{}
-	for _, id := range moltIDs {
-		if seen[id] {
-			continue
-		}
-		seen[id] = true
-		keys = append(keys,
-			keyOf(likePK(crabID), likeSK(id)),
-			keyOf(remoltMarkerPK(crabID), remoltMarkerSK(id)),
-			keyOf(bookmarkPK(crabID), bookmarkSK(id)),
-		)
-	}
-	out := map[string]Marks{}
-	for start := 0; start < len(keys); start += 100 {
-		req := map[string]types.KeysAndAttributes{s.table: {
-			Keys:                 keys[start:min(start+100, len(keys))],
-			ProjectionExpression: aws.String("PK, SK, molt_id"),
-		}}
-		err := retryUnprocessed(ctx, 5, func() (int, error) {
-			res, err := s.db.BatchGetItem(ctx, &dynamodb.BatchGetItemInput{RequestItems: req})
-			if err != nil {
-				return 0, err
-			}
-			var items []struct {
-				PK     string `dynamodbav:"PK"`
-				SK     string `dynamodbav:"SK"`
-				MoltID string `dynamodbav:"molt_id"`
-			}
-			if err := attributevalue.UnmarshalListOfMaps(res.Responses[s.table], &items); err != nil {
-				return 0, err
-			}
-			for _, it := range items {
-				switch {
-				case it.PK == likePK(crabID):
-					id := strings.TrimPrefix(it.SK, likeSK(""))
-					mk := out[id]
-					mk.Liked = true
-					out[id] = mk
-				case it.PK == remoltMarkerPK(crabID):
-					id := strings.TrimPrefix(it.SK, remoltMarkerSK(""))
-					mk := out[id]
-					mk.RemoltedAs = it.MoltID
-					out[id] = mk
-				case it.PK == bookmarkPK(crabID):
-					id := strings.TrimPrefix(it.SK, bookmarkSK(""))
-					mk := out[id]
-					mk.Bookmarked = true
-					out[id] = mk
-				}
-			}
-			req = res.UnprocessedKeys
-			return len(req[s.table].Keys), nil
-		})
-		if err != nil {
-			return nil, fmt.Errorf("marks on molts: %w", err)
-		}
-	}
-	return out, nil
 }

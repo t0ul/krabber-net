@@ -965,6 +965,62 @@ func TestMarksAndUndoRemolt(t *testing.T) {
 	}
 }
 
+func TestMarksOnRanges(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+	author := mustCrab(t, s, "plankton")
+	karen := mustCrab(t, s, "karen")
+	var molts []*Molt
+	for _, text := range []string{"a", "b", "c", "d"} {
+		m, err := s.CreateMolt(ctx, author, text)
+		if err != nil {
+			t.Fatal(err)
+		}
+		molts = append(molts, m)
+	}
+	a, b, c, d := molts[0], molts[1], molts[2], molts[3]
+	for _, m := range []*Molt{a, d} {
+		if err := s.LikeMolt(ctx, karen, m); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := s.Bookmark(ctx, karen, b); err != nil {
+		t.Fatal(err)
+	}
+	// A molt from two days ago is too far from the others to share their
+	// range, so its markers are read by key.
+	old, err := ksuid.FromParts(time.Now().Add(-48*time.Hour), make([]byte, 16))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range [][2]string{{likePK(karen.ID), likeSK(old.String())}, {bookmarkPK(karen.ID), bookmarkSK(old.String())}} {
+		item, _ := marshal(map[string]string{"PK": key[0], "SK": key[1], "molt_id": old.String()})
+		if _, err := s.db.PutItem(ctx, &dynamodb.PutItemInput{TableName: s.tableName(), Item: item}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	mctx, meter := platform.WithMeter(ctx)
+	got, err := s.MarksOn(mctx, karen.ID, []string{a.ID, b.ID, c.ID, old.String()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]Marks{a.ID: {Liked: true}, b.ID: {Bookmarked: true}, old.String(): {Liked: true, Bookmarked: true}}
+	if len(got) != len(want) {
+		t.Errorf("marks %+v, want %+v (d is liked but wasn't asked about)", got, want)
+	}
+	for id, w := range want {
+		if got[id] != w {
+			t.Errorf("marks on %s: %+v, want %+v", id, got[id], w)
+		}
+	}
+	// Three range queries for a–c, three keys for the old molt: 3 read units
+	// where looking up every marker by key would bill 6.
+	if read, _, _ := meter.Units(); read != 3 {
+		t.Errorf("read %.1f units", read)
+	}
+}
+
 func TestRateLimitWindows(t *testing.T) {
 	s := newTestStore(t)
 	ctx := context.Background()

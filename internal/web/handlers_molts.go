@@ -87,6 +87,9 @@ func (app *App) moltCreatePost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Molts must be 1–280 characters.", http.StatusUnprocessableEntity)
 		return
 	}
+	if !app.underWriteLimit(w, r, "molt") {
+		return
+	}
 	m, err := app.store.CreateMolt(r.Context(), currentCrab(r), f.Content, store.WithNSFW(f.NSFW))
 	if err != nil {
 		app.serverError(w, r, err)
@@ -165,7 +168,7 @@ func moltReturnPath(r *http.Request) string {
 // bar, so the heart and count update in place.
 func (app *App) moltLikePost(w http.ResponseWriter, r *http.Request) {
 	m, ok := app.moltFromPath(w, r)
-	if !ok {
+	if !ok || !app.underWriteLimit(w, r, "like") {
 		return
 	}
 	liked, err := app.store.ToggleLike(r.Context(), currentCrab(r), m)
@@ -187,7 +190,7 @@ func (app *App) moltLikePost(w http.ResponseWriter, r *http.Request) {
 // returns the original's refreshed action bar.
 func (app *App) remoltPost(w http.ResponseWriter, r *http.Request) {
 	m, ok := app.moltFromPath(w, r)
-	if !ok {
+	if !ok || !app.underWriteLimit(w, r, "molt") {
 		return
 	}
 	var st actionState
@@ -311,7 +314,8 @@ func (app *App) moltNSFWPost(w http.ResponseWriter, r *http.Request) {
 		app.serverError(w, r, err)
 		return
 	}
-	app.dir.invalidate()
+	m.NSFW = f.NSFW
+	app.dir.replaceMolt(*m)
 	if isHTMX(r) {
 		w.Header().Set("HX-Refresh", "true")
 		w.WriteHeader(http.StatusOK)
@@ -469,6 +473,9 @@ func (app *App) replyCreatePost(w http.ResponseWriter, r *http.Request) {
 	}
 	if !validator.NotBlank(f.Content) || !validator.MaxChars(f.Content, store.MaxMoltLength) {
 		http.Error(w, "Replies must be 1–280 characters.", http.StatusUnprocessableEntity)
+		return
+	}
+	if !app.underWriteLimit(w, r, "molt") {
 		return
 	}
 	parent, ok := app.moltFromPath(w, r)

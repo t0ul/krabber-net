@@ -1,5 +1,6 @@
-{{/* Unread count on the bell; it re-polls itself every minute. */}}
-{{define "notification-badge"}}<span class="kb-badge-slot" hx-get="/notifications/badge" hx-trigger="every 60s" hx-swap="outerHTML">{{ if gt . 0 }}<span class="kb-badge" aria-label="{{ . }} unread">{{ if gt . 99 }}99+{{ else }}{{ . }}{{ end }}</span>{{ end }}</span>{{end}}
+{{/* Unread count on the horn. On feed pages the new-molts poll brings it
+   along (OOB); elsewhere it polls itself on app.js's kb:poll tick. */}}
+{{define "notification-badge"}}<span class="kb-badge-slot" id="kb-badge-slot"{{ if .Poll }} hx-get="/notifications/badge" hx-trigger="kb:poll from:body" hx-swap="outerHTML"{{ end }}{{ if .OOB }} hx-swap-oob="true"{{ end }}>{{ if gt .N 0 }}<span class="kb-badge" aria-label="{{ .N }} unread">{{ if gt .N 99 }}99+{{ else }}{{ .N }}{{ end }}</span>{{ end }}</span>{{end}}
 
 {{define "nav"}}{{ $p := .CurrentPath }}
 <div class="col-1 col-lg-3 p-1" id="nav-panel">
@@ -19,7 +20,7 @@
     {{ if .IsAuthenticated }}
     <a href="/notifications" class="btn rounded-pill mx-auto mx-lg-0 mt-2 nav-link-btn kb-nav-notifications"{{ if eq $p "/notifications" }} id="nav-active" aria-current="page"{{ end }}>
         <svg class="btn-icon" width="28" height="28"><use href="{{ asset "img/sprites.svg" }}#horn"></use></svg>
-        {{ template "notification-badge" .Unread }}
+        {{ template "notification-badge" (dict "N" .Unread "Poll" (not .FeedPath)) }}
         <strong class="d-none d-lg-inline-block ml-2">Notifications</strong>
     </a>
     <a href="/bookmarks" class="btn rounded-pill mx-auto mx-lg-0 mt-2 nav-link-btn"{{ if eq $p "/bookmarks" }} id="nav-active" aria-current="page"{{ end }}>
@@ -32,7 +33,7 @@
         <strong class="d-none d-lg-inline-block ml-2">Profile</strong>
     </a>
     <a href="/trench" data-open-modal="compose-modal" id="molt-btn" class="btn btn-primary mx-auto mx-lg-0 subtle-shadow rounded-pill w-md-75 mt-4 d-block">
-        <svg class="btn-icon d-lg-none" width="28" height="28"><use href="/static/img/sprites.svg?version=1704178675#write"></use></svg>
+        <svg class="btn-icon d-lg-none" width="28" height="28"><use href="{{ asset "img/sprites.svg" }}#write"></use></svg>
         <strong class="d-none d-lg-inline-block">Molt</strong>
     </a>
     <a href="/stats" class="btn rounded-pill mx-auto mx-lg-0 mt-2 extra-navs"{{ if eq $p "/stats" }} id="nav-active" aria-current="page"{{ end }}>
@@ -46,13 +47,13 @@
     </a>
     {{ end }}
     <a href="/settings" class="btn rounded-pill mx-auto mx-lg-0 mt-2 extra-navs"{{ if eq $p "/settings" }} id="nav-active" aria-current="page"{{ end }}>
-        <svg class="btn-icon text-muted" width="28" height="28"><use href="/static/img/sprites.svg?version=1704178675#{{ if eq $p "/settings" }}cog-f{{ else }}cog{{ end }}"></use></svg>
+        <svg class="btn-icon text-muted" width="28" height="28"><use href="{{ asset "img/sprites.svg" }}#{{ if eq $p "/settings" }}cog-f{{ else }}cog{{ end }}"></use></svg>
         <strong class="d-none d-lg-inline-block ml-2">Settings</strong>
     </a>
     <form action="/krab/logout" method="POST" data-confirm="Are you sure you want to log out?">
         <input type='hidden' name='csrf_token' value='{{ .CSRFToken }}'>
         <button type="submit" class="btn rounded-pill mx-auto mx-lg-0 mt-2 extra-navs">
-            <svg class="btn-icon text-muted" width="28" height="28"><use href="/static/img/sprites.svg?version=1704178675#log-out"></use></svg>
+            <svg class="btn-icon text-muted" width="28" height="28"><use href="{{ asset "img/sprites.svg" }}#log-out"></use></svg>
             <strong class="d-none d-lg-inline-block ml-2">Log out</strong>
         </button>
     </form>

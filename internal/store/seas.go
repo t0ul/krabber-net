@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
@@ -33,11 +34,17 @@ func (s *Store) SeaPage(ctx context.Context, after string, limit int) (Page, err
 
 // SeaNewer is how many Sea molts are newer than since (a molt ID). An empty
 // since counts from the top. The count walks the same seven-day window as
-// Sea and stops at limit.
+// Sea, but only back to since's day (each day is a query, billed even when
+// empty), and stops at limit.
 func (s *Store) SeaNewer(ctx context.Context, since string, limit int) (int, error) {
 	now := s.now()
+	days := 7
+	if t, ok := idTime(since); ok {
+		back := int(dayStart(now).Sub(dayStart(t)).Hours()/24) + 1
+		days = min(max(back, 1), days)
+	}
 	total := 0
-	for d := 0; d < 7 && total < limit; d++ {
+	for d := 0; d < days && total < limit; d++ {
 		dayKey := moltDayKey(now.AddDate(0, 0, -d))
 		in := &dynamodb.QueryInput{
 			TableName: s.tableName(),
@@ -59,4 +66,9 @@ func (s *Store) SeaNewer(ctx context.Context, since string, limit int) (int, err
 		total += n
 	}
 	return total, nil
+}
+
+func dayStart(t time.Time) time.Time {
+	y, m, d := t.UTC().Date()
+	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
 }

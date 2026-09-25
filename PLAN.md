@@ -14,8 +14,8 @@ Source codebase: **`krabber-net-main`** (the originally deployed app). `Krabber-
 | # | Decision | Choice |
 |---|---|---|
 | 1 | Hosting | **Elastic Beanstalk**, single `t4g.micro` instance, **CloudFront in front** for HTTPS |
-| 2 | Edge pricing | **CloudFront flat-rate Free plan** ($0/month, includes WAF, DDoS protection, Route 53 DNS and TLS, **no overage charges**) |
-| 3 | Cost principle | **The bill must have a known ceiling**, even under attack (section 2.2) |
+| 2 | Edge pricing | **CloudFront flat-rate Free plan** ($0/month, includes WAF, DDoS protection, Route 53 DNS and TLS, **no overage charges**); **Pro** ($15/month) once past about 500 daily active krabs (section 2.2) |
+| 3 | Cost principle | **The bill must have a known ceiling**, even under attack (section 2.3) |
 | 4 | Sessions | **DynamoDB-backed session store** (sessions survive deploys and instance replacement) |
 | 5 | Staging environment | **None on Beanstalk.** Local development covers it; staging arrives with the Lambda move. |
 | 6 | Deploys | **Automatic on merge to `main`**, immutable (zero downtime, automatic rollback if the new instance is unhealthy) |
@@ -23,7 +23,7 @@ Source codebase: **`krabber-net-main`** (the originally deployed app). `Krabber-
 | 8 | Rust | Optional, after the Lambda move (section 14) |
 
 ### Why Beanstalk instead of going straight to Lambda
-- **The cost is fixed.** An instance costs the same idle or under attack. With CloudFront's flat-rate plan in front and the instance accepting traffic only from CloudFront, a flood can make the site slow but can't grow the bill (section 2.2). On Lambda, every request that reaches a Function URL or API Gateway is billed, even rejected ones, so it needs a kill switch and per-function concurrency limits.
+- **The cost is fixed.** An instance costs the same idle or under attack. With CloudFront's flat-rate plan in front and the instance accepting traffic only from CloudFront, a flood can make the site slow but can't grow the bill (section 2.3). On Lambda, every request that reaches a Function URL or API Gateway is billed, even rejected ones, so it needs a kill switch and per-function concurrency limits.
 - **Almost no rewrite.** `krabber-net-main` was built for Beanstalk (`Procfile`, `Buildfile`, HTTP server on port 5000). Background goroutines, the sea refresh ticker and trench fan-out work on one long-running process.
 - **Launch in about a day instead of 5–6.** The account's Lambda concurrency quota is **10**, too low to reserve concurrency per function until AWS raises it.
 - **What it costs:** about $8–10/month more than Lambda at hobby traffic, one instance as a single point of failure, and a plain-HTTP hop from CloudFront to the instance (section 1).
@@ -87,19 +87,40 @@ A single-instance environment has no load balancer to hold an ACM certificate, s
 
 Immutable deploys briefly run a second instance for a few minutes, which costs pennies. The domain renewal (about $15/year) is billed yearly.
 
-### 2.2 Worst case under attack (the ceiling)
+### 2.2 Growing: 100 to 10,000 daily active krabs
+
+Modeled by `scripts/cost_model.py` from the DynamoDB units that `TestCostProfile` measures for each page, poll and action (section 4.3), plus index writes and background work (notifications, fan-out, the hourly directory reload). Assumed per daily active krab and day: 10 feed pages and 3 other pages, 4 "Load more", 20 minutes of active reading (one poll a minute), 8 likes, half a molt and half a reply, a follow every few days, 50 followers per molt, and 20% more page views from signed-out visitors. Three accounts per daily active krab; storage is after a year at that size.
+
+| Daily active krabs (accounts) | DynamoDB reads | Writes | Storage + backups | EC2, IP, disk | CloudFront plan (share of its requests) | **Total a month** |
+|---|---|---|---|---|---|---|
+| 100 (300) | $0.21 | $0.22 | $0.06 | $10.42 | Free, $0 (18%) | **about $12** |
+| 500 (1,500) | $0.86 | $1.10 | $0.31 | $10.42 | Free, $0 (90%) | **about $14** |
+| 1,000 (3,000) | $1.67 | $2.20 | $0.61 | $10.42 | Pro, $15 (18%) | **about $31** |
+| 2,500 (7,500) | $4.12 | $5.50 | $1.53 | $10.42 | Pro, $15 (45%) | **about $38** |
+| 5,000 (15,000) | $8.19 | $11.00 | $3.05 | $10.42 | Pro, $15 (90%) | **about $49** |
+| 10,000 (30,000) | $16.33 | $21.99 | $10.04 | $16.55 (`t4g.small`) | Pro, $15 (179%) | **about $81** |
+
+Totals include about $1.50 for logs, email and the rest.
+
+- **Under $100 up to 10,000 daily active krabs.** Before the 2026-09-25 changes (section 4.3), 10,000 would have cost about $134 on Pro at 6.6 times its request allowance, so realistically the $200 Business plan: polls ran every 30 and 60 seconds even in background tabs, every follow reloaded the directory, and each feed page paid for 60 like, remolt and bookmark lookups that mostly found nothing.
+- **The CloudFront plan is the step to watch.** Every request CloudFront answers counts toward the allowance, cached or not; requests WAF blocks don't. The Free plan's 1M requests a month lasts to about 500 daily active krabs; switch to **Pro ($15)** then, by hand like M7, since CI can't change plans. Pro's 10M lasts to about 5,000. Going over is never billed, but after a few months of large excess AWS may serve from fewer edge locations. At 10,000 the choices are: stay on Pro at 1.8 times the allowance; pay-as-you-go CloudFront and WAF (about $29, total about $96, but attacks are then billed); or poll every two minutes (about a quarter fewer requests).
+- **`MAX_KRABS` caps the bill** (section 7.2): signups close once that many krabs can sign in. Launch with **`MAX_KRABS=3000`** (about 1,000 daily active krabs if a third visit daily: at most about $31 a month) and raise it in steps, 10,000 (about $40) then 30,000 (about $81), each time a real month's bill matches this table, together with that stage's throughput caps (section 4.1).
+- **Where the money goes at 10,000:** writes first (likes are 55% of them: the like, its index entry and the notification; trench fan-out is 26%), then reads (feed pages are 41%, mostly the 20 molt reads each), then storage, which grows by about $1 a month for every month at that size because molts and likes are kept (trench entries, notifications and sessions expire).
+- **EC2:** requests average about 7 a second at 10,000 daily active krabs, which a Go server on a `t4g.micro` handles within its CPU baseline; memory is the tighter limit, so move to `t4g.small` (2 GB, $6 more) past about 5,000.
+
+### 2.3 Worst case under attack (the ceiling)
 
 | Layer | What caps it | Maximum extra cost |
 |---|---|---|
 | CloudFront, WAF, DNS | Flat-rate plan: no overage charges, and WAF-blocked requests don't count toward usage. Sustained excess over the 1M-request allowance can eventually slow delivery but never bills. | **$0** |
 | Direct attacks on the instance's IP | The security group drops everything that isn't from CloudFront. Inbound data transfer is free. | **$0** |
 | EC2 CPU | `t4g` "unlimited" credits bill $0.04 per vCPU-hour only when CPU stays above the 10% baseline. At 100% on both vCPUs all day that's the maximum. An alarm fires within an hour (section 11). | **≤ $0.08/hour (≤ $1.92/day)** |
-| DynamoDB | On-demand **maximum throughput** caps on the table and every index (section 4.1). Requests above the cap are throttled, not billed. In practice a `t4g.micro` can't generate this much traffic. | **≤ about $5/day** at the caps |
+| DynamoDB | On-demand **maximum throughput** caps on the table and every index (section 4.1), set for the `MAX_KRABS` in use. Requests above the cap are throttled, not billed. Per-krab hourly write limits (section 7.2) keep one account from getting near them. | **≤ about $8/day** at the launch caps (section 4.1 has each stage's) |
 | SES | The app refuses to send more than 500 emails/day (a DynamoDB counter), and the SES sandbox limit of 200/day applies until production access is approved | **≤ $0.05/day** |
 | CloudWatch Logs | nginx access log turned off; app logs every error but only a 5% sample of successful requests; 14-day retention | a few cents/day |
 | Data transfer out | Instance → CloudFront is free; CloudFront → viewers is covered by the plan | **$0** |
 
-**Bottom line:** normally about $11/month. In the worst sustained attack, roughly $7/day more, with alarms firing within 15–60 minutes, a **daily budget alert**, and a manual **maintenance switch** (section 7.2) that blocks everything at WAF for $0.
+**Bottom line:** normally about $11/month at launch, and section 2.2's table as it grows. In the worst sustained attack, roughly $10/day more at launch, with alarms firing within 15–60 minutes, a **daily budget alert**, and a manual **maintenance switch** (section 7.2) that blocks everything at WAF for $0.
 
 ---
 
@@ -164,7 +185,7 @@ Bootstrap starts with local state, then moves its own state into the new bucket 
 | **Data** | DynamoDB table | `krabber-prod`; section 4 |
 | **App** | S3 bucket (artifacts) | `krabber-artifacts-381466680812`; private, encrypted; app bundles and the canary zip; old objects expire after 30 days |
 | | EB application | `krabber`; application version lifecycle keeps the latest 10 |
-| | EB environment | `krabber-prod`; `EnvironmentType=SingleInstance`; solution stack chosen by regex "64bit Amazon Linux 2023 .* running Go 1"; `t4g.micro` (arm64) |
+| | EB environment | `krabber-prod`; `EnvironmentType=SingleInstance`; solution stack chosen by regex "64bit Amazon Linux 2023 .* running Go 1"; `t4g.micro` (arm64), `t4g.small` past about 5,000 daily active krabs (section 2.2) |
 | | Security group | `krabber-eb-origin`: port 80 inbound **only** from the CloudFront origin-facing prefix list, nothing else. The prefix list counts as about 55 of the 60-rule limit, so this group holds nothing else. |
 | | Default EB security group | **Disabled**: `aws:autoscaling:launchconfiguration` `DisableDefaultEC2SecurityGroup=true` with `SecurityGroups=krabber-eb-origin` |
 | | Instance role + profile | `krabber-eb-instance`: DynamoDB CRUD on `krabber-prod` and its indexes; `ses:SendEmail` on the `krabber.net` identity and configuration set only; `ssm:GetParametersByPath` on `/krabber/prod/*`; decrypt with the AWS-managed SSM key; CloudWatch Logs write; the SSM Session Manager core policy (no SSH) |
@@ -172,12 +193,12 @@ Bootstrap starts with local state, then moves its own state into the new bucket 
 | | Deploys | `DeploymentPolicy=Immutable` and `RollingUpdateType=Immutable`: every deploy boots a fresh instance, switches only when it's healthy, and terminates it automatically if it isn't |
 | | Instance settings | IMDSv1 disabled; no EC2 key pair; enhanced health; health check URL `/healthz`; managed platform updates weekly (minor + patch) in a Sunday-morning window; log streaming to CloudWatch with 14-day retention |
 | | CPU credits | **`unlimited` (the `t4g` default), capped by an alarm.** `standard` mode would give every new instance zero launch credits, so immutable deploys and platform updates would boot at 10% CPU. The unlimited surcharge can't exceed $0.08/hour. If it's ever a problem, one `aws_ec2_default_credit_specification` resource switches the account to `standard`. |
-| | Environment variables | Non-secret only: `APP_ENV=prod`, `AWS_REGION=us-east-2`, `TABLE_NAME=krabber-prod`, `SSM_PREFIX=/krabber/prod`, `BASE_URL=https://krabber.net` |
+| | Environment variables | Non-secret only: `APP_ENV=prod`, `AWS_REGION=us-east-2`, `TABLE_NAME=krabber-prod`, `SSM_PREFIX=/krabber/prod`, `BASE_URL=https://krabber.net`, `MAX_KRABS=3000` (raised in steps with the throughput caps, section 4.1) |
 | **Edge** | ACM certificate (us-east-1) | `krabber.net` + `www.krabber.net`, DNS-validated |
 | | WAF web ACL (us-east-1, CloudFront scope) | Required by the plan; exactly 5 rules (the Free plan's limit), listed in section 7.2 |
 | | CloudFront distribution | HTTP/2 and HTTP/3; TLS 1.2+; aliases for apex and `www`; WAF attached. Only features the Free plan supports: managed cache and origin request policies, at most 5 cache behaviors, no real-time logs. |
-| | Pricing plan | **Free** flat-rate subscription covering the distribution, the web ACL and the `krabber.net` hosted zone (so the $0.50 zone fee is covered too). **Created once by you (M7), not by Terraform in CI**, because the deploy role is denied pricing-plan writes. The distribution can't be deleted while subscribed. |
-| | Behavior `/static/*` | Managed `CachingOptimized`; the app sends `Cache-Control: public, max-age=86400`, and the deploy pipeline invalidates `/static/*` after each release (one path; the first 1,000 invalidation paths a month are free) |
+| | Pricing plan | **Free** flat-rate subscription covering the distribution, the web ACL and the `krabber.net` hosted zone (so the $0.50 zone fee is covered too). **Created once by you (M7), not by Terraform in CI**, because the deploy role is denied pricing-plan writes. The distribution can't be deleted while subscribed. **Upgrade to Pro by hand** when AWS's 80% allowance email arrives (about 500 daily active krabs, section 2.2). |
+| | Behavior `/static/*` | Managed `UseOriginCacheControlHeaders-QueryStrings`, so `?v=` is part of the cache key. The app sends `public, max-age=31536000, immutable` for URLs carrying the current `?v=` (every page links assets that way) and `max-age=86400` otherwise. The deploy pipeline still invalidates `/static/*` after each release as a backstop (one path; the first 1,000 invalidation paths a month are free) |
 | | Default behavior | Managed `CachingDisabled` + managed `AllViewerAndCloudFrontHeaders-2022-06` origin request policy (forwards `Host`, cookies, query strings and `CloudFront-Viewer-Address`); all HTTP methods |
 | | Origin | The Beanstalk environment hostname, HTTP only, custom header `X-Origin-Verify` from SSM |
 | | Response headers | Managed `SecurityHeadersPolicy` as a backstop (custom response header policies need the Business plan). The **app** sets the full set: CSP, HSTS, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`, `nosniff` (section 7.4). Check during implementation that the managed policy doesn't override the app's headers. |
@@ -192,7 +213,7 @@ Bootstrap starts with local state, then moves its own state into the new bucket 
 | **Config** | SSM parameters | `/krabber/prod/origin_verify_secret` and `origin_verify_secret_previous` (SecureString, generated by Terraform), `mail_from` (`Krabber <no-reply@krabber.net>`), `mail_daily_cap` (`500`), `contact_email` (`support@krabber.net`), `turnstile_site_key`, `turnstile_secret` (SecureString, set by you once) |
 | **Guardrails** | SNS topic | `krabber-alerts` → your email |
 | | Alarms | Section 11 |
-| | Budgets | **Monthly** $15 (alerts at 80% actual, 100% actual, 100% forecast) and **daily** $1.50 (normal is about $0.37/day). The first two budgets are free. |
+| | Budgets | **Monthly** $15 (alerts at 80% actual, 100% actual, 100% forecast) and **daily** $1.50 (normal is about $0.37/day) at launch; each time `MAX_KRABS` goes up, set them to that stage's section 2.2 total plus a quarter (for example $50 and $2.50 at 10,000). The first two budgets are free. |
 | | Cost Anomaly Detection | Service-level monitor with an immediate email subscription at a $3 impact threshold (free) |
 | | Uptime canary | Lambda `krabber-canary` (Go, arm64, 128 MB), triggered every 5 minutes by EventBridge Scheduler. It requests `https://krabber.net/healthz` and `/krab/login` and fails if either isn't a 200 or the login page is missing its form. |
 
@@ -225,12 +246,20 @@ The old README's Python script creates a table named `krabber` in **us-west-2** 
 | Keys | `PK` (hash), `SK` (range), strings | Unchanged |
 | GSIs | **GSI2, GSI3, GSI5, GSI6, GSI7, GSI8** (section 4.2). GSI3 and GSI5 project `KEYS_ONLY`, the rest `ALL` (section 4.3). The list lives in `store.Indexes` / `store.IndexProjections`; `store.CreateTableInput` builds the same table for DynamoDB Local, and `scripts/create_table.py` (boto3) creates it anywhere, checked against the Go definition by `TestPythonSchemaMatches`. | The port made GSI1 (crab by email) and GSI4 (comments on a molt) unnecessary: both are now base-table queries. GSI8 is a new sparse work-queue index. |
 | Billing | `PAY_PER_REQUEST` | The old 1 WCU per index would throttle normal use |
-| **Throughput caps** | Table: 50 reads/s, 10 writes/s. Each GSI: 25 reads/s, 10 writes/s. | The DynamoDB part of the cost ceiling (section 2.2). Normal use is 1–5/s. Raise the caps when traffic grows. |
+| **Throughput caps** | Staged with `MAX_KRABS`; see the table below. Launch: table 50 reads/s and 40 writes/s, GSI2 150 reads/s and 10 writes/s, GSI3, GSI5, GSI6 and GSI7 25 reads/s and 10 writes/s each, GSI8 10 and 5 (also in `scripts/create_table.py`). | The DynamoDB part of the cost ceiling (section 2.3). The app paces its own bursts to stay under them: the hourly directory scan of GSI2 reads at 100 units/s, trench fan-out writes 25 entries/s. |
 | TTL | `expires_at` (epoch seconds) | Cleans up sessions, rate-limit counters and tokens |
 | Point-in-time recovery | On (35 days) | Restore test in Phase 4 |
 | Deletion protection | On | Guards against an accidental destroy |
 | Streams | Off | Only needed in the Lambda phase |
 | Encryption | AWS-owned key | Free |
+
+**Caps by stage.** Each stage's caps are about twice its expected peak (section 2.2's usage, peak at 4 times the day's average), plus room for paced fan-out. Raise them in the same change that raises `MAX_KRABS`. "Ceiling" is what a day would cost with every cap saturated around the clock; index writes only come from table writes, so the real worst case is lower.
+
+| `MAX_KRABS` (about daily active) | Table reads/s, writes/s | GSI2 reads/s, writes/s | GSI3, 5, 6, 7 each | GSI8 | Ceiling |
+|---|---|---|---|---|---|
+| 3,000 (1,000), launch | 50, 40 | 150, 10 | 25, 10 | 10, 5 | about $8/day |
+| 10,000 (3,300) | 150, 60 | 150, 25 | 25, 25 | 10, 5 | about $15/day |
+| 30,000 (10,000) | 400, 150 | 300, 50 | 50, 50 | 10, 5 | about $32/day |
 
 ### 4.2 Access patterns
 
@@ -288,12 +317,35 @@ It also stops storing each molt three times. The only code change was the Sea de
 - **On-demand, not provisioned.** Provisioned capacity has a free tier (25 read and 25 write units), but the table and six indexes would each need their own share, and trench fan-out bursts would throttle. On-demand with the maximum-throughput caps in 4.1 bills pennies at hobby traffic and has a hard ceiling.
 - **Transactions stay where counters must match their items** (likes, follows, replies, remolts). Dropping them would halve those writes but let counts drift.
 
-**Where the money goes, at about 100 active krabs** (300 molts, 1,500 likes and 200 replies a day, 20 followers each, 5,000 page views): about 25,000 write units a day (fan-out and likes are most of it) and 350,000 read units a day (page views, plus the directory reload every 2 minutes). That's roughly $0.50 a month in writes and $1.30 in reads; storage stays inside the free 25 GB because trench entries, notifications, link cards, sessions, tokens and rate-limit windows all expire (TTL deletes are free).
+**Where the money goes, at about 100 active krabs** (first pass, before the second pass below): about 25,000 write units a day (fan-out and likes are most of it) and 350,000 read units a day (page views, plus the directory reload every 2 minutes). That's roughly $0.50 a month in writes and $1.30 in reads; storage stays inside the free 25 GB because trench entries, notifications, link cards, sessions, tokens and rate-limit windows all expire (TTL deletes are free). After the second pass the model (section 2.2) puts 100 daily active krabs at about $0.45 a month for DynamoDB.
 
-**What to watch as it grows:**
-- **Trench fan-out** is one write per follower per molt. If a krab ever has thousands of followers, read their molts at view time instead of fanning them out.
-- **The directory reload** (a GSI2 scan of up to 500 krabs plus the week's molts, every 2 minutes per instance) is the largest fixed read cost. Lengthen its TTL, or keep the snapshot in one item, before raising the 500 cap.
-- **Per page view** the site reads the session, the krab (strongly consistent), the unread count, the viewer's follows, and one batch each for like/remolt/bookmark markers and link cards: a few read units, not worth caching yet.
+**Second pass, for 1,000 to 10,000 daily active krabs (2026-09-25).** Measured first: a meter on the DynamoDB client (`internal/platform/meter.go`) asks for consumed capacity on every call (free) and adds it per request, counting at least what AWS bills, because DynamoDB Local reports reads of missing items as free and AWS doesn't. `TestCostProfile` seeds 25 krabs and records every main page, poll and action; it now fails when one goes over its budget. Read units, before → after:
+
+| Request | Before | After | What changed |
+|---|---|---|---|
+| Trench, Sea or krabtag page (20 molts) | 45–47 | 16–18 | Like, remolt and bookmark markers were 3 lookups per molt (60 billed reads, most finding nothing); now one range query per marker partition over the page's molt IDs (they sort by time), split into 6-hour spans so an old remolt doesn't pull in years of likes |
+| Search | 43 | 6.5 | Same |
+| Thread, profile | 23.5, 14.5 | 12.5, 9.5 | Same |
+| New-molts poll | 4.5 (Sea 7.5) | 3.0 | Fragments stopped building the sidebar and unread count; the Sea poll only queries back to the day of the newest molt shown (was 7 day queries); the unread count is an eventually consistent read |
+| Signed-out Sea poll | 3.5 | 0.5 | Same |
+| Follow, unfollow | 14.5, 15.5 (26 calls) | 2.5, 3.5 | Every follow, block and NSFW change forced a directory reload within 10 seconds |
+
+And requests, which the CloudFront plans count: polling was every 30 s (new molts) and 60 s (badge), in background tabs too. Now `app.js` sends one poll a minute, only while the tab is visible and used in the last 5 minutes; on feed pages the badge rides along with the new-molts answer (out of band). Asset URLs carrying `?v=` are cached for good.
+
+Other changes in the same pass:
+- **The directory** reloads hourly in the background (a request never waits, except the very first; the server also loads it at startup). Changes made on the server (signups, profile edits, renames, bans, new molts) go into it right away and are replayed on top of a reload that was running meanwhile. Counts can be an hour old, which only matters for suggestions and Stats. It now holds up to 50,000 krabs and the newest 1,000 molts, precomputes the most-followed order and the lowercase names (both were rebuilt on every page view), and its scan is paced to 100 read units/s.
+- **Notifications** are three plain writes instead of a transaction: they're best effort anyway, a transaction bills each item twice, and a repeat like (whose once-marker already exists) billed the whole cancelled transaction. Now a repeat costs one write. The notifications page only resets the unread count when it isn't 0.
+- **Trophies** remember which krabs hold which trophy, so a repeat trigger (a hidden krabtag used again, a profile save) doesn't bill a cancelled transaction.
+- **Friends of friends** are cached for an hour for up to 20,000 viewers (the 2,000-viewer limit would have kept recomputing at 10,000 daily active krabs).
+- **Fan-out** writes 25 trench entries a second, so a krab with many followers can't trip the table's write cap and get everyone else throttled.
+- **Guards:** `MAX_KRABS` and the per-krab hourly write limits (section 7.2).
+
+**Levers left, if the bill ever needs them** (at 10,000 daily active krabs):
+- Serve feed molts from the directory's recent molts instead of reading each (about 10 of a feed page's 17 units; about $5/month), once like and reply counts are kept current in memory.
+- Likes without a transaction (5 → 3 write units; about $4/month), at the risk of a count drifting if the second write fails.
+- Read big accounts' molts at view time instead of fanning them out (only matters once someone has thousands of followers).
+- Cache the signed-out Sea's first page for 30 seconds (it costs 12.5 units and is what crawlers hit).
+- Poll every two minutes (about a quarter fewer requests, for CloudFront's allowance).
 
 ---
 
@@ -441,6 +493,8 @@ Two checks during implementation: whether the Free plan allows a URI-path scope-
 | Password hashing | bcrypt cost 12 (existing); passwords capped at 72 bytes in the validator (bcrypt silently truncates longer input) |
 | Login throttling | DynamoDB fixed-window counters with TTL: 5 failures per email per 15 minutes, 20 attempts per IP per 15 minutes, then a generic "try again later". Also limits CPU spent on bcrypt. |
 | Signup throttling | 3 signups per IP per hour |
+| Account cap | `MAX_KRABS`: signups close ("Krabber is full for now") once that many krabs can sign in, counted from the in-memory directory for free. Accounts that never activate don't count. Section 2.2 has what each size costs. |
+| Write limits per krab | Per hour, in memory (one instance; a restart only resets them): 100 molts (replies, quotes and remolts included), 1,000 likes, 300 follows, 300 bookmarks. Past them the request gets a 429 and the page says to slow down. Far above what a person does; they bound what one account or a stolen session can cost, since a molt is written once more per follower. |
 | Bot protection | **Cloudflare Turnstile** (free) on signup, password reset and resend. (WAF CAPTCHA needs the Pro plan.) |
 | Account enumeration | Login: "email or password is incorrect" (existing). Reset and resend: "if that account exists, we sent an email". Signup keeps "email already in use" at launch as an accepted risk. |
 | Tokens | Stored as SHA-256 hashes (existing), single use, with expiry: activation 3 days, reset 1 hour |
@@ -593,7 +647,8 @@ All alarms notify `krabber-alerts` (your email). Eight alarms, within the 10 fre
 | Email cap reached | Metric filter on the app's "mail cap reached" log line | Someone may be abusing signup or reset |
 
 Also:
-- **Budgets:** $1.50/day and $15/month (section 3.4), plus **Cost Anomaly Detection**.
+- **Budgets:** $1.50/day and $15/month at launch, raised with `MAX_KRABS` (section 3.4), plus **Cost Anomaly Detection**.
+- **Cost per request:** every logged request line carries `rru`, `wru` and `ddb_calls` (DynamoDB units used), and fan-out lines carry the units per molt, so a Logs Insights query such as `stats sum(rru), sum(wru) by path` shows which pages cost what. `LOG_ALL_REQUESTS=true` logs every request instead of 5% for a while.
 - **Why not a Route 53 health check:** its many checkers would send more than a million requests a month through CloudFront, which is more than the Free plan's allowance. The canary sends about 17,000.
 - **Logs:** app JSON logs in CloudWatch (14 days), queryable with Logs Insights.
 
@@ -642,4 +697,4 @@ For the theme, not for cost. Port after the Lambda move, one function at a time 
 1. **Alert email address** for alarms, budgets, bounces and DMARC reports.
 2. **Turnstile:** OK to add Cloudflare Turnstile to signup and reset?
 3. **HSTS preload:** submit `krabber.net` to the browser preload list after a clean week? It's hard to undo.
-4. **CloudFront Pro plan ($15/month) later?** It adds WAF CAPTCHA, header-based rules and custom response header policies. Not needed for launch.
+4. **CloudFront Pro plan ($15/month):** needed once requests pass the Free plan's 1M a month, about 500 daily active krabs (section 2.2). It also adds WAF CAPTCHA, header-based rules and custom response header policies. Not needed for launch.

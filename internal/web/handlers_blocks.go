@@ -97,7 +97,6 @@ func (app *App) setBlock(w http.ResponseWriter, r *http.Request, block bool) {
 		app.serverError(w, r, err)
 		return
 	}
-	app.dir.invalidate()
 	if block {
 		app.sessions.Put(r.Context(), sessionFlash, "@"+other.UserName+" is blocked. You won't see each other's molts.")
 	} else {

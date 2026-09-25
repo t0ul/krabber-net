@@ -103,6 +103,12 @@ func (c *cardRecorder) asked(u string) bool {
 
 func newHarness(t *testing.T) *harness {
 	t.Helper()
+	return newHarnessWith(t, nil, nil)
+}
+
+// newHarnessWith is newHarness with a config tweak and an extra log handler.
+func newHarnessWith(t *testing.T, tweak func(*config.Config), extraLog slog.Handler) *harness {
+	t.Helper()
 	endpoint := os.Getenv("KRABBER_TEST_DYNAMO_ENDPOINT")
 	if endpoint == "" {
 		t.Skip("KRABBER_TEST_DYNAMO_ENDPOINT not set; skipping DynamoDB Local test")
@@ -127,11 +133,19 @@ func newHarness(t *testing.T) *harness {
 	t.Cleanup(srv.Close)
 	base, _ := url.Parse(srv.URL)
 
-	log := slog.New(slog.NewTextHandler(testLog{t}, nil))
+	var logHandler slog.Handler = slog.NewTextHandler(testLog{t}, nil)
+	if extraLog != nil {
+		logHandler = extraLog
+	}
+	log := slog.New(logHandler)
 	captured := &capturedMail{}
 	cards := &cardRecorder{}
+	cfg := &config.Config{Env: "prod", BaseURL: base, TableName: table, OriginVerifySecrets: []string{originSecret}}
+	if tweak != nil {
+		tweak(cfg)
+	}
 	app, err := New(Deps{
-		Config:   &config.Config{Env: "prod", BaseURL: base, TableName: table, OriginVerifySecrets: []string{originSecret}},
+		Config:   cfg,
 		Log:      log,
 		Store:    st,
 		Mailer:   mail.New(captured, st, 100, log),
@@ -494,7 +508,7 @@ func TestNotifications(t *testing.T) {
 	if strings.Count(body, "liked your molt") != 1 {
 		t.Errorf("like notified %d times", strings.Count(body, "liked your molt"))
 	}
-	if _, body, _ := h.get("/notifications/badge"); badgeRX.MatchString(body) || !strings.Contains(body, `hx-trigger="every 60s"`) {
+	if _, body, _ := h.get("/notifications/badge"); badgeRX.MatchString(body) || !strings.Contains(body, `hx-trigger="kb:poll from:body"`) {
 		t.Fatalf("badge after reading: %s", body)
 	}
 }
@@ -1715,6 +1729,16 @@ func TestNewMolts(t *testing.T) {
 	if status != http.StatusOK || !strings.Contains(body, `/trench/new?since=`) {
 		t.Fatalf("trench poller: %d", status)
 	}
+	// A feed page's poll brings the badge along; elsewhere the badge polls itself.
+	if strings.Contains(body, `hx-get="/notifications/badge"`) {
+		t.Error("the badge polls on a feed page, which polls already")
+	}
+	if _, body, _ := h.get("/trench/new?since=" + first.ID); !strings.Contains(body, `id="kb-badge-slot" hx-swap-oob="true"`) {
+		t.Errorf("trench poll without the badge: %s", body)
+	}
+	if _, body, _ := h.get("/bookmarks"); !strings.Contains(body, `hx-get="/notifications/badge" hx-trigger="kb:poll from:body"`) {
+		t.Error("the badge doesn't poll on a page without a feed")
+	}
 }
 
 func TestGeneratedAvatars(t *testing.T) {
@@ -2413,6 +2437,49 @@ func TestInviteCodes(t *testing.T) {
 	}
 	if status, _ := signup("squidward", ""); status != http.StatusUnprocessableEntity {
 		t.Errorf("closed signup post: %d", status)
+	}
+
+	// MAX_KRABS closes signups once that many krabs can sign in.
+	h.app.cfg.SignupMode = config.SignupOpen
+	h.app.cfg.MaxKrabs = h.app.activeKrabs(httptest.NewRequest(http.MethodGet, "/", nil))
+	if _, body, _ := h.get("/krab/signup"); !strings.Contains(body, "Krabber is full for now") || strings.Contains(body, `action="/krab/signup"`) {
+		t.Error("a full Krabber should show the notice, not the form")
+	}
+	if status, body := signup("squidward", ""); status != http.StatusUnprocessableEntity || !strings.Contains(body, "Krabber is full") {
+		t.Errorf("signup past the cap: %d", status)
+	}
+	h.app.cfg.MaxKrabs++
+	if _, body, _ := h.get("/krab/signup"); !strings.Contains(body, `action="/krab/signup"`) {
+		t.Error("signup should reopen below the cap")
+	}
+}
+
+func TestWriteLimits(t *testing.T) {
+	h := newHarness(t)
+	h.signupAndActivate("karen", "karen@krabber.test", "computer-wife!")
+	karen, _ := h.store.CrabByUsername(context.Background(), "karen")
+	m, err := h.store.CreateMolt(context.Background(), karen, "like me")
+	if err != nil {
+		t.Fatal(err)
+	}
+	old := writeLimits["like"]
+	writeLimits["like"] = 2
+	t.Cleanup(func() { writeLimits["like"] = old })
+
+	h.login("karen@krabber.test", "computer-wife!")
+	tok := h.csrf("/trench")
+	for i, want := range []int{http.StatusOK, http.StatusOK, http.StatusTooManyRequests} {
+		status, body, hdr := h.post("/molt/like/"+m.ID, url.Values{"csrf_token": {tok}}, "HX-Request", "true")
+		if status != want {
+			t.Fatalf("like %d: %d %s", i+1, status, body)
+		}
+		if status == http.StatusTooManyRequests && (hdr.Get("Retry-After") == "" || !strings.Contains(body, "going a bit fast")) {
+			t.Errorf("limit response: %q %q", hdr.Get("Retry-After"), body)
+		}
+	}
+	// Other kinds of writes have their own count.
+	if status, _, _ := h.post("/molt/bookmark/"+m.ID, url.Values{"csrf_token": {tok}}, "HX-Request", "true"); status != http.StatusOK {
+		t.Errorf("bookmark after the like limit: %d", status)
 	}
 }
 

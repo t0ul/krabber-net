@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/smithy-go/logging"
+	"github.com/aws/smithy-go/middleware"
 )
 
 // NewLogger returns a JSON logger on stdout, which Beanstalk streams to CloudWatch.
@@ -33,6 +34,9 @@ func AWSConfig(ctx context.Context, region string) (aws.Config, error) {
 // which accepts any static credentials.
 func DynamoDB(cfg aws.Config, endpoint string) *dynamodb.Client {
 	return dynamodb.NewFromConfig(cfg, func(o *dynamodb.Options) {
+		o.APIOptions = append(o.APIOptions, func(s *middleware.Stack) error {
+			return s.Initialize.Add(meterMiddleware, middleware.After)
+		})
 		if endpoint != "" {
 			o.BaseEndpoint = aws.String(endpoint)
 			o.Credentials = credentials.NewStaticCredentialsProvider("local", "local", "")

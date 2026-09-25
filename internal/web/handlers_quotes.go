@@ -48,6 +48,9 @@ func (app *App) quoteCreatePost(w http.ResponseWriter, r *http.Request) {
 	}
 	f.CheckField(validator.NotBlank(f.Content), "content", "Say something about it.")
 	f.CheckField(validator.MaxChars(f.Content, store.MaxMoltLength), "content", "Molts can be up to 280 characters.")
+	if f.Valid() && !app.underWriteLimit(w, r, "molt") {
+		return
+	}
 	if !f.Valid() {
 		app.renderQuote(w, r, http.StatusUnprocessableEntity, f)
 		return

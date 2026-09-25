@@ -45,6 +45,14 @@ type Config struct {
 	// invite code is optional), SignupInvite (only with a krab's invite
 	// code) or SignupClosed.
 	SignupMode string
+
+	// MaxKrabs closes signups once this many krabs can sign in, to keep the
+	// bill bounded; 0 means no cap. Accounts that never activate don't count.
+	MaxKrabs int
+
+	// LogAllRequests logs every request with its DynamoDB units instead of a
+	// 5% sample (always on in dev).
+	LogAllRequests bool
 }
 
 // Signup modes.
@@ -127,6 +135,7 @@ func parse(env map[string]string) (*Config, error) {
 		TurnstileSiteKey:  env["TURNSTILE_SITE_KEY"],
 		TurnstileSecret:   env["TURNSTILE_SECRET"],
 		SignupMode:        strings.ToLower(valueOr(env["SIGNUP_MODE"], SignupOpen)),
+		LogAllRequests:    env["LOG_ALL_REQUESTS"] == "true",
 		OriginVerifySecrets: nonEmpty(
 			env["ORIGIN_VERIFY_SECRET"],
 			env["ORIGIN_VERIFY_SECRET_PREVIOUS"],
@@ -149,6 +158,12 @@ func parse(env map[string]string) (*Config, error) {
 	c.MailDailyCap, err = strconv.Atoi(capStr)
 	if err != nil || c.MailDailyCap < 0 {
 		errs = append(errs, fmt.Errorf("MAIL_DAILY_CAP must be a non-negative integer, got %q", capStr))
+	}
+
+	maxStr := valueOr(env["MAX_KRABS"], "0")
+	c.MaxKrabs, err = strconv.Atoi(maxStr)
+	if err != nil || c.MaxKrabs < 0 {
+		errs = append(errs, fmt.Errorf("MAX_KRABS must be a non-negative integer, got %q", maxStr))
 	}
 
 	if c.MailSender == "" {

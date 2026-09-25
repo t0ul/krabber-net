@@ -42,10 +42,20 @@ INDEXES = [
     ("GSI8", "ALL"),
 ]
 
-# On-demand maximum throughput (PLAN.md section 4.1): requests above these
-# are throttled, not billed, which caps the DynamoDB bill.
-TABLE_MAX_READS, TABLE_MAX_WRITES = 50, 10
-INDEX_MAX_READS, INDEX_MAX_WRITES = 25, 10
+# On-demand maximum throughput for the launch stage (PLAN.md section 4.1):
+# requests above these are throttled, not billed, which caps the DynamoDB
+# bill. Raise them with MAX_KRABS. The app paces its own bursts to stay under
+# them: the hourly directory scan of GSI2 at 100 reads/s and trench fan-out
+# at 25 writes/s.
+TABLE_MAX_READS, TABLE_MAX_WRITES = 50, 40
+INDEX_MAX = {  # reads/s, writes/s
+    "GSI2": (150, 10),
+    "GSI3": (25, 10),
+    "GSI5": (25, 10),
+    "GSI6": (25, 10),
+    "GSI7": (25, 10),
+    "GSI8": (10, 5),
+}
 
 
 def create_table_input(table, caps=True):
@@ -69,9 +79,10 @@ def create_table_input(table, caps=True):
             "Projection": {"ProjectionType": projection},
         }
         if caps:
+            reads, writes = INDEX_MAX[name]
             gsi["OnDemandThroughput"] = {
-                "MaxReadRequestUnits": INDEX_MAX_READS,
-                "MaxWriteRequestUnits": INDEX_MAX_WRITES,
+                "MaxReadRequestUnits": reads,
+                "MaxWriteRequestUnits": writes,
             }
         gsis.append(gsi)
     req = {

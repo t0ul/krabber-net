@@ -64,7 +64,10 @@ func (app *App) renderNewMolts(w http.ResponseWriter, r *http.Request, feed stri
 	data.FeedPath = feed
 	data.Since = since
 	data.NewCount = n
-	app.renderTemplate(w, r, http.StatusOK, fragmentPage, "new-molts", data)
+	if data.IsAuthenticated {
+		data.Unread = app.unread(r)
+	}
+	app.renderTemplate(w, r, http.StatusOK, fragmentPage, "new-molts-poll", data)
 }
 
 func (app *App) sea(w http.ResponseWriter, r *http.Request) {
@@ -85,11 +88,13 @@ func (app *App) notifications(w http.ResponseWriter, r *http.Request) {
 		app.serverError(w, r, err)
 		return
 	}
-	if err := app.store.MarkNotificationsRead(r.Context(), c.ID); err != nil {
-		app.log.Warn("mark notifications read", "err", err)
+	if app.unread(r) > 0 { // a read costs a tenth of a write
+		if err := app.store.MarkNotificationsRead(r.Context(), c.ID); err != nil {
+			app.log.Warn("mark notifications read", "err", err)
+		}
 	}
 	data := app.newTemplateData(r)
-	data.Unread = 0
+	data.Unread, data.unreadKnown = 0, true
 	hidden := app.hidden(r)
 	_, byID, _ := app.snapshot(r)
 	for _, n := range notes {
@@ -104,13 +109,11 @@ func (app *App) notifications(w http.ResponseWriter, r *http.Request) {
 	app.render(w, r, http.StatusOK, "notifications.html", data)
 }
 
-// notificationBadge is polled by the nav so the unread count stays current.
+// notificationBadge is polled by the nav (on pages without a feed poll) so
+// the unread count stays current.
 func (app *App) notificationBadge(w http.ResponseWriter, r *http.Request) {
-	n, err := app.store.UnreadNotifications(r.Context(), currentCrab(r).ID)
-	if err != nil {
-		app.log.Warn("unread notifications", "err", err)
-	}
-	app.renderTemplate(w, r, http.StatusOK, fragmentPage, "notification-badge", n)
+	app.renderTemplate(w, r, http.StatusOK, fragmentPage, "notification-badge",
+		map[string]any{"N": app.unread(r), "Poll": true})
 }
 
 // Profile tabs.
@@ -310,7 +313,7 @@ func (app *App) unfollowPost(w http.ResponseWriter, r *http.Request) {
 // setFollow follows or unfollows, then returns the updated button.
 func (app *App) setFollow(w http.ResponseWriter, r *http.Request, follow bool) {
 	followee, ok := app.crabFromPath(w, r)
-	if !ok {
+	if !ok || !app.underWriteLimit(w, r, "follow") {
 		return
 	}
 	var err error
@@ -334,7 +337,6 @@ func (app *App) setFollow(w http.ResponseWriter, r *http.Request, follow bool) {
 		app.serverError(w, r, err)
 		return
 	}
-	app.dir.invalidate()
 	app.fof.forget(currentCrab(r).ID)
 	if !isHTMX(r) {
 		http.Redirect(w, r, "/krabs/"+followee.UserName, http.StatusSeeOther)
@@ -431,9 +433,10 @@ func favicon(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, asset("img/favicon.svg"), http.StatusMovedPermanently)
 }
 
-// staticFiles serves embedded assets. CloudFront caches them for a day and the
-// deploy pipeline invalidates /static/* after each release; pages link them
-// with ?v=<content hash> so browsers pick up new versions too.
+// staticFiles serves embedded assets. Pages link them with ?v=<content hash>
+// (see asset), which CloudFront keeps in its cache key, so a release's new
+// files get new URLs everywhere; the deploy pipeline also invalidates
+// /static/* as a backstop.
 func staticFiles() http.Handler {
 	sub, err := fs.Sub(ui.Files, "static")
 	if err != nil {
@@ -445,7 +448,14 @@ func staticFiles() http.Handler {
 			http.NotFound(w, r)
 			return
 		}
-		w.Header().Set("Cache-Control", "public, max-age=86400")
+		// A ?v= URL changes whenever any static file does, so browsers can
+		// keep it for good; every request CloudFront answers counts toward
+		// the plan's allowance, cached or not.
+		if r.URL.Query().Get("v") == assetVersion {
+			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		} else {
+			w.Header().Set("Cache-Control", "public, max-age=86400")
+		}
 		files.ServeHTTP(w, r)
 	})
 }

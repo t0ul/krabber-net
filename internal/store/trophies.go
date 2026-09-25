@@ -64,9 +64,10 @@ func (s *Store) RevokeTrophy(ctx context.Context, c *Crab, trophyID string) erro
 func (s *Store) CrabsWhere(ctx context.Context, keep func(Crab) bool) ([]Crab, error) {
 	var out []Crab
 	p := dynamodb.NewScanPaginator(s.db, &dynamodb.ScanInput{
-		TableName:            s.tableName(),
-		IndexName:            aws.String(gsiCrabByID),
-		ProjectionExpression: aws.String("PK, SK, #id, #un, #ca, #act, #ban, #del, #tr"),
+		TableName:              s.tableName(),
+		IndexName:              aws.String(gsiCrabByID),
+		ReturnConsumedCapacity: types.ReturnConsumedCapacityTotal,
+		ProjectionExpression:   aws.String("PK, SK, #id, #un, #ca, #act, #ban, #del, #tr"),
 		ExpressionAttributeNames: map[string]string{
 			"#id":  "id",
 			"#un":  "user_name",
@@ -89,6 +90,11 @@ func (s *Store) CrabsWhere(ctx context.Context, keep func(Crab) bool) ([]Crab, e
 		for _, c := range crabs {
 			if c.CanSignIn() && keep(c) {
 				out = append(out, c)
+			}
+		}
+		if p.HasMorePages() {
+			if err := pace(ctx, page.ConsumedCapacity); err != nil {
+				return nil, fmt.Errorf("scan crabs: %w", err)
 			}
 		}
 	}
