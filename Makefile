@@ -7,7 +7,7 @@ PORT            ?= 5050
 VERSION         := $(shell git rev-parse --short HEAD 2>/dev/null || echo dev)
 GO_BUILD        := CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags="-s -w -X main.version=$(VERSION)"
 
-.PHONY: help dev db db-down seed run test test-unit lint vet fmt vuln build bundle clean lambdas plan apply deploy
+.PHONY: help dev db db-down seed run test test-unit lint vet fmt vuln build bundle clean lambdas plan apply deploy ship release public-check hooks
 
 help: ## Show targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-10s %s\n", $$1, $$2}'
@@ -72,7 +72,29 @@ plan: lambdas ## Plan prod (AWS_PROFILE=krabber-admin after aws login); writes i
 apply: ## Apply the plan you reviewed (make plan first)
 	$(TF_PROD) apply -input=false prod.tfplan
 
-deploy: bundle ## Ship dist/krabber.zip to krabber-prod and wait until it's healthy
-	go run ./cmd/deploy $(DEPLOY_FLAGS) \
+RELEASE ?= v$(shell date -u +%Y.%m.%d-%H%M)
+
+deploy: ## Ship the pushed commit to krabber-prod, wait until it's healthy, and publish a GitHub release
+	@git diff --quiet && git diff --cached --quiet || { echo "Commit or stash your changes first: the release has to match a commit."; exit 1; }
+	@git fetch -q origin main && [ "$$(git rev-parse HEAD)" = "$$(git rev-parse origin/main)" ] || { echo "Push main first: the release points at a commit GitHub has."; exit 1; }
+	./scripts/public-check.sh
+	$(MAKE) ship LABEL=$(RELEASE)-$(VERSION)
+	$(MAKE) release TAG=$(RELEASE)
+
+ship: bundle ## Just the deploy: upload, switch the environment, wait (CI runs this with DEPLOY_FLAGS=-wait=false)
+	go run ./cmd/deploy $(DEPLOY_FLAGS) $(if $(LABEL),-label $(LABEL)) \
 		-bucket $$($(TF_PROD) output -raw artifacts_bucket) \
 		-distribution $$($(TF_PROD) output -raw distribution_id)
+
+release: ## Tag the deployed commit (TAG=...) and publish a GitHub release with generated notes
+	git tag -a $(TAG) -m "Deployed $(VERSION) to krabber.net"
+	git push origin $(TAG)
+	gh release create $(TAG) --title "$(TAG)" --generate-notes --verify-tag || \
+		echo "The tag is pushed, but gh couldn't publish the release: run 'gh release create $(TAG) --generate-notes' once gh works, or use GitHub's Releases page."
+
+public-check: ## Make sure nothing private is tracked or in the history
+	./scripts/public-check.sh
+
+hooks: ## Run the public check before every git push
+	printf '#!/bin/sh\nexec ./scripts/public-check.sh\n' > .git/hooks/pre-push && chmod +x .git/hooks/pre-push
+	@echo "pre-push hook installed"

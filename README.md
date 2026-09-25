@@ -82,3 +82,23 @@ python3 scripts/cost_model.py 1000 5000 10000   # daily active krabs
 ```bash
 make bundle   # dist/krabber.zip: bin/application (linux/arm64) + Procfile + .platform/
 ```
+
+## Deploy
+
+Deploys run from a laptop, which costs no GitHub Actions minutes:
+
+```bash
+aws login --profile krabber-admin
+export AWS_PROFILE=krabber-admin
+make plan && make apply   # only when infra/ changed; review the plan first
+make deploy               # checks, ships the pushed commit, waits until healthy, publishes a GitHub release
+```
+
+`make deploy` refuses to run with uncommitted or unpushed changes (the release has to match a commit GitHub has) and runs the public check first. It tags the commit `vYYYY.MM.DD-HHMM` and creates a GitHub release with generated notes; that needs a working `gh` (`gh auth status`). Away from the laptop, the **deploy** workflow in the Actions tab does the same deploy without the release.
+
+## Before going public
+
+```bash
+make public-check   # nothing private tracked or anywhere in the history
+make hooks          # run that check before every git push
+```

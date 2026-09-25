@@ -1,17 +1,11 @@
-# Every push to main: test, then apply Terraform and deploy the app (PLAN.md
-# section 9). To pause deploys, disable this workflow in GitHub's Actions tab.
+# Deploys go from a laptop (make deploy), which costs no build minutes and
+# publishes a GitHub release. This workflow is the same deploy, run by hand
+# from the Actions tab when you're away from the laptop (PLAN.md section 9).
 # Tests run in a job without AWS access, so test-time code can't mint a token
 # for the deploy role.
 name: deploy
 
 on:
-  push:
-    branches: [main]
-    # Docs and the cost model don't change what runs.
-    paths-ignore:
-      - "**.md"
-      - "docs/**"
-      - "scripts/cost_model.py"
   workflow_dispatch:
 
 permissions:
@@ -74,4 +68,4 @@ jobs:
           terraform init -input=false
           terraform apply -input=false -auto-approve -no-color
       - name: Deploy the app
-        run: make deploy DEPLOY_FLAGS=-wait=false
+        run: make ship DEPLOY_FLAGS=-wait=false
