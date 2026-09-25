@@ -47,6 +47,8 @@ jobs:
         with:
           role-to-assume: arn:aws:iam::381466680812:role/krabber-gha-deploy
           aws-region: us-east-2
+      - name: Lambda bundles
+        run: make lambdas
       - name: Terraform apply
         working-directory: infra/prod
         env:

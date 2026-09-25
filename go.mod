@@ -6,6 +6,7 @@ toolchain go1.26.8
 
 require (
 	github.com/alexedwards/scs/v2 v2.9.0
+	github.com/aws/aws-lambda-go v1.55.1
 	github.com/aws/aws-sdk-go-v2 v1.47.1
 	github.com/aws/aws-sdk-go-v2/config v1.33.5
 	github.com/aws/aws-sdk-go-v2/credentials v1.20.5
@@ -14,7 +15,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/dynamodb v1.69.0
 	github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk v1.43.1
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.113.4
-	github.com/aws/aws-sdk-go-v2/service/sesv2 v1.75.0
+	github.com/aws/aws-sdk-go-v2/service/sesv2 v1.76.0
 	github.com/aws/aws-sdk-go-v2/service/ssm v1.78.0
 	github.com/aws/smithy-go v1.28.1
 	github.com/go-playground/form/v4 v4.5.0

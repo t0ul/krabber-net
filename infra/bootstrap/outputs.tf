@@ -18,6 +18,10 @@ output "eb_instance_profile_name" {
   value = aws_iam_instance_profile.eb_instance.name
 }
 
+output "mail_forward_role_arn" {
+  value = aws_iam_role.mail_forward.arn
+}
+
 output "canary_role_arn" {
   value = aws_iam_role.canary.arn
 }

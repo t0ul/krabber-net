@@ -7,7 +7,7 @@ PORT            ?= 5050
 VERSION         := $(shell git rev-parse --short HEAD 2>/dev/null || echo dev)
 GO_BUILD        := CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags="-s -w -X main.version=$(VERSION)"
 
-.PHONY: help dev db db-down seed run test test-unit lint vet fmt vuln build bundle clean plan apply deploy
+.PHONY: help dev db db-down seed run test test-unit lint vet fmt vuln build bundle clean lambdas plan apply deploy
 
 help: ## Show targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-10s %s\n", $$1, $$2}'
@@ -58,7 +58,14 @@ clean: ## Remove build output
 
 TF_PROD := terraform -chdir=infra/prod
 
-plan: ## Plan prod (AWS_PROFILE=krabber-admin after aws login); writes infra/prod/prod.tfplan
+lambdas: ## Lambda bundles Terraform deploys (dist/mailforward.zip), built reproducibly
+	mkdir -p dist/lambda/mailforward
+	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags="-s -w -buildid=" -tags lambda.norpc \
+		-o dist/lambda/mailforward/bootstrap ./cmd/mailforward
+	touch -t 202001010000 dist/lambda/mailforward/bootstrap
+	rm -f dist/mailforward.zip && cd dist/lambda/mailforward && zip -X -q ../../mailforward.zip bootstrap
+
+plan: lambdas ## Plan prod (AWS_PROFILE=krabber-admin after aws login); writes infra/prod/prod.tfplan
 	$(TF_PROD) init -input=false
 	$(TF_PROD) plan -input=false -out=prod.tfplan
 

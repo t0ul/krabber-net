@@ -142,6 +142,56 @@ resource "aws_iam_instance_profile" "eb_instance" {
 }
 
 # ---------------------------------------------------------------------------
+# support@krabber.net forwarder Lambda
+# ---------------------------------------------------------------------------
+
+resource "aws_iam_role" "mail_forward" {
+  name               = "krabber-mail-forward"
+  description        = "Execution role for the support@krabber.net forwarder."
+  assume_role_policy = data.aws_iam_policy_document.canary_trust.json
+}
+
+data "aws_iam_policy_document" "mail_forward" {
+  statement {
+    sid       = "ReadInbound"
+    actions   = ["s3:GetObject"]
+    resources = ["arn:aws:s3:::krabber-inbound-mail-${local.account_id}/support/*"]
+  }
+
+  # identity/* because in the SES sandbox a send is also checked against the
+  # recipient's verified identity; the configuration set because it's the
+  # domain's default, so every send uses it.
+  statement {
+    sid     = "Forward"
+    actions = ["ses:SendEmail", "ses:SendRawEmail"]
+    resources = [
+      "arn:aws:ses:${var.region}:${local.account_id}:identity/*",
+      "arn:aws:ses:${var.region}:${local.account_id}:configuration-set/krabber-transactional",
+    ]
+
+    condition {
+      test     = "StringEquals"
+      variable = "ses:FromAddress"
+      values   = ["support@krabber.net"]
+    }
+  }
+
+  statement {
+    sid     = "Logs"
+    actions = ["logs:CreateLogStream", "logs:PutLogEvents"]
+    resources = [
+      "arn:aws:logs:${var.region}:${local.account_id}:log-group:/aws/lambda/krabber-mail-forward:*",
+    ]
+  }
+}
+
+resource "aws_iam_role_policy" "mail_forward" {
+  name   = "krabber-mail-forward"
+  role   = aws_iam_role.mail_forward.id
+  policy = data.aws_iam_policy_document.mail_forward.json
+}
+
+# ---------------------------------------------------------------------------
 # Uptime canary Lambda
 # ---------------------------------------------------------------------------
 
