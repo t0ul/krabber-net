@@ -14,6 +14,7 @@ type statsPage struct {
 	Crabs       int
 	Molts       int // molts, replies and remolts crabs have now
 	Follows     int
+	Trophies    int
 	WeekMolts   int
 	WeekMore    bool // the week has more molts than the snapshot holds
 	King        *store.Crab
@@ -35,6 +36,7 @@ func (app *App) statsPage(w http.ResponseWriter, r *http.Request) {
 		st.Crabs++
 		st.Molts += c.MoltCount
 		st.Follows += c.FollowingCount
+		st.Trophies += c.Trophies
 		if hidden(c.ID) {
 			continue
 		}

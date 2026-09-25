@@ -17,6 +17,18 @@
             <div class="kb-bio">{{ .Snippet }}</div>
         </div>
     </div>
+    {{ else if eq .Type "trophy" }}
+    <a class="d-flex border-bottom border-dark px-3 py-2 kb-notification text-light" href="/krabs/{{ $.CrabName }}/trophies">
+        <div class="kb-notification-icon mr-3">
+            <svg class="notif-trophy" width="22" height="22"><use href="{{ asset "img/sprites.svg" }}#medal-f"></use></svg>
+        </div>
+        <div class="flex-grow-1 min-w-0">
+            <div class="d-flex align-items-center mb-1">
+                <span>You earned the trophy: <strong>{{ (trophy .Snippet).Title }}</strong>!</span>
+                <span class="text-muted small ml-auto">{{ template "time" .CreatedAt }}</span>
+            </div>
+        </div>
+    </a>
     {{ else }}
     <div class="d-flex border-bottom border-dark px-3 py-2 kb-notification">
         <div class="kb-notification-icon kb-notification-{{ .Type }} mr-3">

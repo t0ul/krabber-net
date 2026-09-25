@@ -60,6 +60,9 @@
   align-items: flex-start;
   justify-content: space-between;
 }
+.trophy .mini-molt-credentials {
+  display: block;
+}
 
 .kb-menu {
   position: relative;

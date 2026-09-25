@@ -17,6 +17,7 @@ import (
 	"github.com/t0ul/krabber-net/internal/linkcard"
 	"github.com/t0ul/krabber-net/internal/richtext"
 	"github.com/t0ul/krabber-net/internal/store"
+	"github.com/t0ul/krabber-net/internal/trophies"
 	"github.com/t0ul/krabber-net/ui"
 )
 
@@ -48,7 +49,8 @@ type templateData struct {
 	Parents      []store.Molt // on a reply's thread page, oldest first
 	ParentGone   bool         // the molt it replies to was deleted or is hidden
 	Replies      []store.Molt
-	Tab          string // the profile tab shown: molts, replies or likes
+	Tab          string // the profile tab shown: molts, replies, likes or trophies
+	TrophyCase   []trophyCase
 	Molts        []store.Molt
 	Likes        []store.Like
 	EmptyMessage string
@@ -147,6 +149,8 @@ var modActions = map[string][2]string{ // action: {done, tried to}
 	"verify":             {"verified", "verify"},
 	"unverify":           {"removed the verified badge from", "remove the verified badge from"},
 	"make_moderator":     {"made a moderator:", "make a moderator:"},
+	"award_trophy":       {"awarded a trophy to", "award a trophy to"},
+	"revoke_trophy":      {"took a trophy back from", "take a trophy back from"},
 	"remove_moderator":   {"removed the moderator role from", "remove the moderator role from"},
 	"remove_molt":        {"removed a molt by", "remove a molt by"},
 	"restore_molt":       {"restored a molt by", "restore a molt by"},
@@ -224,6 +228,8 @@ var templateFuncs = template.FuncMap{
 	"hasPrefix":      strings.HasPrefix,
 	"join":           strings.Join,
 	"commas":         commas,
+	"trophy":         trophyByID,
+	"manualTrophies": trophies.Manual,
 	"modActionLabel": modActionLabel,
 	"reportLabel":    store.ReportLabel,
 	"reportReasons":  func() []store.ReportReason { return store.ReportReasons },

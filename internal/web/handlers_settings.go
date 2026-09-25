@@ -13,6 +13,7 @@ import (
 
 	"github.com/t0ul/krabber-net/internal/auth"
 	"github.com/t0ul/krabber-net/internal/store"
+	"github.com/t0ul/krabber-net/internal/trophies"
 	"github.com/t0ul/krabber-net/internal/validator"
 )
 
@@ -178,6 +179,10 @@ func (app *App) settingsProfilePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	c.Profile = f.profile()
+	p, facts := c.Profile, c.FunFacts
+	if trophies.CustomizedProfile(p.DisplayName, p.Bio, p.Location, p.Website, !facts.Empty()) {
+		app.award(r.Context(), &c, "i-want-it-that-way")
+	}
 	app.dir.putCrab(c)
 	app.sessions.Put(r.Context(), sessionFlash, "Profile saved.")
 	http.Redirect(w, r, "/settings", http.StatusSeeOther)

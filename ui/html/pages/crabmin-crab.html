@@ -94,6 +94,23 @@
                 {{ end }}
             {{ end }}
         </form>
+        <form method="POST" action="{{ $action }}" class="mt-2">
+            <input type='hidden' name='csrf_token' value='{{ .CSRFToken }}'>
+            <label for="award-trophy" class="small font-weight-bold">Trophies</label>
+            <div class="d-flex">
+                <select name="trophy" id="award-trophy" class="form-control form-control-sm mr-2">
+                    {{ range manualTrophies }}<option value="{{ .ID }}">{{ .Title }}</option>{{ end }}
+                </select>
+                <button type="submit" name="action" value="award_trophy" class="btn btn-sm btn-outline-light rounded-pill">Award</button>
+            </div>
+        </form>
+        {{ with .TrophyCase }}
+        <form method="POST" action="{{ $action }}" class="d-flex flex-wrap mt-2">
+            <input type='hidden' name='csrf_token' value='{{ $.CSRFToken }}'>
+            <input type="hidden" name="action" value="revoke_trophy">
+            {{ range . }}<button type="submit" name="trophy" value="{{ .ID }}" class="btn btn-sm btn-outline-secondary rounded-pill mr-2 mb-2" title="Take it back">{{ .Title }} ×</button>{{ end }}
+        </form>
+        {{ end }}
     </div>
     {{ else if and (ne $c.ID .CrabID) (not $c.Deleted) }}
     <div class="px-3 py-3 border-bottom border-dark small text-muted">

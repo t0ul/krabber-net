@@ -118,6 +118,28 @@ func (f *fakeFetcher) Fetch(_ context.Context, url string) (linkcard.Card, error
 	return linkcard.Card{}, linkcard.ErrNoCard
 }
 
+func TestAwardShow(t *testing.T) {
+	s := newStore(t)
+	ctx := context.Background()
+	r := New(s, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	karen := crab(t, s, "karen")
+
+	r.awardShow(ctx)
+	if got, _ := s.Trophies(ctx, karen.ID); len(got) != 0 {
+		t.Fatalf("new crab got %+v", got)
+	}
+	r.now = func() time.Time { return karen.CreatedAt.AddDate(1, 0, 1) }
+	r.awardShow(ctx)
+	r.awardShow(ctx)
+	got, err := s.Trophies(ctx, karen.ID)
+	if err != nil || len(got) != 1 || got[0].TrophyID != "one-year" {
+		t.Fatalf("after a year: %+v %v", got, err)
+	}
+	if n := <-r.notes; n.Type != store.NotifyTrophy || n.RecipientID != karen.ID || len(r.notes) != 0 {
+		t.Errorf("notifications: %+v, %d more", n, len(r.notes))
+	}
+}
+
 func TestLinkCards(t *testing.T) {
 	s := newStore(t)
 	ctx := context.Background()

@@ -43,6 +43,7 @@ import (
 //	Report            R#<moltID>             R#by#<reporterID>
 //	Link card         LC#<sha256 hex of URL> LC#                  (expires: 30 days, or 1 day after a failed fetch)
 //	Invite code       IC#<code>              IC#                  (holds the owner's crab keys and disabled)
+//	Trophy            TR#<crabID>            TR#<trophyID>        (one per trophy; the crab counts them in trophies)
 //
 // Molt and other generated IDs are KSUIDs, so sorting by SK sorts by time.
 // Replies use their own SK prefix so a crab's molts and replies are each one
@@ -121,6 +122,8 @@ func reportRowSK(reporterID string) string       { return "R#by#" + reporterID }
 func linkCardSK() string                         { return "LC#" }
 func invitePK(code string) string                { return "IC#" + code }
 func inviteSK() string                           { return "IC#" }
+func trophyPK(crabID string) string              { return "TR#" + crabID }
+func trophySK(trophyID string) string            { return "TR#" + trophyID }
 func linkCardPK(url string) string {
 	sum := sha256.Sum256([]byte(url))
 	return "LC#" + hex.EncodeToString(sum[:])

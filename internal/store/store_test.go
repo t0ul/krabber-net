@@ -1155,6 +1155,48 @@ func TestChangeUsername(t *testing.T) {
 	}
 }
 
+func TestTrophies(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+	karen := mustCrab(t, s, "karen")
+	if ok, err := s.AwardTrophy(ctx, karen, "baby-krab"); !ok || err != nil {
+		t.Fatalf("award: %v %v", ok, err)
+	}
+	if ok, err := s.AwardTrophy(ctx, karen, "baby-krab"); ok || err != nil {
+		t.Fatalf("second award: %v %v", ok, err)
+	}
+	if _, err := s.AwardTrophy(ctx, karen, "mingler"); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.Trophies(ctx, karen.ID)
+	if err != nil || len(got) != 2 || got[0].TrophyID != "baby-krab" || got[1].TrophyID != "mingler" {
+		t.Fatalf("trophies: %+v %v", got, err)
+	}
+	if fresh, _ := s.CrabByID(ctx, karen.ID); fresh.Trophies != 2 {
+		t.Fatalf("count %d", fresh.Trophies)
+	}
+	if err := s.RevokeTrophy(ctx, karen, "mingler"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.RevokeTrophy(ctx, karen, "mingler"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("revoking twice: %v", err)
+	}
+	if fresh, _ := s.CrabByID(ctx, karen.ID); fresh.Trophies != 1 {
+		t.Fatalf("count after revoke %d", fresh.Trophies)
+	}
+
+	fresh, _ := s.CrabByID(ctx, karen.ID)
+	if _, err := s.DeleteAccount(ctx, fresh); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.PurgeCrab(ctx, karen.ID); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := s.Trophies(ctx, karen.ID); len(got) != 0 {
+		t.Fatalf("trophies after purge: %+v", got)
+	}
+}
+
 func TestInviteCodes(t *testing.T) {
 	s := newTestStore(t)
 	ctx := context.Background()

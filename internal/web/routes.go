@@ -65,6 +65,7 @@ func (app *App) Routes() http.Handler {
 	mux.HandleFunc("GET /krabs/{name}", app.profile)
 	mux.HandleFunc("GET /krabs/{name}/replies", app.profileReplies)
 	mux.HandleFunc("GET /krabs/{name}/likes", app.profileLikes)
+	mux.HandleFunc("GET /krabs/{name}/trophies", app.profileTrophies)
 	mux.HandleFunc("GET /krabs/{name}/followers", app.followersList)
 	mux.HandleFunc("GET /krabs/{name}/following", app.followingList)
 	mux.HandleFunc("GET /search", app.searchPage)

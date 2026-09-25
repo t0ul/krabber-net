@@ -21,6 +21,7 @@ const (
 	NotifyQuote   = "quote"
 	NotifyMention = "mention"
 	NotifyWarning = "warning" // from a moderator; Snippet holds the message
+	NotifyTrophy  = "trophy"  // Snippet holds the trophy's ID
 )
 
 const (

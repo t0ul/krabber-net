@@ -51,6 +51,8 @@ type Crab struct {
 	InvitedBy  string `dynamodbav:"invited_by,omitempty"`  // ID of the crab whose code they signed up with
 	Invites    int    `dynamodbav:"invites,omitempty"`     // crabs who signed up with this crab's code
 
+	Trophies int `dynamodbav:"trophies,omitempty"` // trophies in the crab's trophy case
+
 	// The molt shown at the top of the crab's profile, if any.
 	PinnedMoltID string `dynamodbav:"pinned_molt_id,omitempty"`
 	PinnedMoltPK string `dynamodbav:"pinned_molt_pk,omitempty"`
@@ -393,10 +395,11 @@ func (s *Store) ListCrabs(ctx context.Context, limit int) ([]Crab, map[string]bo
 	p := dynamodb.NewScanPaginator(s.db, &dynamodb.ScanInput{
 		TableName:            s.tableName(),
 		IndexName:            aws.String(gsiCrabByID),
-		ProjectionExpression: aws.String("#id, #un, #frc, #fgc, #mc, #act, #ban, #del, #ca, #dn, #bio, #av, #ver, #inv"),
+		ProjectionExpression: aws.String("#id, #un, #frc, #fgc, #mc, #act, #ban, #del, #ca, #dn, #bio, #av, #ver, #inv, #tr"),
 		ExpressionAttributeNames: map[string]string{
 			"#ver": "verified",
 			"#inv": "invites",
+			"#tr":  "trophies",
 			"#dn":  "display_name",
 			"#bio": "bio",
 			"#ca":  "created_at",

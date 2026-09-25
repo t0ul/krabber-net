@@ -114,6 +114,7 @@ func (app *App) publish(r *http.Request, m *store.Molt, skipMention string) {
 	app.enqueueCard(cardURL(m.Content))
 	app.dir.addMolt(*m)
 	app.notifyMentions(r, m, skipMention)
+	app.awardMolt(r.Context(), currentCrab(r), m)
 	app.displayOne(r, m)
 	if m.AuthorName == "" {
 		m.AuthorName = currentCrab(r).Name()
@@ -177,6 +178,7 @@ func (app *App) moltLikePost(w http.ResponseWriter, r *http.Request) {
 	}
 	if liked {
 		app.notify(r, m.AuthorID, store.NotifyLike, m.ID, m.Content)
+		app.awardLike(r.Context(), currentCrab(r), m)
 	}
 	app.renderActions(w, r, m, actionState{liked: &liked})
 }

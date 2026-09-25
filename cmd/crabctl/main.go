@@ -4,6 +4,7 @@
 //
 //	AWS_PROFILE=krabber-admin TABLE_NAME=krabber-prod go run ./cmd/crabctl role <username> admin
 //	AWS_PROFILE=krabber-admin TABLE_NAME=krabber-prod go run ./cmd/crabctl verify <username> on
+//	AWS_PROFILE=krabber-admin TABLE_NAME=krabber-prod go run ./cmd/crabctl trophy <username> contributor
 package main
 
 import (
@@ -15,19 +16,23 @@ import (
 
 	"github.com/t0ul/krabber-net/internal/platform"
 	"github.com/t0ul/krabber-net/internal/store"
+	"github.com/t0ul/krabber-net/internal/trophies"
 )
 
 const usage = `usage: crabctl role <username> <admin|moderator|none>
-       crabctl verify <username> <on|off>`
+       crabctl verify <username> <on|off>
+       crabctl trophy <username> <trophy-id>`
 
 func main() {
 	if len(os.Args) != 4 {
 		log.Fatal(usage)
 	}
 	cmd, name, value := os.Args[1], os.Args[2], os.Args[3]
+	_, isTrophy := trophies.Get(value)
 	switch {
 	case cmd == "role" && (value == store.RoleAdmin || value == store.RoleModerator || value == "none"):
 	case cmd == "verify" && (value == "on" || value == "off"):
+	case cmd == "trophy" && isTrophy:
 	default:
 		log.Fatal(usage)
 	}
@@ -49,6 +54,7 @@ func main() {
 		log.Fatalf("find %q in %q: %v", name, table, err) //nolint:gosec // the operator's own arguments, printed to their terminal
 	}
 	entry := store.ModAction{Moderator: "crabctl", CrabID: c.ID, Crab: c.UserName}
+	grant := ""
 	switch cmd {
 	case "role":
 		role := value
@@ -57,15 +63,34 @@ func main() {
 		}
 		err = s.SetRole(ctx, c, role)
 		entry.Action, entry.Note = "set_role", value
+		if role != "" {
+			grant = "unlimited-power"
+		}
 	case "verify":
 		err = s.SetVerified(ctx, c, value == "on")
 		entry.Action = "verify"
 		if value == "off" {
 			entry.Action = "unverify"
 		}
+	case "trophy":
+		grant = value
+		entry.Action, entry.Note = "award_trophy", value
 	}
 	if err != nil {
 		log.Fatal(err)
+	}
+	if grant != "" {
+		ok, err := s.AwardTrophy(ctx, c, grant)
+		switch {
+		case err != nil:
+			log.Fatal(err)
+		case ok:
+			if err := s.AddNotification(ctx, store.Notification{RecipientID: c.ID, Type: store.NotifyTrophy, Actor: "Krabber", Snippet: grant}); err != nil {
+				log.Printf("warning: awarded but not notified: %v", err)
+			}
+		case cmd == "trophy":
+			log.Fatalf("@%s already has %s", c.UserName, grant) //nolint:gosec // the operator's own arguments, printed to their terminal
+		}
 	}
 	if err := s.LogModAction(ctx, entry); err != nil {
 		log.Printf("warning: done but not logged: %v", err)

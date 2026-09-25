@@ -1,5 +1,6 @@
 // Package jobs runs the web server's background work: trench fan-out,
-// notifications, link cards and cleanup after deleted accounts. Fan-out and
+// notifications, link cards, cleanup after deleted accounts and the daily
+// anniversary trophies. Fan-out and
 // cleanup interrupted by a deploy are picked up again, because pending work is
 // recorded in DynamoDB, not only in memory. Notifications and link cards
 // are best effort: one lost in a restart isn't worth a durable queue (a
@@ -15,6 +16,7 @@ import (
 
 	"github.com/t0ul/krabber-net/internal/linkcard"
 	"github.com/t0ul/krabber-net/internal/store"
+	"github.com/t0ul/krabber-net/internal/trophies"
 )
 
 // CardFetcher reads the card for a web page.
@@ -32,6 +34,7 @@ const (
 	purgeSweepBatch   = 5
 	cardQueueSize     = 128
 	cardFetchTimeout  = 10 * time.Second
+	awardShowEvery    = 24 * time.Hour
 )
 
 // Runner owns the background goroutines.
@@ -42,6 +45,7 @@ type Runner struct {
 	notes   chan store.Notification
 	cards   chan string
 	fetcher CardFetcher
+	now     func() time.Time
 	mu      sync.Mutex
 	pending map[string]bool // card URLs queued or being fetched
 	wg      sync.WaitGroup
@@ -56,6 +60,7 @@ func New(s *store.Store, log *slog.Logger) *Runner {
 		notes:   make(chan store.Notification, notifyQueueSize),
 		cards:   make(chan string, cardQueueSize),
 		fetcher: linkcard.New(),
+		now:     time.Now,
 		pending: map[string]bool{},
 	}
 }
@@ -136,12 +141,36 @@ func (r *Runner) Enqueue(m *store.Molt) {
 
 // Start launches the workers. They stop when ctx is cancelled.
 func (r *Runner) Start(ctx context.Context) {
-	r.wg.Add(5)
+	r.wg.Add(6)
 	go r.fanoutWorker(ctx)
 	go r.notifyWorker(ctx)
 	go r.cardWorker(ctx)
 	go r.every(ctx, fanoutSweepEvery, 5*time.Second, r.sweepFanouts)
 	go r.every(ctx, purgeSweepEvery, 15*time.Second, r.sweepPurges)
+	go r.every(ctx, awardShowEvery, 2*time.Minute, r.awardShow)
+}
+
+// awardShow gives "One Year" to crabs in the week after their first
+// anniversary. Every instance runs it; the award is a conditional write, so
+// nobody gets it twice.
+func (r *Runner) awardShow(ctx context.Context) {
+	now := r.now()
+	crabs, err := r.store.CrabsWhere(ctx, func(c store.Crab) bool { return trophies.Anniversary(c.CreatedAt, now) })
+	if err != nil {
+		r.log.Error("award show failed", "err", err)
+		return
+	}
+	for i := range crabs {
+		c := &crabs[i]
+		ok, err := r.store.AwardTrophy(ctx, c, "one-year")
+		if err != nil {
+			r.log.Error("award one-year failed", "crab", c.ID, "err", err)
+			continue
+		}
+		if ok {
+			r.Notify(store.Notification{RecipientID: c.ID, Type: store.NotifyTrophy, Actor: "Krabber", Snippet: "one-year"})
+		}
+	}
 }
 
 // sweepPurges cleans up after deleted accounts. A purge cut short by a

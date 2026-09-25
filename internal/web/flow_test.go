@@ -481,7 +481,8 @@ func TestNotifications(t *testing.T) {
 
 	h.login("karen@krabber.test", "computer-wife!")
 	_, body, _ := h.get("/trench")
-	if got := badgeRX.FindStringSubmatch(body); got == nil || got[1] != "3" {
+	// Follow, like, reply, and the Baby Krab and Social Newbie trophies.
+	if got := badgeRX.FindStringSubmatch(body); got == nil || got[1] != "5" {
 		t.Fatalf("badge before reading: %v", got)
 	}
 	_, body, _ = h.get("/notifications")
@@ -1367,7 +1368,7 @@ func TestCrabmin(t *testing.T) {
 	}
 
 	act("troll", "warn", "Please be kind to the other crabs")
-	if notes, _ := h.store.Notifications(ctx, crab("troll").ID, 10); len(notes) != 1 || notes[0].Type != store.NotifyWarning {
+	if notes, _ := h.store.Notifications(ctx, crab("troll").ID, 10); len(notes) == 0 || notes[0].Type != store.NotifyWarning {
 		t.Fatalf("warning: %+v", notes)
 	}
 	act("troll", "clear_bio", "")
@@ -2135,6 +2136,102 @@ func TestVerifiedBadge(t *testing.T) {
 	h.post("/krabmin/krabs/"+karen.ID, url.Values{"csrf_token": {tok}, "action": {"unverify"}})
 	if _, body, _ := h.get("/krabs/karen"); strings.Contains(body, badge) {
 		t.Error("badge still on the profile after unverify")
+	}
+}
+
+func TestTrophies(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	for _, name := range []string{"boss", "karen", "plankton"} {
+		hash, _ := auth.HashPassword("secret-" + name)
+		c, err := h.store.CreateCrab(ctx, name, name+"@krabber.test", hash)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := h.store.ActivateCrab(ctx, c.ID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	crab := func(name string) *store.Crab {
+		c, err := h.store.CrabByUsername(ctx, name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return c
+	}
+	has := func(name string) []string {
+		got, err := h.store.Trophies(ctx, crab(name).ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ids := make([]string, 0, len(got))
+		for _, a := range got {
+			ids = append(ids, a.TrophyID)
+		}
+		return ids
+	}
+	if err := h.store.SetRole(ctx, crab("boss"), store.RoleAdmin); err != nil {
+		t.Fatal(err)
+	}
+	karen := crab("karen")
+	rogen, err := h.store.CreateMolt(ctx, karen, "Seth Rogen laugh: heh heh heh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := h.store.Follow(ctx, karen, crab("plankton")); err != nil {
+		t.Fatal(err)
+	}
+
+	h.login("plankton@krabber.test", "secret-plankton")
+	tok := h.csrf("/sea")
+	h.post("/molt/create", url.Values{"csrf_token": {tok}, "content": {"my plan is %420 friendly"}})
+	h.post("/molt/create", url.Values{"csrf_token": {tok}, "content": {"again %420"}})
+	h.post("/follow/"+karen.ID, url.Values{"csrf_token": {tok}})
+	h.post("/molt/like/"+rogen.ID, url.Values{"csrf_token": {tok}})
+	h.post("/unfollow/"+karen.ID, url.Values{"csrf_token": {tok}})
+
+	if got := has("plankton"); !slices.Equal(got, []string{"baby-krab", "pineapple-express", "rogen"}) {
+		t.Errorf("plankton's trophies: %v", got)
+	}
+	if got := has("karen"); !slices.Equal(got, []string{"social-newbie", "back-krabber"}) {
+		t.Errorf("karen's trophies: %v", got)
+	}
+	if n := crab("plankton").Trophies; n != 3 {
+		t.Errorf("plankton's trophy count: %d", n)
+	}
+	_, body, _ := h.get("/krabs/plankton/trophies")
+	if !strings.Contains(body, "Pineapple Express") || !strings.Contains(body, "<strong>3</strong> <span class=\"text-muted\">trophies") {
+		t.Error("trophy tab doesn't show plankton's trophies")
+	}
+	if _, body, _ := h.get("/notifications"); !strings.Contains(body, "You earned the trophy: <strong>Baby Krab</strong>") {
+		t.Error("no trophy notification")
+	}
+	if _, body, _ := h.get("/krabs/boss/trophies"); !strings.Contains(body, "hasn't earned any trophies") {
+		t.Error("empty trophy case message missing")
+	}
+
+	if status, _, _ := h.post("/krabmin/krabs/"+karen.ID, url.Values{"csrf_token": {tok}, "action": {"award_trophy"}, "trophy": {"contributor"}}); status != http.StatusForbidden && status != http.StatusNotFound {
+		t.Errorf("a regular krab reached Krabmin: %d", status)
+	}
+
+	h.client = h.newClient()
+	h.login("boss@krabber.test", "secret-boss")
+	tok = h.csrf("/krabmin/krabs/karen")
+	h.post("/krabmin/krabs/"+karen.ID, url.Values{"csrf_token": {tok}, "action": {"award_trophy"}, "trophy": {"mingler"}})
+	h.post("/krabmin/krabs/"+karen.ID, url.Values{"csrf_token": {tok}, "action": {"award_trophy"}, "trophy": {"contributor"}})
+	if got := has("karen"); !slices.Contains(got, "contributor") || slices.Contains(got, "mingler") {
+		t.Errorf("after awards: %v (only manual trophies can be handed out)", got)
+	}
+	h.post("/krabmin/krabs/"+karen.ID, url.Values{"csrf_token": {tok}, "action": {"revoke_trophy"}, "trophy": {"contributor"}})
+	if got := has("karen"); slices.Contains(got, "contributor") {
+		t.Errorf("contributor not revoked: %v", got)
+	}
+	h.post("/krabmin/krabs/"+karen.ID, url.Values{"csrf_token": {tok}, "action": {"make_moderator"}})
+	if got := has("karen"); !slices.Contains(got, "unlimited-power") {
+		t.Errorf("new moderator has no Unlimited Power: %v", got)
+	}
+	if _, body, _ := h.get("/krabmin/log"); !strings.Contains(body, "awarded a trophy to") || !strings.Contains(body, "took a trophy back from") {
+		t.Error("trophy actions aren't logged")
 	}
 }
 

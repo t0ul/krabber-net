@@ -58,6 +58,7 @@
             <span><strong>{{ $p.MoltCount }}</strong> <span class="text-muted">molts</span></span>
             <a class="ml-3 text-light" href="/krabs/{{ $p.UserName }}/following"><strong>{{ $p.FollowingCount }}</strong> <span class="text-muted">following</span></a>
             <a class="ml-3 text-light" href="/krabs/{{ $p.UserName }}/followers"><strong>{{ $p.FollowerCount }}</strong> <span class="text-muted">followers</span></a>
+            <a class="ml-3 text-light" href="/krabs/{{ $p.UserName }}/trophies"><strong>{{ $p.Trophies }}</strong> <span class="text-muted">{{ if eq $p.Trophies 1 }}trophy{{ else }}trophies{{ end }}</span></a>
         </div>
         <details class="kb-full-bio mt-3">
             <summary>
@@ -87,12 +88,36 @@
         {{ template "profile-tab" (dict "Href" (print "/krabs/" $p.UserName) "Label" "Molts" "Active" (eq .Tab "molts")) }}
         {{ template "profile-tab" (dict "Href" (print "/krabs/" $p.UserName "/replies") "Label" "Replies" "Active" (eq .Tab "replies")) }}
         {{ template "profile-tab" (dict "Href" (print "/krabs/" $p.UserName "/likes") "Label" "Likes" "Active" (eq .Tab "likes")) }}
+        {{ template "profile-tab" (dict "Href" (print "/krabs/" $p.UserName "/trophies") "Label" "Trophies" "Active" (eq .Tab "trophies")) }}
     </nav>
     {{ end }}
+    {{ if eq .Tab "trophies" }}
+    <div id="trophies" class="d-flex mt-4 flex-wrap justify-content-center">
+        {{ range .TrophyCase }}{{ template "trophy" . }}
+        {{ else }}
+        <div class="d-inline-block w-100 p-5 text-muted text-molt text-center">This krab hasn't earned any trophies</div>
+        {{ end }}
+        <div class="trophy-space-filler m-2" style="height: 0; width: 150px;"></div>
+        <div class="trophy-space-filler m-2" style="height: 0; width: 150px;"></div>
+    </div>
+    {{ else }}
     {{ if and (eq $p.ID .CrabID) (eq .Tab "molts") }}{{ template "compose" . }}{{ end }}
     {{ with .Pinned }}<div class="border-bottom border-dark border-thicc" id="pinned-molt">{{ template "molt" (dict "M" . "D" $ "Pinned" true) }}</div>{{ end }}
     {{ template "molt-list" . }}
+    {{ end }}
 {{ template "shell-bottom" . }}
 {{end}}
+
+{{define "trophy"}}<div class="mini-molt trophy mini-bio rounded-media m-2 absolute-container not-clickable" title="{{ .Description }}">
+    <div class="mini-molt-profile-box zindex-front d-flex justify-content-center">
+        <img src="{{ asset .Image }}" alt="Trophy icon" width="95" height="95">
+    </div>
+    <div class="mini-molt-text-box w-100 h-100 p-2">
+        <div class="mini-molt-credentials">
+            <div class="d-flex justify-content-center"><strong>{{ .Title }}</strong></div>
+            <div class="d-flex justify-content-center"><small class="text-muted">awarded on <time datetime="{{ .AwardedAt.UTC.Format "2006-01-02T15:04:05Z" }}">{{ .AwardedAt.UTC.Format "01/02/2006" }}</time></small></div>
+        </div>
+    </div>
+</div>{{end}}
 
 {{define "profile-tab"}}<a class="kb-tab flex-fill text-center py-2{{ if .Active }} active{{ end }}" href="{{ .Href }}"{{ if .Active }} aria-current="page"{{ end }}>{{ .Label }}</a>{{end}}

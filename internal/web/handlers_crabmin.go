@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/t0ul/krabber-net/internal/store"
+	"github.com/t0ul/krabber-net/internal/trophies"
 	"github.com/t0ul/krabber-net/internal/validator"
 )
 
@@ -20,6 +21,7 @@ const (
 type modCrabForm struct {
 	Action              string `form:"action"`
 	Note                string `form:"note"` // ban reason or warning text
+	Trophy              string `form:"trophy"`
 	validator.Validator `form:"-"`
 }
 
@@ -92,6 +94,10 @@ func (app *App) crabminCrab(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if data.InviteDisabled, err = app.store.InviteCodeDisabled(r.Context(), c); err != nil {
+		app.serverError(w, r, err)
+		return
+	}
+	if data.TrophyCase, err = app.trophyCaseOf(r.Context(), c.ID); err != nil {
 		app.serverError(w, r, err)
 		return
 	}
@@ -262,7 +268,30 @@ func (app *App) crabminCrabPost(w http.ResponseWriter, r *http.Request) {
 			role, verb = "", " is no longer a moderator."
 		}
 		err = app.store.SetRole(ctx, target, role)
+		if err == nil && role != "" {
+			app.award(ctx, target, "unlimited-power")
+		}
 		msg = "@" + target.UserName + verb
+	case "award_trophy", "revoke_trophy":
+		t, ok := trophies.Get(f.Trophy)
+		if !ok || (f.Action == "award_trophy" && !t.Manual) {
+			done("Pick a trophy.")
+			return
+		}
+		entry.Note = t.Title
+		if f.Action == "award_trophy" {
+			if len(app.award(ctx, target, t.ID)) == 0 {
+				done("@" + target.UserName + " already has " + t.Title + ".")
+				return
+			}
+			msg = "Awarded " + t.Title + " to @" + target.UserName + "."
+		} else {
+			if err = app.store.RevokeTrophy(ctx, target, t.ID); errors.Is(err, store.ErrNotFound) {
+				done("@" + target.UserName + " doesn't have " + t.Title + ".")
+				return
+			}
+			msg = "Took " + t.Title + " back from @" + target.UserName + "."
+		}
 	default:
 		app.clientError(w, http.StatusBadRequest)
 		return

@@ -127,6 +127,9 @@ func (app *App) profileReplies(w http.ResponseWriter, r *http.Request) {
 func (app *App) profileLikes(w http.ResponseWriter, r *http.Request) { app.profileTab(w, r, tabLikes) }
 
 // profileTab shows a crab's page: counts, follow button, and one tab of
+// their molts, replies, likes or trophies.
+
+// profileTab shows a crab's page: counts, follow button, and one tab of
 // their molts, replies or likes.
 func (app *App) profileTab(w http.ResponseWriter, r *http.Request, tab string) {
 	p, ok := app.crabFromName(w, r)
@@ -139,6 +142,18 @@ func (app *App) profileTab(w http.ResponseWriter, r *http.Request, tab string) {
 	if _, blocking := blocksOf(r).Blocking[p.ID]; blocking {
 		data.IsBlocking = true
 		data.EmptyMessage = "You blocked @" + p.UserName + ". Unblock them to see their molts."
+		app.render(w, r, http.StatusOK, "profile.html", data)
+		return
+	}
+	if tab == tabTrophies {
+		var err error
+		if data.TrophyCase, err = app.trophyCaseOf(r.Context(), p.ID); err != nil {
+			app.serverError(w, r, err)
+			return
+		}
+		if !app.setFollowsState(w, r, &data, p) {
+			return
+		}
 		app.render(w, r, http.StatusOK, "profile.html", data)
 		return
 	}
@@ -170,17 +185,28 @@ func (app *App) profileTab(w http.ResponseWriter, r *http.Request, tab string) {
 		data.Pinned = &data.Molts[0]
 		data.Molts = data.Molts[1:]
 	}
-	if c := currentCrab(r); c != nil && c.ID != p.ID {
-		if data.IsFollowing, err = app.store.IsFollowing(r.Context(), c.ID, p.ID); err != nil {
-			app.serverError(w, r, err)
-			return
-		}
-		if data.FollowsYou, err = app.store.IsFollowing(r.Context(), p.ID, c.ID); err != nil {
-			app.serverError(w, r, err)
-			return
-		}
+	if !app.setFollowsState(w, r, &data, p) {
+		return
 	}
 	app.renderMolts(w, r, "profile.html", data)
+}
+
+// setFollowsState fills in whether the viewer and p follow each other.
+func (app *App) setFollowsState(w http.ResponseWriter, r *http.Request, data *templateData, p *store.Crab) bool {
+	c := currentCrab(r)
+	if c == nil || c.ID == p.ID {
+		return true
+	}
+	var err error
+	if data.IsFollowing, err = app.store.IsFollowing(r.Context(), c.ID, p.ID); err != nil {
+		app.serverError(w, r, err)
+		return false
+	}
+	if data.FollowsYou, err = app.store.IsFollowing(r.Context(), p.ID, c.ID); err != nil {
+		app.serverError(w, r, err)
+		return false
+	}
+	return true
 }
 
 func (app *App) followersList(w http.ResponseWriter, r *http.Request) {
@@ -292,12 +318,16 @@ func (app *App) setFollow(w http.ResponseWriter, r *http.Request, follow bool) {
 		err = app.store.Follow(r.Context(), currentCrab(r), followee)
 		if err == nil {
 			app.notify(r, followee.ID, store.NotifyFollow, "", "")
+			app.awardFollow(r.Context(), currentCrab(r), followee, true)
 		}
 		if errors.Is(err, store.ErrBlocked) {
 			follow = false
 		}
 	} else {
 		err = app.store.Unfollow(r.Context(), currentCrab(r), followee)
+		if err == nil {
+			app.awardFollow(r.Context(), currentCrab(r), followee, false)
+		}
 	}
 	if err != nil && !errors.Is(err, store.ErrAlreadyExists) && !errors.Is(err, store.ErrNotAllowed) &&
 		!errors.Is(err, store.ErrNotFound) && !errors.Is(err, store.ErrBlocked) {

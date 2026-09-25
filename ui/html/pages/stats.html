@@ -17,6 +17,7 @@
             <div class="d-flex flex-wrap justify-content-center">
                 {{ template "stat" (dict "Number" (commas .Molts) "Label" "molts sent") }}
                 {{ template "stat" (dict "Number" (commas .Follows) "Label" "follows") }}
+                {{ template "stat" (dict "Number" (commas .Trophies) "Label" "trophies awarded") }}
                 {{ template "stat" (dict "Number" (print (commas .WeekMolts) (or (and .WeekMore "+") "")) "Label" "molts this week") }}
             </div>
         </div>
