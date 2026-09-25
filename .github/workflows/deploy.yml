@@ -1,6 +1,5 @@
 # Every push to main: test, apply Terraform, and deploy the app (PLAN.md
-# section 9). Off until the repository variable DEPLOY is "on", which you set
-# after the first launch from a laptop (make plan, make apply, make deploy).
+# section 9). To pause deploys, disable this workflow in GitHub's Actions tab.
 name: deploy
 
 on:
@@ -18,10 +17,10 @@ concurrency:
 
 jobs:
   deploy:
-    # The krabber environment holds DEPLOY and ALERT_EMAIL; limit it to main
-    # in the repository's environment settings.
+    # The krabber environment holds ALERT_EMAIL; limit it to main in the
+    # repository's environment settings. (A job-level if can't read
+    # environment variables, so there's no on/off variable here.)
     environment: krabber
-    if: vars.DEPLOY == 'on'
     runs-on: ubuntu-latest
     services:
       dynamodb:
