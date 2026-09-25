@@ -73,6 +73,6 @@ apply: ## Apply the plan you reviewed (make plan first)
 	$(TF_PROD) apply -input=false prod.tfplan
 
 deploy: bundle ## Ship dist/krabber.zip to krabber-prod and wait until it's healthy
-	go run ./cmd/deploy \
+	go run ./cmd/deploy $(DEPLOY_FLAGS) \
 		-bucket $$($(TF_PROD) output -raw artifacts_bucket) \
 		-distribution $$($(TF_PROD) output -raw distribution_id)

@@ -36,6 +36,7 @@ func main() {
 	bucket := flag.String("bucket", "", "artifacts bucket (terraform output artifacts_bucket)")
 	distribution := flag.String("distribution", "", "CloudFront distribution to invalidate /static/* on (optional)")
 	timeout := flag.Duration("timeout", 30*time.Minute, "how long to wait for the environment")
+	wait := flag.Bool("wait", true, "wait until the environment is healthy on the new version (CI doesn't: the wait is about 11 minutes of build time, and Beanstalk rolls back a bad version and emails krabber-alerts itself)")
 	flag.Parse()
 	if *bucket == "" {
 		log.Fatal("-bucket is required")
@@ -52,7 +53,7 @@ func main() {
 	}
 	d := deployer{
 		s3: s3.NewFromConfig(cfg), eb: elasticbeanstalk.NewFromConfig(cfg), cf: cloudfront.NewFromConfig(cfg),
-		app: *app, env: *env, label: *label,
+		app: *app, env: *env, label: *label, wait: *wait,
 	}
 	if err := d.run(ctx, *bundle, *bucket, *distribution); err != nil {
 		log.Fatal(err)
@@ -72,6 +73,7 @@ type deployer struct {
 	eb              *elasticbeanstalk.Client
 	cf              *cloudfront.Client
 	app, env, label string
+	wait            bool
 }
 
 func (d deployer) run(ctx context.Context, bundle, bucket, distribution string) error {
@@ -107,7 +109,9 @@ func (d deployer) run(ctx context.Context, bundle, bucket, distribution string) 
 	}); err != nil {
 		return fmt.Errorf("update environment: %w", err)
 	}
-	if err := d.waitHealthy(ctx, start); err != nil {
+	if !d.wait {
+		log.Printf("%s is on its way (about 11 minutes); Beanstalk emails krabber-alerts if it rolls back", d.label)
+	} else if err := d.waitHealthy(ctx, start); err != nil {
 		return err
 	}
 
@@ -123,7 +127,9 @@ func (d deployer) run(ctx context.Context, bundle, bucket, distribution string) 
 			return fmt.Errorf("invalidate: %w", err)
 		}
 	}
-	log.Printf("%s is live", d.label)
+	if d.wait {
+		log.Printf("%s is live", d.label)
+	}
 	return nil
 }
 
