@@ -93,8 +93,11 @@ data "aws_iam_policy_document" "eb_instance_app" {
   statement {
     sid     = "SendMail"
     actions = ["ses:SendEmail", "ses:SendRawEmail"]
+    # identity/* because in the SES sandbox a send is also checked against
+    # the recipient's verified identity. The FromAddress condition still
+    # limits it to no-reply@krabber.net.
     resources = [
-      "arn:aws:ses:${var.region}:${local.account_id}:identity/krabber.net",
+      "arn:aws:ses:${var.region}:${local.account_id}:identity/*",
       "arn:aws:ses:${var.region}:${local.account_id}:configuration-set/krabber-transactional",
     ]
 

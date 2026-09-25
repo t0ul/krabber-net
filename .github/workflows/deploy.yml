@@ -18,6 +18,9 @@ concurrency:
 
 jobs:
   deploy:
+    # The krabber environment holds DEPLOY and ALERT_EMAIL; limit it to main
+    # in the repository's environment settings.
+    environment: krabber
     if: vars.DEPLOY == 'on'
     runs-on: ubuntu-latest
     services:

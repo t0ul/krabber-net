@@ -98,6 +98,7 @@ data "aws_iam_policy_document" "gha_deploy_trust" {
       values = [
         "repo:${var.github_repo}:ref:refs/heads/main",
         "repo:${var.github_repo}:environment:prod",
+        "repo:${var.github_repo}:environment:krabber",
       ]
     }
   }
