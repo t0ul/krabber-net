@@ -517,10 +517,10 @@ func (s *Store) LatestMoltsPage(ctx context.Context, after string, limit int) (P
 		}
 		afterDay, afterSK = "", ""
 		for _, m := range withoutDeleted(molts) {
-			if m.PK == "" || m.SK == "" || seen[m.ID] {
+			if m.PK == "" || m.SK == "" || seen[m.SK] {
 				continue
 			}
-			seen[m.ID] = true
+			seen[m.SK] = true
 			if len(keys) >= limit {
 				break
 			}

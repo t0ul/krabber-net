@@ -42,7 +42,8 @@ Tests that need DynamoDB Local are skipped when `KRABBER_TEST_DYNAMO_ENDPOINT` i
 |---|---|
 | `cmd/web` | The website (Beanstalk runs this) |
 | `cmd/devseed` | Dev only: create the table in DynamoDB Local and add sample krabs |
-| `cmd/crabctl` | Operator commands run from your machine (set a crab's role) |
+| `cmd/crabctl` | Operator commands run from your machine (set a krab's role, verify a krab) |
+| `scripts/create_table.py` | Create the DynamoDB table with boto3 (`--local` for DynamoDB Local, `--print` for the JSON definition); a Go test keeps it matching `internal/store/schema.go` |
 | `internal/store` | All DynamoDB access; every key format is in `keys.go` |
 | `internal/web` | Routes, handlers, templates, security middleware |
 | `internal/jobs` | Trench fan-out worker and sea refresh |

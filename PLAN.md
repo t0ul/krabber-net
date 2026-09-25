@@ -223,7 +223,7 @@ The old README's Python script creates a table named `krabber` in **us-west-2** 
 |---|---|---|
 | Name | `krabber-prod` | Passed as `TABLE_NAME`; no hard-coded constant |
 | Keys | `PK` (hash), `SK` (range), strings | Unchanged |
-| GSIs | **GSI2, GSI3, GSI5, GSI6, GSI7, GSI8**, projection `ALL` (section 4.2). The list lives in `store.Indexes`, and `store.CreateTableInput` builds the same table for DynamoDB Local. | The port made GSI1 (crab by email) and GSI4 (comments on a molt) unnecessary: both are now base-table queries. GSI8 is a new sparse work-queue index. |
+| GSIs | **GSI2, GSI3, GSI5, GSI6, GSI7, GSI8** (section 4.2). GSI3 and GSI5 project `KEYS_ONLY`, the rest `ALL` (section 4.3). The list lives in `store.Indexes` / `store.IndexProjections`; `store.CreateTableInput` builds the same table for DynamoDB Local, and `scripts/create_table.py` (boto3) creates it anywhere, checked against the Go definition by `TestPythonSchemaMatches`. | The port made GSI1 (crab by email) and GSI4 (comments on a molt) unnecessary: both are now base-table queries. GSI8 is a new sparse work-queue index. |
 | Billing | `PAY_PER_REQUEST` | The old 1 WCU per index would throttle normal use |
 | **Throughput caps** | Table: 50 reads/s, 10 writes/s. Each GSI: 25 reads/s, 10 writes/s. | The DynamoDB part of the cost ceiling (section 2.2). Normal use is 1–5/s. Raise the caps when traffic grows. |
 | TTL | `expires_at` (epoch seconds) | Cleans up sessions, rate-limit counters and tokens |
@@ -251,14 +251,49 @@ As implemented in `internal/store/keys.go` (the single source for every key form
 | Like | `L#<crabID>` | `L#<moltID>` | GSI7 `L#<moltID>` (who liked a molt) |
 | Follow | `F#<followerID>` | `F#<followeeID>` | GSI6 `F#<followeeID>` (followers of a crab) |
 | Trench (feed) entry | `T#<crabID>` | `T#<moltID>` | — (stores the molt's key, so a feed page is one `BatchGetItem`; `expires_at` 90 days) |
-| Sea cache shard | `MS#<0-4>` | `MS#<0-4>` | — |
+| Notification | `N#<recipientID>` | `N#<ksuid>` | — (`expires_at` 90 days); unread count on `NC#<crabID>` / `NC#`, once-only markers on `NO#<recipientID>` |
+| Block | `B#<crabID>` | `B#out#<otherID>` / `B#in#<otherID>` | — (both directions in one transaction) |
+| Avatar marker | `AV#<trait code>` | `AV#` | — (keeps generated avatars unique) |
+| Username hold | the old `U#<username>` marker with `expires_at` | | — (for 30 days after a rename the old name still finds the krab) |
+| Invite code | `IC#<code>` | `IC#` | — (holds the owner's keys and `disabled`) |
+| Link card | `LC#<sha256 of URL>` | `LC#` | — (`expires_at` 30 days, 1 day after a failed fetch) |
+| Moderation log | `ML#<yyyy-mm>` | `ML#<ksuid>` | — |
 | Token | `CT#<sha256 hex>` | `CT#<scope>` | — (`expires_at`; only the hash is stored) |
 | **Session** | `S#<sha256 hex of session token>` | `S#` | — (`expires_at`) |
 | **Rate-limit counter** | `RL#<action>#<key>` | `RL#<window start, Unix>` | — (`expires_at`; the email cap is action `mail`, key `daily`) |
 | **Pending fan-out marker** | on the molt item | | GSI8 `Q#fanout` / `<moltID>` until fanned out, then the attributes are removed |
 | **Report** (Phase 5) | `R#<moltID>` | `R#<reporterCrabID>` | GSI8 `Q#report` / `<time>` while open |
 
-GSI8 is **sparse**: only items with a pending job carry `GSI8PK`, so it stays tiny and cheap to query. The table starts empty, so none of the key changes from the old code need a data migration.
+GSI8 is **sparse**: only items with a pending job carry `GSI8PK`, so it stays tiny and cheap to query. The table starts empty, so none of the key changes from the old code need a data migration. `internal/store/keys.go` stays the authority for every key format.
+
+### 4.3 Cost review (2026-09-25)
+
+Prices: on-demand writes $0.625 per million write units, reads $0.125 per million read units (eventually consistent reads cost half), storage $0.25/GB-month with the first 25 GB free, PITR $0.20/GB-month. A write unit covers 1 KB, a read unit 4 KB; a transaction charges each item twice; every index an item is written to costs another write.
+
+**Change made: the molt indexes (GSI3, GSI5) project keys only.** Every read of them only takes `PK`/`SK` and then loads the molt from the base table (so counts are current), but with `ALL` each counter change was copied into both indexes. Write units per action, before → after:
+
+| Action | Before | After |
+|---|---|---|
+| Like or unlike | 7 | 5 |
+| Reply (parent's count changes) | ~12 | ~10 |
+| Remolt (original's count changes) | ~14 | ~12 |
+| Edit a molt | 4 | 2 |
+| Post a molt (index entries are still created) | 8 + 1 per follower | 8 + 1 per follower |
+
+It also stops storing each molt three times. The only code change was the Sea de-duplicating by `SK` instead of `id`.
+
+**Kept as they are, and why:**
+- **GSI2 (crab by ID) stays `ALL`.** `CrabByID` needs the whole item, and the directory reload scans it for its fields. Keys-only would save one index write per counter change on a crab, but every directory reload would then batch-read all crabs from the base table, which costs more than it saves at any realistic size.
+- **GSI6 (followers), GSI7 (likers), GSI8 (work queue) stay `ALL`.** Follows and likes are written once and never updated, so a smaller projection saves only a little storage; GSI8 is sparse and short-lived.
+- **On-demand, not provisioned.** Provisioned capacity has a free tier (25 read and 25 write units), but the table and six indexes would each need their own share, and trench fan-out bursts would throttle. On-demand with the maximum-throughput caps in 4.1 bills pennies at hobby traffic and has a hard ceiling.
+- **Transactions stay where counters must match their items** (likes, follows, replies, remolts). Dropping them would halve those writes but let counts drift.
+
+**Where the money goes, at about 100 active krabs** (300 molts, 1,500 likes and 200 replies a day, 20 followers each, 5,000 page views): about 25,000 write units a day (fan-out and likes are most of it) and 350,000 read units a day (page views, plus the directory reload every 2 minutes). That's roughly $0.50 a month in writes and $1.30 in reads; storage stays inside the free 25 GB because trench entries, notifications, link cards, sessions, tokens and rate-limit windows all expire (TTL deletes are free).
+
+**What to watch as it grows:**
+- **Trench fan-out** is one write per follower per molt. If a krab ever has thousands of followers, read their molts at view time instead of fanning them out.
+- **The directory reload** (a GSI2 scan of up to 500 krabs plus the week's molts, every 2 minutes per instance) is the largest fixed read cost. Lengthen its TTL, or keep the snapshot in one item, before raising the 500 cap.
+- **Per page view** the site reads the session, the krab (strongly consistent), the unread count, the viewer's follows, and one batch each for like/remolt/bookmark markers and link cards: a few read units, not worth caching yet.
 
 ---
 

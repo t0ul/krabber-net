@@ -11,9 +11,24 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
-// Indexes lists the GSIs the code uses. infra/modules/table must define the
-// same set.
+// Indexes lists the GSIs the code uses. infra/modules/table and
+// scripts/create_table.py must define the same set.
 var Indexes = []string{gsiCrabByID, gsiMoltsByDay, gsiMoltByID, gsiFollowers, gsiLikesOnMolt, gsiWorkQueue}
+
+// IndexProjections is each GSI's projection. The molt indexes only find keys
+// (every read loads the molt from the base table, where counters are
+// current), so they project keys only: a like, reply or edit then changes the
+// molt without also rewriting two index copies of it. The rest need their
+// items (crab lists, follower IDs, likers, queued jobs) and are written once
+// or rarely.
+var IndexProjections = map[string]types.ProjectionType{
+	gsiCrabByID:    types.ProjectionTypeAll,
+	gsiMoltsByDay:  types.ProjectionTypeKeysOnly,
+	gsiMoltByID:    types.ProjectionTypeKeysOnly,
+	gsiFollowers:   types.ProjectionTypeAll,
+	gsiLikesOnMolt: types.ProjectionTypeAll,
+	gsiWorkQueue:   types.ProjectionTypeAll,
+}
 
 // CreateTableInput describes the table for DynamoDB Local (dev and tests).
 func CreateTableInput(table string) *dynamodb.CreateTableInput {
@@ -34,7 +49,7 @@ func CreateTableInput(table string) *dynamodb.CreateTableInput {
 				{AttributeName: aws.String(pk), KeyType: types.KeyTypeHash},
 				{AttributeName: aws.String(sk), KeyType: types.KeyTypeRange},
 			},
-			Projection: &types.Projection{ProjectionType: types.ProjectionTypeAll},
+			Projection: &types.Projection{ProjectionType: IndexProjections[name]},
 		})
 	}
 	return &dynamodb.CreateTableInput{
