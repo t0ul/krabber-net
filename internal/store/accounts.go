@@ -183,7 +183,7 @@ func (s *Store) PurgeCrab(ctx context.Context, crabID string) error {
 		return fmt.Errorf("purge %s: %w", crabID, err)
 	}
 	for _, step := range []func(context.Context, *Crab) error{
-		s.purgeMolts, s.purgeLikes, s.purgeFollows, s.purgeBlocks,
+		s.purgeMolts, s.purgeLikes, s.purgeFollows, s.purgeBlocks, s.purgeAPIKeys,
 	} {
 		if err := step(ctx, tomb); err != nil {
 			return fmt.Errorf("purge %s: %w", crabID, err)

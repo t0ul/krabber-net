@@ -64,6 +64,30 @@ func reload(t *testing.T, s *Store, c *Crab) *Crab {
 	return fresh
 }
 
+func TestCreateMoltCapsTags(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+	c := mustCrab(t, s, "tagger")
+
+	var b strings.Builder
+	for i := 0; i < 30; i++ {
+		fmt.Fprintf(&b, "%%tag%d ", i)
+	}
+	m, err := s.CreateMolt(ctx, c, b.String())
+	if err != nil {
+		t.Fatalf("create molt: %v", err) // a molt with too many tag pointers would blow the transaction's item limit
+	}
+	// The store never writes more than MaxTags pointers (richtext caps lower
+	// still), and the molt is retrievable, so the create transaction stayed
+	// under the item limit.
+	if len(m.Tags) == 0 || len(m.Tags) > MaxTags {
+		t.Fatalf("tags: got %d, want 1..%d", len(m.Tags), MaxTags)
+	}
+	if _, err := s.MoltByID(ctx, m.ID); err != nil {
+		t.Fatalf("molt by id: %v", err)
+	}
+}
+
 func TestCrabEmailAndUsernameAreUnique(t *testing.T) {
 	s := newTestStore(t)
 	ctx := context.Background()

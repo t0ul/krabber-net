@@ -50,6 +50,7 @@ type App struct {
 	dir       *directory
 	fof       *suggestions
 	writes    *writeLimiter
+	apiRate   *minuteLimiter
 	// trophiesHeld skips award attempts for trophies a krab already has.
 	trophiesHeld *heldTrophies
 	strangersSea *seaForStrangers
@@ -127,6 +128,7 @@ func New(d Deps) (*App, error) {
 		dir:       &directory{},
 		fof:       &suggestions{},
 		writes:    &writeLimiter{},
+		apiRate:   &minuteLimiter{},
 
 		trophiesHeld: &heldTrophies{},
 		strangersSea: &seaForStrangers{},

@@ -19,6 +19,13 @@ import (
 // MaxMoltLength is the longest molt accepted, in characters.
 const MaxMoltLength = 280
 
+// MaxTags caps how many crabtag pointers one molt writes, so CreateMolt's
+// transaction stays well under DynamoDB's 100-item limit no matter what the
+// caller passes. richtext.Tags already returns at most richtext.MaxPerMolt
+// (currently 10), so this is a backstop the store owns rather than trusting
+// that; every %tag still renders as a link, only the first MaxTags are indexed.
+const MaxTags = 20
+
 // Molt is a post. A remolt is a separate molt owned by the remolting crab that
 // points at the original and names its author; it doesn't copy the text, so
 // deleting the original erases it everywhere.
@@ -118,6 +125,10 @@ func (m Molt) FeedID() string { //nolint:gocritic // value receiver so templates
 func (s *Store) newMolt(owner *Crab, authorID, author, content string) *Molt {
 	id := newID()
 	now := s.now()
+	tags := richtext.Tags(content)
+	if len(tags) > MaxTags {
+		tags = tags[:MaxTags]
+	}
 	return &Molt{
 		PK:        moltPK(owner.ID),
 		SK:        moltSK(id),
@@ -133,7 +144,7 @@ func (s *Store) newMolt(owner *Crab, authorID, author, content string) *Molt {
 		Author:    author,
 		Content:   content,
 		CreatedAt: now,
-		Tags:      richtext.Tags(content),
+		Tags:      tags,
 		Mentions:  richtext.Mentions(content),
 	}
 }

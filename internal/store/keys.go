@@ -33,6 +33,8 @@ import (
 //	Trench entry      T#<crabID>             T#<moltID>
 //	Token             CT#<sha256 hex>        CT#<scope>
 //	Session           S#<sha256 hex>         S#
+//	API key           AK#<sha256 hex>        AK#                   (holds the owner's crab keys and scopes)
+//	API key list item AKL#<crabID>           AKL#<keyID>          (so the owner can list and revoke)
 //	Rate-limit window RL#<action>#<key>      RL#<window unix>
 //	Notification      N#<recipientID>        N#<notificationID>
 //	Notified-once     NO#<recipientID>       <type>#<actorID>#<moltID>
@@ -102,6 +104,10 @@ func tokenPK(hash string) string               { return "CT#" + hash }
 func tokenSK(scope string) string              { return "CT#" + scope }
 func sessionPK(hash string) string             { return "S#" + hash }
 func sessionSK() string                        { return "S#" }
+func apiKeyPK(hash string) string              { return "AK#" + hash }
+func apiKeySK() string                         { return "AK#" }
+func apiKeyListPK(crabID string) string        { return "AKL#" + crabID }
+func apiKeyListSK(keyID string) string         { return "AKL#" + keyID }
 func rateLimitPK(action, key string) string    { return "RL#" + action + "#" + key }
 func rateLimitSK(windowStart time.Time) string { return fmt.Sprintf("RL#%d", windowStart.Unix()) }
 func notificationPK(crabID string) string      { return "N#" + crabID }

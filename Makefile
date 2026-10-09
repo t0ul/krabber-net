@@ -58,12 +58,17 @@ clean: ## Remove build output
 
 TF_PROD := terraform -chdir=infra/prod
 
-lambdas: ## Lambda bundles Terraform deploys (dist/mailforward.zip), built reproducibly
+lambdas: ## Lambda bundles Terraform deploys (dist/*.zip), built reproducibly
 	mkdir -p dist/lambda/mailforward
 	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags="-s -w -buildid=" -tags lambda.norpc \
 		-o dist/lambda/mailforward/bootstrap ./cmd/mailforward
 	touch -t 202001010000 dist/lambda/mailforward/bootstrap
 	rm -f dist/mailforward.zip && cd dist/lambda/mailforward && zip -X -q ../../mailforward.zip bootstrap
+	mkdir -p dist/lambda/scuttle
+	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags="-s -w -buildid=" -tags lambda.norpc \
+		-o dist/lambda/scuttle/bootstrap ./cmd/scuttle
+	touch -t 202001010000 dist/lambda/scuttle/bootstrap
+	rm -f dist/scuttle.zip && cd dist/lambda/scuttle && zip -X -q ../../scuttle.zip bootstrap
 
 plan: lambdas ## Plan prod (AWS_PROFILE=krabber-admin after aws login); writes infra/prod/prod.tfplan
 	$(TF_PROD) init -input=false

@@ -3,12 +3,15 @@ package web
 import (
 	"net/http"
 	"strings"
+
+	"github.com/t0ul/krabber-net/internal/store"
 )
 
 // Routes returns the full handler. Order, outermost first:
 //
 //	recoverPanic → originVerify → withClientIP → logRequests → securityHeaders
 //	  /static/*, /healthz, /robots.txt, /favicon.ico, old /crab… URLs: served directly (no session)
+//	  /api/*: bearer-auth JSON, no cookie session or CSRF
 //	  everything else: sessions → crossOriginProtection → csrf → authenticate → mux
 func (app *App) Routes() http.Handler {
 	mux := http.NewServeMux()
@@ -103,6 +106,11 @@ func (app *App) Routes() http.Handler {
 	root.HandleFunc("GET /favicon.ico", favicon)
 	root.HandleFunc("GET /sw.js", serveEmbedded("static/js/sw.js", "text/javascript; charset=utf-8"))
 	root.HandleFunc("GET /offline", serveEmbedded("static/offline.html", "text/html; charset=utf-8"))
+
+	// The bearer-auth JSON API. It bypasses the cookie session, CSRF and
+	// cross-origin stack (an API client sends no cookies) but still runs behind
+	// originVerify and the security headers in the outer chain.
+	root.HandleFunc("POST /api/v1/molts", app.apiAuthenticate(store.ScopeWriteMolts, app.apiCreateMolt))
 	for old := range legacyRedirects {
 		root.HandleFunc(old, redirectLegacy)
 		root.HandleFunc(old+"/", redirectLegacy)

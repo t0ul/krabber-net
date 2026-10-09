@@ -213,6 +213,51 @@ resource "aws_iam_role_policy" "mail_forward" {
 }
 
 # ---------------------------------------------------------------------------
+# @scuttle news bot Lambda
+# ---------------------------------------------------------------------------
+
+resource "aws_iam_role" "scuttle" {
+  name               = "krabber-scuttle"
+  description        = "Execution role for the @scuttle tide-and-weather bot."
+  assume_role_policy = data.aws_iam_policy_document.canary_trust.json
+}
+
+data "aws_iam_policy_document" "scuttle" {
+  # The bot's Krabber API key, and nothing else in Parameter Store.
+  statement {
+    sid       = "ApiKey"
+    actions   = ["ssm:GetParameter"]
+    resources = ["arn:aws:ssm:${var.region}:${local.account_id}:parameter/krabber/scuttle/api-key"]
+  }
+
+  statement {
+    sid       = "DecryptApiKey"
+    actions   = ["kms:Decrypt"]
+    resources = ["*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "kms:ViaService"
+      values   = ["ssm.${var.region}.amazonaws.com"]
+    }
+  }
+
+  statement {
+    sid     = "Logs"
+    actions = ["logs:CreateLogStream", "logs:PutLogEvents"]
+    resources = [
+      "arn:aws:logs:${var.region}:${local.account_id}:log-group:/aws/lambda/krabber-scuttle:*",
+    ]
+  }
+}
+
+resource "aws_iam_role_policy" "scuttle" {
+  name   = "krabber-scuttle"
+  role   = aws_iam_role.scuttle.id
+  policy = data.aws_iam_policy_document.scuttle.json
+}
+
+# ---------------------------------------------------------------------------
 # Uptime canary Lambda
 # ---------------------------------------------------------------------------
 

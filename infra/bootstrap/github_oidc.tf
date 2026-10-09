@@ -277,6 +277,7 @@ data "aws_iam_policy_document" "gha_deploy_iam_and_guards" {
       aws_iam_role.eb_instance.arn,
       aws_iam_role.canary.arn,
       aws_iam_role.mail_forward.arn,
+      aws_iam_role.scuttle.arn,
     ]
 
     condition {
