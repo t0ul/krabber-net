@@ -521,6 +521,27 @@ Disallow: /trench
 Disallow: /search
 Disallow: /molt/report/
 Disallow: /molt/likes/
+
+# AI training and LLM scrapers aren't welcome anywhere. Advisory only: the
+# well-behaved ones honor this, the rest are caught by the WAF rate and
+# anonymous-IP rules (infra/prod/edge.tf).
+User-agent: GPTBot
+User-agent: ChatGPT-User
+User-agent: OAI-SearchBot
+User-agent: ClaudeBot
+User-agent: anthropic-ai
+User-agent: Claude-Web
+User-agent: CCBot
+User-agent: Google-Extended
+User-agent: PerplexityBot
+User-agent: Bytespider
+User-agent: Amazonbot
+User-agent: Applebot-Extended
+User-agent: Meta-ExternalAgent
+User-agent: Diffbot
+User-agent: Omgilibot
+User-agent: YouBot
+Disallow: /
 `
 
 // serveEmbedded serves one embedded file at a root path: the service worker
