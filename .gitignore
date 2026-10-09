@@ -51,4 +51,5 @@ override.tf.json
 # Editor/IDE/OS
 .idea/
 .vscode/
+.cursor/
 .DS_Store
