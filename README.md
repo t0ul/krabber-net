@@ -102,3 +102,13 @@ make deploy               # checks, ships the pushed commit, waits until healthy
 make public-check   # nothing private tracked or anywhere in the history
 make hooks          # run that check before every git push
 ```
+
+## License and credits
+
+Krabber is licensed under the [GNU General Public License v2.0](LICENSE).
+
+Krabber is a Go port of [Crabber](https://github.com/crabber-net/crabber)
+([crabber.net](https://crabber.net)), an open-source Flask application, which is
+itself GPL-2.0. Krabber keeps that license and credits Crabber's original
+authors. It is a separate, independent project — not affiliated with or endorsed
+by the Crabber maintainers — and its name, logo and icons are its own.
