@@ -88,6 +88,35 @@ func TestCreateMoltCapsTags(t *testing.T) {
 	}
 }
 
+func TestListAPIKeysReportsLastUsed(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+	c := mustCrab(t, s, "keyowner")
+
+	_, key, err := s.CreateAPIKey(ctx, c, "k", []string{ScopeWriteMolts})
+	if err != nil {
+		t.Fatal(err)
+	}
+	keys, err := s.ListAPIKeys(ctx, c.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(keys) != 1 || keys[0].LastUsedAt != 0 {
+		t.Fatalf("new key should be unused: %+v", keys)
+	}
+
+	if err := s.TouchAPIKey(ctx, key); err != nil {
+		t.Fatal(err)
+	}
+	keys, err = s.ListAPIKeys(ctx, c.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(keys) != 1 || keys[0].LastUsedAt == 0 {
+		t.Fatalf("list should report last-used after a touch: %+v", keys)
+	}
+}
+
 func TestCrabEmailAndUsernameAreUnique(t *testing.T) {
 	s := newTestStore(t)
 	ctx := context.Background()

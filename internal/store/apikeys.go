@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -148,10 +149,23 @@ func (s *Store) ListAPIKeys(ctx context.Context, crabID string) ([]APIKey, error
 	}
 	out := make([]APIKey, 0, len(items))
 	for _, it := range items {
-		out = append(out, APIKey{
+		k := APIKey{
 			ID: it.ID, CrabID: crabID, Name: it.Name,
 			Scopes: it.Scopes, CreatedAt: it.CreatedAt, Revoked: it.Revoked,
-		})
+		}
+		// Last-used is recorded on the hashed lookup item, not this list copy,
+		// so read it from there. A revoked key has no lookup item left.
+		if !it.Revoked {
+			var lookup APIKey
+			switch err := s.getItem(ctx, apiKeyPK(it.Hash), apiKeySK(), &lookup); {
+			case errors.Is(err, ErrNotFound):
+			case err != nil:
+				return nil, fmt.Errorf("list api keys: %w", err)
+			default:
+				k.LastUsedAt = lookup.LastUsedAt
+			}
+		}
+		out = append(out, k)
 	}
 	return out, nil
 }

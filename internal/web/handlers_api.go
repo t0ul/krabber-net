@@ -133,6 +133,12 @@ func (app *App) apiCreateMolt(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	app.publish(r, m, "")
+	// A bot made with krabctl is written straight to the table, so this running
+	// instance's krab directory won't know it until the next hourly reload, and
+	// its molts would show the default avatar until then. Registering the author
+	// here resolves their avatar from the first molt. putCrab replaces by id, so
+	// it's a no-op for an author the directory already has.
+	app.dir.putCrab(*c)
 	apiJSON(w, http.StatusCreated, map[string]string{
 		"id":  m.ID,
 		"url": app.cfg.BaseURL.JoinPath("molt", "view", m.ID).String(),

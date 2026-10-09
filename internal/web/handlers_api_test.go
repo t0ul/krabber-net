@@ -76,7 +76,10 @@ func TestAPICreateMolt(t *testing.T) {
 	if st != http.StatusOK {
 		t.Fatalf("molt page: %d", st)
 	}
-	for _, want := range []string{"high tide 6:42a", "scuttle", `/krabtag/nyc`} {
+	// The bot was created straight in the store, so this also checks the API
+	// post registered it in the directory: its molt shows its generated avatar,
+	// not the default image.
+	for _, want := range []string{"high tide 6:42a", "scuttle", `/krabtag/nyc`, "/avatar/" + bot.Avatar + ".svg"} {
 		if !strings.Contains(page, want) {
 			t.Fatalf("molt page missing %q", want)
 		}
