@@ -1,6 +1,6 @@
-# CloudFront + WAF + TLS + DNS (PLAN.md sections 1, 3.4 and 7.2). Only
+# CloudFront + WAF + TLS + DNS (PLAN.md sections 1, 3.4 and 7.2). Sticks to
 # features the flat-rate Free plan allows: managed cache and origin request
-# policies, at most 5 WAF rules, no real-time logs.
+# policies, AWS-vendored WAF rule groups, no real-time logs.
 
 locals {
   www = "www.${var.domain}"
@@ -45,7 +45,8 @@ resource "aws_acm_certificate_validation" "site" {
 }
 
 # ---------------------------------------------------------------------------
-# WAF: exactly 5 rules, the Free plan's limit
+# WAF: 7 rules. geo-block and anonymous-ip were added past the old 5-rule
+# budget (~$1/rule/month extra each; the AWS managed groups themselves are free).
 # ---------------------------------------------------------------------------
 
 resource "aws_wafv2_web_acl" "site" {
@@ -58,11 +59,34 @@ resource "aws_wafv2_web_acl" "site" {
     allow {}
   }
 
-  # 1. Maintenance switch: matches everything; counts normally, blocks when
+  # 1. Geo-block: drop whole countries we never expect real krabs from, before
+  #    any rate rule spends budget evaluating them. Add ISO codes as needed.
+  rule {
+    name     = "geo-block"
+    priority = 0
+
+    action {
+      block {}
+    }
+
+    statement {
+      geo_match_statement {
+        country_codes = ["LT"]
+      }
+    }
+
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "geo-block"
+      sampled_requests_enabled   = true
+    }
+  }
+
+  # 2. Maintenance switch: matches everything; counts normally, blocks when
   #    maintenance_mode is on.
   rule {
     name     = "maintenance"
-    priority = 0
+    priority = 1
 
     action {
       dynamic "count" {
@@ -96,10 +120,10 @@ resource "aws_wafv2_web_acl" "site" {
     }
   }
 
-  # 2. Login, signup, password and resend pages: 20 requests per IP per 5 minutes.
+  # 3. Login, signup, password and resend pages: 20 requests per IP per 5 minutes.
   rule {
     name     = "auth-rate"
-    priority = 1
+    priority = 2
 
     action {
       block {}
@@ -139,10 +163,10 @@ resource "aws_wafv2_web_acl" "site" {
     }
   }
 
-  # 3. Everything: 500 requests per IP per 5 minutes.
+  # 4. Everything: 500 requests per IP per 5 minutes.
   rule {
     name     = "all-rate"
-    priority = 2
+    priority = 3
 
     action {
       block {}
@@ -163,10 +187,10 @@ resource "aws_wafv2_web_acl" "site" {
     }
   }
 
-  # 4. Known-bad IPs.
+  # 5. Known-bad IPs.
   rule {
     name     = "ip-reputation"
-    priority = 3
+    priority = 4
 
     override_action {
       none {}
@@ -186,14 +210,14 @@ resource "aws_wafv2_web_acl" "site" {
     }
   }
 
-  # 5. Common exploits. Counting for the first week to check it doesn't break
-  #    htmx posts; then switch override_action to none {} to block.
+  # 6. Common exploits. Now blocking (no htmx-post false positives observed in
+  #    the counting period). Watch the "common" metric after any form changes.
   rule {
     name     = "common"
-    priority = 4
+    priority = 5
 
     override_action {
-      count {}
+      none {}
     }
 
     statement {
@@ -206,6 +230,31 @@ resource "aws_wafv2_web_acl" "site" {
     visibility_config {
       cloudwatch_metrics_enabled = true
       metric_name                = "common"
+      sampled_requests_enabled   = true
+    }
+  }
+
+  # 7. Anonymous/hosting-provider IPs — VPNs, Tor exit nodes and datacenters,
+  #    where scrapers run from. Honors the group's own allow-list for verified
+  #    search crawlers so Googlebot et al. still get through.
+  rule {
+    name     = "anonymous-ip"
+    priority = 6
+
+    override_action {
+      none {}
+    }
+
+    statement {
+      managed_rule_group_statement {
+        vendor_name = "AWS"
+        name        = "AWSManagedRulesAnonymousIpList"
+      }
+    }
+
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "anonymous-ip"
       sampled_requests_enabled   = true
     }
   }
