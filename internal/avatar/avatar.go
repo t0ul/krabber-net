@@ -10,7 +10,7 @@ import (
 	"fmt"
 )
 
-// Counts match docs/NOTES.md section 3.6.
+// Trait counts are fixed by the tables below.
 const (
 	Shells      = 8
 	Patterns    = 8
