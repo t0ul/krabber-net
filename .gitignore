@@ -48,6 +48,9 @@ override.tf.json
 *.tfvars
 !*.tfvars.example
 
+# Private planning docs (kept local, not published)
+docs/
+
 # Editor/IDE/OS
 .idea/
 .vscode/
