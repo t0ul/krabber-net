@@ -31,7 +31,8 @@ import (
 const usage = `usage: krabctl role <username> <admin|moderator|none>
        krabctl verify <username> <on|off>
        krabctl trophy <username> <trophy-id>
-       krabctl bot <username> <email>            create an activated bot account
+       krabctl bot <username> <email> [display] [bio]  create an activated bot account
+       krabctl profile <username> <display> [bio]       set a crab's display name (and bio)
        krabctl apikey <username> <name> [scope]  mint an API key (shown once); default scope write:molts
        krabctl apikeys <username>                list a crab's API keys
        krabctl apikey-revoke <username> <key-id> stop a key working`
@@ -60,6 +61,8 @@ func main() {
 		runModeration(ctx, s, table, args)
 	case "bot":
 		runBot(ctx, s, table, args)
+	case "profile":
+		runProfile(ctx, s, args)
 	case "apikey":
 		runAPIKey(ctx, s, args)
 	case "apikeys":
@@ -139,10 +142,17 @@ func runModeration(ctx context.Context, s *store.Store, table string, args []str
 // the web (its password is random and discarded); it posts through the API with
 // a key from `krabctl apikey`.
 func runBot(ctx context.Context, s *store.Store, table string, args []string) {
-	if len(args) != 3 {
+	if len(args) < 3 || len(args) > 5 {
 		log.Fatal(usage)
 	}
 	name, email := args[1], args[2]
+	display, bio := "", ""
+	if len(args) >= 4 {
+		display = args[3]
+	}
+	if len(args) == 5 {
+		bio = args[4]
+	}
 
 	secret := make([]byte, 32)
 	if _, err := rand.Read(secret); err != nil {
@@ -163,14 +173,37 @@ func runBot(ctx context.Context, s *store.Store, table string, args []string) {
 	if err := s.ActivateCrab(ctx, c.ID); err != nil {
 		log.Fatal(err)
 	}
-	if err := s.UpdateProfile(ctx, c, store.Profile{
-		DisplayName: "The Daily Scuttle",
-		Bio:         "A bot that reads the Manhattan tide and sky. Posts through the Krabber API.",
-	}); err != nil {
-		log.Printf("warning: created but bio not set: %v", err)
+	// Set the display name / bio only if given; otherwise the crab shows as
+	// @username. (No hardcoded default, so bots aren't all named alike.)
+	if display != "" || bio != "" {
+		if err := s.UpdateProfile(ctx, c, store.Profile{DisplayName: display, Bio: bio}); err != nil {
+			log.Printf("warning: created but profile not set: %v", err)
+		}
 	}
 	fmt.Printf("@%s (%s) in %s: bot account created and activated\n", c.UserName, c.ID, table)
 	fmt.Printf("next: krabctl apikey %s \"%s bot\"\n", name, name)
+}
+
+// runProfile sets a crab's display name (and optionally bio), preserving the
+// rest of the profile.
+func runProfile(ctx context.Context, s *store.Store, args []string) {
+	if len(args) != 3 && len(args) != 4 {
+		log.Fatal(usage)
+	}
+	name, display := args[1], args[2]
+	c, err := s.CrabByUsername(ctx, name)
+	if err != nil {
+		log.Fatalf("find %q: %v", name, err) //nolint:gosec // the operator's own arguments
+	}
+	p := c.Profile // keep existing bio/location/website/fun facts
+	p.DisplayName = display
+	if len(args) == 4 {
+		p.Bio = args[3]
+	}
+	if err := s.UpdateProfile(ctx, c, p); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("@%s: display name set to %q\n", c.UserName, display)
 }
 
 // runAPIKey mints a key and prints it once.
