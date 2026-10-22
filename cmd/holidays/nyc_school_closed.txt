@@ -1,0 +1,31 @@
+# NYC public-school closure dates — @holidays reads this for its %nyc heads-ups.
+#
+# One closure per line:  YYYY-MM-DD  Label
+# Blank lines and lines starting with # are ignored.
+#
+# SOURCE: the official NYC Public Schools calendar, https://www.schools.nyc.gov/calendar
+# There is no machine-readable feed, so these are transcribed by hand and MUST be
+# refreshed each school year. Dates that are also U.S. federal holidays are left
+# out here — @holidays posts those from its built-in federal calendar (%fed).
+#
+# GAP: this only covers SCHEDULED closures. Snow days and emergency closures are
+# announced same-day by the DOE and are not in here.
+#
+# VERIFY these against schools.nyc.gov/calendar before trusting them.
+
+# --- 2026-2027 school year (classes begin 2026-09-10) ---
+2026-09-21  Yom Kippur
+2026-11-27  Day after Thanksgiving
+2026-12-24  Winter recess
+2026-12-28  Winter recess
+2026-12-29  Winter recess
+2026-12-30  Winter recess
+2026-12-31  Winter recess
+2027-02-16  Midwinter recess
+2027-02-17  Midwinter recess
+2027-02-18  Midwinter recess
+2027-02-19  Midwinter recess
+
+# Not yet transcribed (confirm dates on the official calendar before adding):
+#   Rosh Hashanah, Diwali, Lunar New Year, Eid al-Fitr, Good Friday, Spring recess,
+#   Chancellor's/Clerical days, Anniversary (Brooklyn-Queens) Day.

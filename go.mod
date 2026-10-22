@@ -5,6 +5,7 @@ go 1.26.0
 toolchain go1.26.8
 
 require (
+	github.com/MobilityData/gtfs-realtime-bindings/golang/gtfs v1.0.0
 	github.com/alexedwards/scs/v2 v2.9.0
 	github.com/aws/aws-lambda-go v1.55.1
 	github.com/aws/aws-sdk-go-v2 v1.47.1
@@ -23,6 +24,7 @@ require (
 	github.com/segmentio/ksuid v1.0.4
 	golang.org/x/crypto v0.57.0
 	golang.org/x/net v0.59.0
+	google.golang.org/protobuf v1.36.12
 )
 
 require (

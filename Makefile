@@ -69,6 +69,31 @@ lambdas: ## Lambda bundles Terraform deploys (dist/*.zip), built reproducibly
 		-o dist/lambda/scuttle/bootstrap ./cmd/scuttle
 	touch -t 202001010000 dist/lambda/scuttle/bootstrap
 	rm -f dist/scuttle.zip && cd dist/lambda/scuttle && zip -X -q ../../scuttle.zip bootstrap
+	mkdir -p dist/lambda/gm
+	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags="-s -w -buildid=" -tags lambda.norpc \
+		-o dist/lambda/gm/bootstrap ./cmd/gm
+	touch -t 202001010000 dist/lambda/gm/bootstrap
+	rm -f dist/gm.zip && cd dist/lambda/gm && zip -X -q ../../gm.zip bootstrap
+	mkdir -p dist/lambda/barnacle
+	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags="-s -w -buildid=" -tags lambda.norpc \
+		-o dist/lambda/barnacle/bootstrap ./cmd/barnacle
+	touch -t 202001010000 dist/lambda/barnacle/bootstrap
+	rm -f dist/barnacle.zip && cd dist/lambda/barnacle && zip -X -q ../../barnacle.zip bootstrap
+	mkdir -p dist/lambda/holidays
+	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags="-s -w -buildid=" -tags lambda.norpc \
+		-o dist/lambda/holidays/bootstrap ./cmd/holidays
+	touch -t 202001010000 dist/lambda/holidays/bootstrap
+	rm -f dist/holidays.zip && cd dist/lambda/holidays && zip -X -q ../../holidays.zip bootstrap
+	mkdir -p dist/lambda/ferry
+	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags="-s -w -buildid=" -tags lambda.norpc \
+		-o dist/lambda/ferry/bootstrap ./cmd/ferry
+	touch -t 202001010000 dist/lambda/ferry/bootstrap
+	rm -f dist/ferry.zip && cd dist/lambda/ferry && zip -X -q ../../ferry.zip bootstrap
+	mkdir -p dist/lambda/bus
+	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags="-s -w -buildid=" -tags lambda.norpc \
+		-o dist/lambda/bus/bootstrap ./cmd/bus
+	touch -t 202001010000 dist/lambda/bus/bootstrap
+	rm -f dist/bus.zip && cd dist/lambda/bus && zip -X -q ../../bus.zip bootstrap
 
 plan: lambdas ## Plan prod (AWS_PROFILE=krabber-admin after aws login); writes infra/prod/prod.tfplan
 	$(TF_PROD) init -input=false

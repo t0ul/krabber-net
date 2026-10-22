@@ -258,6 +258,61 @@ resource "aws_iam_role_policy" "scuttle" {
 }
 
 # ---------------------------------------------------------------------------
+# Compose-and-post bots (@gm, @barnacle, @holidays). Same shape as @scuttle:
+# read one SSM key, decrypt it, write logs. No table or feed access. Add a bot
+# by adding its name here and a block in infra/prod/bots.tf.
+# ---------------------------------------------------------------------------
+
+locals {
+  post_bots = toset(["gm", "barnacle", "holidays", "ferry", "bus"])
+}
+
+resource "aws_iam_role" "bot" {
+  for_each           = local.post_bots
+  name               = "krabber-${each.key}"
+  description        = "Execution role for the @${each.key} Krabber bot."
+  assume_role_policy = data.aws_iam_policy_document.canary_trust.json
+}
+
+data "aws_iam_policy_document" "bot" {
+  for_each = local.post_bots
+
+  # The bot's Krabber API key, and nothing else in Parameter Store.
+  statement {
+    sid       = "ApiKey"
+    actions   = ["ssm:GetParameter"]
+    resources = ["arn:aws:ssm:${var.region}:${local.account_id}:parameter/krabber/${each.key}/api-key"]
+  }
+
+  statement {
+    sid       = "DecryptApiKey"
+    actions   = ["kms:Decrypt"]
+    resources = ["*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "kms:ViaService"
+      values   = ["ssm.${var.region}.amazonaws.com"]
+    }
+  }
+
+  statement {
+    sid     = "Logs"
+    actions = ["logs:CreateLogStream", "logs:PutLogEvents"]
+    resources = [
+      "arn:aws:logs:${var.region}:${local.account_id}:log-group:/aws/lambda/krabber-${each.key}:*",
+    ]
+  }
+}
+
+resource "aws_iam_role_policy" "bot" {
+  for_each = local.post_bots
+  name     = "krabber-${each.key}"
+  role     = aws_iam_role.bot[each.key].id
+  policy   = data.aws_iam_policy_document.bot[each.key].json
+}
+
+# ---------------------------------------------------------------------------
 # Uptime canary Lambda
 # ---------------------------------------------------------------------------
 
