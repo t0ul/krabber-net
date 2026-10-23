@@ -50,7 +50,7 @@ func main() { botkit.Run("barnacle", compose) }
 func compose(ctx context.Context) (string, error) {
 	now := time.Now().In(nyLoc())
 	q := prompts[now.YearDay()%len(prompts)]
-	return botkit.Fit("🦞 Shell Prompt: "+q+" Reply in a molt.", "🦞 Shell Prompt: "+q), nil
+	return botkit.Fit("🐚 Shell Prompt: "+q+" Reply in a molt.", "🐚 Shell Prompt: "+q), nil
 }
 
 func nyLoc() *time.Location {
