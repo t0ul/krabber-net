@@ -2947,6 +2947,20 @@ func TestFormsRequired(t *testing.T) {
 		!strings.Contains(body, "Three lines.") || !strings.Contains(body, "kb-rule-advice") {
 		t.Error("the required-mode picker should drop the Note, preselect haiku and show its rules")
 	}
+	// A plain note can't be the default either; one chosen before the switch
+	// falls back to a haiku.
+	if _, body, _ := h.get("/settings"); strings.Contains(body, `<option value="note"`) || !strings.Contains(body, `<option value="haiku" selected`) {
+		t.Error("required mode should offer no plain note as a default")
+	}
+	if status, _, _ := h.post("/settings/writing", url.Values{"csrf_token": {tok}, "default_form": {"note"}}); status != http.StatusBadRequest {
+		t.Errorf("a note default in required mode: %d", status)
+	}
+	if err := h.store.SetDefaultForm(context.Background(), currentCrabByName(t, h, "basho"), store.FormNote); err != nil {
+		t.Fatal(err)
+	}
+	if _, body, _ := h.get("/trench"); !strings.Contains(body, `<option value="haiku" selected`) {
+		t.Error("a note default should fall back to a haiku when forms are required")
+	}
 	if _, body, _ := h.get("/forms"); strings.Contains(body, "has no rules") || !strings.Contains(body, "no plain notes") {
 		t.Error("the forms page should say there are no plain notes")
 	}
@@ -2996,13 +3010,17 @@ func TestFormsRequired(t *testing.T) {
 		t.Errorf("editing into a plain molt: %d %s", status, body)
 	}
 
-	// The API gets the same answer in its error body.
+	// The API gets the same answer in its error body when it asks for a plain
+	// note; a body that names no form takes the krab's default, a haiku.
 	key, _, err := h.store.CreateAPIKey(context.Background(), currentCrabByName(t, h, "basho"), "verse bot", []string{store.ScopeWriteMolts})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if status, body := h.apiPost("/api/v1/molts", key, `{"text":"just a thought"}`); status != http.StatusUnprocessableEntity || !strings.Contains(body, `{"error":"Pick a form."}`) {
+	if status, body := h.apiPost("/api/v1/molts", key, `{"text":"just a thought","form":""}`); status != http.StatusUnprocessableEntity || !strings.Contains(body, `{"error":"Pick a form."}`) {
 		t.Errorf("API plain molt: %d %s", status, body)
+	}
+	if status, body := h.apiPost("/api/v1/molts", key, `{"text":"just a thought"}`); status != http.StatusUnprocessableEntity || !strings.Contains(body, "Not quite a haiku yet") {
+		t.Errorf("API with no form named: %d %s", status, body)
 	}
 	if status, body := h.apiPost("/api/v1/molts", key, `{"text":"low tide at sunrise\na krab raises one wet claw\nhello to the gulls","form":"haiku"}`); status != http.StatusCreated {
 		t.Errorf("API haiku: %d %s", status, body)
@@ -3012,8 +3030,8 @@ func TestFormsRequired(t *testing.T) {
 	}
 }
 
-// TestFormsOptional is today's behaviour, the default: a plain note is fine
-// and the welcome page keeps its copy.
+// TestFormsOptional is the default: a plain note is fine (the composer
+// starts on a haiku, but offers the note) and the welcome page keeps its copy.
 func TestFormsOptional(t *testing.T) {
 	h := newHarness(t)
 	if _, body, _ := h.get("/"); !strings.Contains(body, "dumb blogging platform powered by krabs") || strings.Contains(body, "every molt is a poem") {
@@ -3022,13 +3040,103 @@ func TestFormsOptional(t *testing.T) {
 	h.signupAndActivate("basho", "basho@krabber.test", "old-silent-pond")
 	h.login("basho@krabber.test", "old-silent-pond")
 	tok := h.csrf("/trench")
-	if _, body, _ := h.get("/trench"); !strings.Contains(body, `<option value="" selected`) || strings.Contains(body, `<option value="haiku" selected`) || strings.Contains(body, "Three lines.") {
-		t.Error("the default picker should start on a plain Note, with no rules showing")
+	if _, body, _ := h.get("/trench"); !strings.Contains(body, `<option value="" data-max`) || !strings.Contains(body, `<option value="haiku" selected`) {
+		t.Error("the default picker should offer a plain Note and start on a haiku")
 	}
 	if _, body, _ := h.get("/forms"); !strings.Contains(body, "has no rules") {
 		t.Error("the forms page should still explain the plain note")
 	}
 	if status, _, _ := h.post("/molt/create", url.Values{"csrf_token": {tok}, "content": {"just a thought"}}, "HX-Request", "true"); status != http.StatusOK {
 		t.Errorf("a plain molt: %d", status)
+	}
+}
+
+// TestDefaultForm: every krab's molts start as a haiku unless they pick
+// another form, or a plain note, in their settings. Any molt can still take
+// another form, and an API post that names no form takes the krab's default.
+func TestDefaultForm(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	h.signupAndActivate("basho", "basho@krabber.test", "old-silent-pond")
+	h.login("basho@krabber.test", "old-silent-pond")
+	tok := h.csrf("/trench")
+
+	// Out of the box: a haiku, rules showing, with the plain note still offered.
+	if _, body, _ := h.get("/trench"); !strings.Contains(body, `<option value="haiku" selected`) || !strings.Contains(body, `<option value="" data-max`) || !strings.Contains(body, "Three lines.") {
+		t.Error("a new krab's composer should start on a haiku and still offer a note")
+	}
+	if _, body, _ := h.get("/settings"); !strings.Contains(body, `name="default_form"`) || !strings.Contains(body, `<option value="haiku" selected`) || !strings.Contains(body, `<option value="note"`) {
+		t.Error("the settings page should offer the default form, haiku selected")
+	}
+
+	// Any molt can be something else.
+	couplet := "The tide goes out, the tide comes in,\nthe krab just sits and wears a grin."
+	if status, body, _ := h.post("/molt/create", url.Values{"csrf_token": {tok}, "content": {couplet}, "form": {"couplet"}}, "HX-Request", "true"); status != http.StatusOK {
+		t.Fatalf("a couplet: %d %s", status, body)
+	}
+	molts, _ := h.store.MoltsByOwner(ctx, currentID(t, h, "basho"), 1)
+	coupletID := molts[0].ID
+
+	// Plain notes by default.
+	if status, _, hdr := h.post("/settings/writing", url.Values{"csrf_token": {tok}, "default_form": {"note"}}); status != http.StatusSeeOther || hdr.Get("Location") != "/settings" {
+		t.Errorf("choosing notes: %d", status)
+	}
+	if c := currentCrabByName(t, h, "basho"); c.DefaultForm != store.FormNote {
+		t.Errorf("stored default %q", c.DefaultForm)
+	}
+	if _, body, _ := h.get("/trench"); !strings.Contains(body, `<option value="" selected`) || strings.Contains(body, "Three lines.") {
+		t.Error("the composer should start on a plain note, no rules showing")
+	}
+	if _, body, _ := h.get("/settings"); !strings.Contains(body, `<option value="note" selected`) {
+		t.Error("the settings page should show the note chosen")
+	}
+
+	// Couplets by default: the composer, the reply box and a fresh quote all start on one.
+	if status, _, _ := h.post("/settings/writing", url.Values{"csrf_token": {tok}, "default_form": {"couplet"}}); status != http.StatusSeeOther {
+		t.Errorf("choosing couplets: %d", status)
+	}
+	if _, body, _ := h.get("/trench"); !strings.Contains(body, `<option value="couplet" selected`) || !strings.Contains(body, "Two lines.") {
+		t.Error("the composer should start on a couplet, rules showing")
+	}
+	if _, body, _ := h.get("/molt/view/" + coupletID); !strings.Contains(body, `<option value="couplet" selected`) {
+		t.Error("the reply box should start on a couplet")
+	}
+	if _, body, _ := h.get("/molt/quote/" + coupletID); !strings.Contains(body, `<option value="couplet" selected`) || !strings.Contains(body, "Two lines.") {
+		t.Error("a fresh quote should start on a couplet")
+	}
+	// Editing keeps the molt's own form, whatever the default.
+	if _, body, _ := h.get("/molt/edit/" + coupletID); !strings.Contains(body, `<option value="couplet" selected`) {
+		t.Error("the edit form should keep the molt's form")
+	}
+
+	// Not a form: refused, and the default stays.
+	for _, bad := range []string{"sestina", ""} {
+		if status, _, _ := h.post("/settings/writing", url.Values{"csrf_token": {tok}, "default_form": {bad}}); status != http.StatusBadRequest {
+			t.Errorf("default %q: %d", bad, status)
+		}
+	}
+	if c := currentCrabByName(t, h, "basho"); c.DefaultForm != "couplet" {
+		t.Errorf("stored default %q", c.DefaultForm)
+	}
+
+	// The API: a post that names no form takes the krab's default; "" is a plain note.
+	key, _, err := h.store.CreateAPIKey(ctx, currentCrabByName(t, h, "basho"), "verse bot", []string{store.ScopeWriteMolts})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status, body := h.apiPost("/api/v1/molts", key, `{"text":"just a thought"}`); status != http.StatusUnprocessableEntity || !strings.Contains(body, "Not quite a couplet yet") {
+		t.Errorf("API with no form: %d %s", status, body)
+	}
+	if status, body := h.apiPost("/api/v1/molts", key, `{"text":"The tide goes out, the tide comes in,\nthe krab just sits and wears a grin."}`); status != http.StatusCreated {
+		t.Errorf("API couplet by default: %d %s", status, body)
+	}
+	if molts, _ := h.store.MoltsByOwner(ctx, currentID(t, h, "basho"), 1); molts[0].Form != "couplet" {
+		t.Errorf("the API molt's form is %q, not the default", molts[0].Form)
+	}
+	if status, body := h.apiPost("/api/v1/molts", key, `{"text":"just a thought","form":""}`); status != http.StatusCreated {
+		t.Errorf("API plain note: %d %s", status, body)
+	}
+	if molts, _ := h.store.MoltsByOwner(ctx, currentID(t, h, "basho"), 1); molts[0].Form != "" {
+		t.Errorf("the API note's form is %q", molts[0].Form)
 	}
 }

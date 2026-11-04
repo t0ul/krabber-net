@@ -61,6 +61,7 @@ func (app *App) Routes() http.Handler {
 	mux.HandleFunc("POST /settings/profile", app.requireAuthentication(app.settingsProfilePost))
 	mux.HandleFunc("POST /settings/avatar", app.requireAuthentication(app.settingsAvatarPost))
 	mux.HandleFunc("POST /settings/content", app.requireAuthentication(app.settingsContentPost))
+	mux.HandleFunc("POST /settings/writing", app.requireAuthentication(app.settingsWritingPost))
 	mux.HandleFunc("POST /settings/username", app.requireAuthentication(app.settingsUsernamePost))
 	mux.HandleFunc("POST /settings/appearance", app.requireAuthentication(app.settingsAppearancePost))
 	mux.HandleFunc("POST /settings/password", app.requireAuthentication(app.settingsPasswordPost))

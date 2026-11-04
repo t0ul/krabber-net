@@ -1,6 +1,6 @@
 // Package botkit is the shared spine for the Krabber bots (@gm, @barnacle,
 // @holidays, …). Each bot is a tiny cmd/<bot> that composes one molt's text
-// in a writing form (a couplet, a three-panel joke); botkit checks the text
+// in a writing form (a haiku, like every krab's molts by default); botkit checks the text
 // against the form's rules, handles reading the API key from SSM (or API_KEY
 // locally), posting to the Krabber API with the bearer key, and the
 // Lambda-vs-local run modes. This mirrors how cmd/scuttle works, without

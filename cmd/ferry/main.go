@@ -1,10 +1,9 @@
 // Command ferry is the @ferry Krabber bot: a heads-up on NYC Ferry service
 // changes. It reads the keyless NYC Ferry GTFS-realtime alerts feed and posts
-// one molt for the alerts in effect right now, as an envelope poem: the
-// announcement, the routes, the headline, and the announcement again, the
-// way a pier's loudspeaker repeats itself. The ferry network is small, so
-// by default it watches every route; ROUTES can narrow it. No active alert
-// means no molt.
+// one molt for the alerts in effect right now, as a haiku (every krab's
+// molts start as one): the announcement, the routes, the headline. The ferry
+// network is small, so by default it watches every route; ROUTES can narrow
+// it. No active alert means no molt.
 package main
 
 import (
@@ -22,8 +21,8 @@ const (
 	defaultFeed = "http://nycferry.connexionz.net/rtt/public/utility/gtfsrealtime.aspx/alert"
 	maxRoutes   = 4
 	tag         = "%ferry"
-	form        = "envelope" // the writing form every @ferry molt takes
-	lead        = "⛴️ NYC Ferry service change."
+	form        = "haiku" // the writing form every @ferry molt takes
+	lead        = "⛴️ NYC Ferry service change"
 )
 
 // routeNames maps NYC Ferry route codes to readable names; unknown codes show
@@ -57,20 +56,20 @@ func compose(ctx context.Context) (string, error) {
 	return announce(routes, headline), nil
 }
 
-// announce lays the alert out as an envelope: the announcement, the routes,
-// the headline with the tag, and the announcement again. The headline is cut
-// to keep the whole molt within MoltMax; the lines are never dropped.
+// announce lays the alert out as a haiku: the announcement, the routes, the
+// headline with the tag. The headline is cut to keep the molt within
+// MoltMax; the lines are never dropped.
 func announce(routes []string, headline string) string {
-	where := "Every route."
+	where := "every route"
 	if names := friendly(routes); names != "" {
-		where = names + "."
+		where = names
 	}
 	headline = strings.Join(strings.Fields(headline), " ")
 	if headline == "" {
-		headline = "Check the app before you board."
+		headline = "check the app before you board"
 	}
-	budget := botkit.MoltMax - 2*utf8.RuneCountInString(lead) - utf8.RuneCountInString(where) - utf8.RuneCountInString(tag) - 4 // three newlines and a space
-	return lead + "\n" + where + "\n" + botkit.Truncate(headline, budget) + " " + tag + "\n" + lead
+	budget := botkit.MoltMax - utf8.RuneCountInString(lead) - utf8.RuneCountInString(where) - utf8.RuneCountInString(tag) - 3 // two newlines and a space
+	return lead + "\n" + where + "\n" + botkit.Truncate(headline, budget) + " " + tag
 }
 
 // friendly turns route codes into a readable, capped list ("East River, Astoria").

@@ -97,6 +97,24 @@
         <button type="submit" class="btn btn-outline-light rounded-pill">Save</button>
     </form>
 
+    <form class="px-3 py-3 border-bottom border-dark kb-settings" method="POST" action="/settings/writing">
+        <input type='hidden' name='csrf_token' value='{{ .CSRFToken }}'>
+        <h2 class="h6 font-weight-bold mb-3">Writing</h2>
+        <div class="form-group">
+            <label for="default-form">Your molts start as</label>
+            <select name="default_form" id="default-form" class="custom-select">
+                {{ if not .FormsRequired }}<option value="{{ noteForm }}"{{ if eq .StartForm "" }} selected{{ end }}>Note</option>{{ end }}
+                {{ range formGroups }}{{ $group := . }}{{ with pickable $group $.FormsRequired }}
+                <optgroup label="{{ $group }}">
+                    {{ range . }}<option value="{{ .ID }}"{{ if eq $.StartForm .ID }} selected{{ end }}>{{ .Name }}</option>{{ end }}
+                </optgroup>
+                {{ end }}{{ end }}
+            </select>
+            <small class="form-text text-muted">A haiku, unless you say otherwise: every composer starts on it, and you can pick another form for any molt. <a href="/forms">How the forms work.</a></small>
+        </div>
+        <button type="submit" class="btn btn-outline-light rounded-pill">Save</button>
+    </form>
+
     {{ with .Form }}{{ if .InviteCode }}
     <div class="px-3 py-3 border-bottom border-dark kb-settings" id="invites">
         <h2 class="h6 font-weight-bold mb-3">Invite friends</h2>

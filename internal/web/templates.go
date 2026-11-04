@@ -40,6 +40,7 @@ type templateData struct {
 	SignupMode       string // config.SignupOpen, SignupInvite or SignupClosed
 	SignupFull       bool   // MAX_KRABS reached
 	FormsRequired    bool   // MOLT_FORMS=required: every molt takes a writing form
+	StartForm        string // the form the krab's composers start on; "" for a plain note
 	Description      string // the page's <meta name="description">, when it has one
 	Form             any
 	Query            string
@@ -257,6 +258,7 @@ var templateFuncs = template.FuncMap{
 	"verse":          verse,
 	"folded":         folded,
 	"freshCheck":     freshCheck,
+	"noteForm":       func() string { return store.FormNote },
 }
 
 func avatarSrc(code string) string {
@@ -360,6 +362,7 @@ func (app *App) newTemplateData(r *http.Request) templateData {
 		d.ShowNSFW, d.MutedWords, d.Appearance = c.ShowNSFW, c.MutedWords, c.Appearance
 		d.IsAdmin = c.IsAdmin()
 		d.IsModerator = c.IsModerator()
+		d.StartForm = app.startForm(c)
 	}
 	return d
 }

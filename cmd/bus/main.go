@@ -1,9 +1,9 @@
 // Command bus is the @bus Krabber bot: a rush-hour heads-up on MTA bus service
 // changes for a watched set of Manhattan routes. It reads the keyless MTA Bus
 // GTFS-realtime alerts feed, keeps the alerts active right now on a watched
-// route, and posts one molt as an envelope poem: the announcement, the
-// routes, the headline, and the announcement again, like the recording on
-// the bus. No watched route affected means no molt.
+// route, and posts one molt as a haiku (every krab's molts start as one):
+// the announcement, the routes, the headline. No watched route affected
+// means no molt.
 //
 // FEED_URL and ROUTES (comma-separated) override the defaults below.
 package main
@@ -28,8 +28,8 @@ const (
 	defaultRoutes = "M11,M12,M20,M23,M42,M50,M57,M66,M72,M79,M104"
 	maxRoutes     = 6
 	tag           = "%bus"
-	form          = "envelope" // the writing form every @bus molt takes
-	lead          = "🚌 MTA bus service change."
+	form          = "haiku" // the writing form every @bus molt takes
+	lead          = "🚌 MTA bus service change"
 )
 
 func main() { botkit.Run("bus", form, compose) }
@@ -50,20 +50,20 @@ func compose(ctx context.Context) (string, error) {
 	return announce(routes, headline), nil
 }
 
-// announce lays the alert out as an envelope: the announcement, the routes,
-// the headline with the tag, and the announcement again. The headline is cut
-// to keep the whole molt within MoltMax; the lines are never dropped.
+// announce lays the alert out as a haiku: the announcement, the routes, the
+// headline with the tag. The headline is cut to keep the molt within
+// MoltMax; the lines are never dropped.
 func announce(routes []string, headline string) string {
 	more := ""
 	if len(routes) > maxRoutes {
 		more = fmt.Sprintf(" +%d more", len(routes)-maxRoutes)
 		routes = routes[:maxRoutes]
 	}
-	where := strings.Join(routes, ", ") + more + "."
+	where := strings.Join(routes, ", ") + more
 	headline = strings.Join(strings.Fields(headline), " ")
 	if headline == "" {
-		headline = "Check before you board."
+		headline = "check before you board"
 	}
-	budget := botkit.MoltMax - 2*utf8.RuneCountInString(lead) - utf8.RuneCountInString(where) - utf8.RuneCountInString(tag) - 4 // three newlines and a space
-	return lead + "\n" + where + "\n" + botkit.Truncate(headline, budget) + " " + tag + "\n" + lead
+	budget := botkit.MoltMax - utf8.RuneCountInString(lead) - utf8.RuneCountInString(where) - utf8.RuneCountInString(tag) - 3 // two newlines and a space
+	return lead + "\n" + where + "\n" + botkit.Truncate(headline, budget) + " " + tag
 }

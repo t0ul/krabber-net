@@ -1,9 +1,9 @@
 // Command holidays is the @holidays Krabber bot: a day-before heads-up for days
 // off. It posts when TOMORROW is a U.S. federal holiday (computed, tagged %fed)
 // and/or a scheduled NYC public-school closure (from an embedded, hand-kept list,
-// tagged %nyc). The heads-up is a three-panel joke: the day, what it means,
-// and the punchline (sleep in). If tomorrow is an ordinary day it posts
-// nothing. Scheduled once a morning.
+// tagged %nyc). The heads-up is a haiku, as every krab's molts are by
+// default: the day, what it is, and the advice (sleep in). If tomorrow is an
+// ordinary day it posts nothing. Scheduled once a morning.
 package main
 
 import (
@@ -22,7 +22,7 @@ import (
 var nycClosuresRaw string
 
 // form is the writing form every heads-up takes.
-const form = "three-panel"
+const form = "haiku"
 
 func main() { botkit.Run("holidays", form, compose) }
 
@@ -39,31 +39,22 @@ func headsUp(day time.Time) string {
 	fedName := federalHolidays(day.Year())[key]
 	nycName := nycClosures()[key]
 
+	first := fmt.Sprintf("Heads up 🦀 tomorrow (%s)", pretty)
 	switch {
 	case fedName != "" && nycName != "":
-		return panels(
-			fmt.Sprintf("Heads up 🦀 tomorrow (%s) is %s.", pretty, fedName),
-			"A federal holiday, and NYC public schools are closed.",
-			"Sleep in. %fed %nyc")
+		return haiku(first, fedName+": a federal holiday", "schools closed too, sleep in %fed %nyc")
 	case fedName != "":
-		return panels(
-			fmt.Sprintf("Heads up 🦀 tomorrow (%s) is %s.", pretty, fedName),
-			"A federal holiday: most crabs are off work.",
-			"Sleep in. %fed")
+		return haiku(first, fedName+": a federal holiday", "most crabs are off, sleep in %fed")
 	case nycName != "":
-		return panels(
-			fmt.Sprintf("Heads up 🦀 no NYC public school tomorrow (%s).", pretty),
-			fmt.Sprintf("The schools are closed: %s.", nycName),
-			"Small crabs, sleep in. %nyc")
+		return haiku(first, "no NYC public school: "+nycName, "small crabs, sleep in %nyc")
 	default:
 		return "" // ordinary day, nothing to announce
 	}
 }
 
-// panels lays out a three-panel joke: setup, build, punchline, a blank line
-// between each.
-func panels(setup, build, punchline string) string {
-	return setup + "\n\n" + build + "\n\n" + punchline
+// haiku lays three lines out as one.
+func haiku(a, b, c string) string {
+	return a + "\n" + b + "\n" + c
 }
 
 // nycClosures parses the embedded closure list into date -> label.

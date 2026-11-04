@@ -74,7 +74,7 @@ func TestHeadsUp(t *testing.T) {
 	if m := headsUp(d("2026-10-23")); m != "" {
 		t.Errorf("ordinary day should be empty, got %q", m)
 	}
-	// Every heads-up is a three-panel joke.
+	// Every heads-up is a haiku.
 	for _, day := range []string{"2026-12-25", "2026-09-21", "2026-11-26", "2026-01-19", "2026-12-28"} {
 		if m := headsUp(d(day)); m == "" {
 			t.Errorf("%s should get a heads-up", day)

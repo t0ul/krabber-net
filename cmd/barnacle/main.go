@@ -1,7 +1,8 @@
 // Command barnacle is the @barnacle Krabber bot: a daily "Shell Prompt" — one
-// light conversation starter for the reef to reply to, as a couplet: the
-// question, then a rhymed line asking for replies. Scheduled once a day
-// around midday. The prompt rotates by day of year, so the list cycles.
+// light conversation starter for the reef to reply to, as a haiku (every
+// krab's molts start as one): the title, the question, then a rhymed line
+// asking for replies. Scheduled once a day around midday. The prompt rotates
+// by day of year, so the list cycles.
 package main
 
 import (
@@ -13,10 +14,11 @@ import (
 )
 
 // form is the writing form every Shell Prompt takes.
-const form = "couplet"
+const form = "haiku"
 
-// prompts are deliberately low-stakes and answerable in a molt. Each is a
-// question and the line that asks for replies, which rhymes with it.
+// prompts are deliberately low-stakes and answerable in a molt. Each is the
+// haiku's second and third lines: a question and the line that asks for
+// replies, which rhymes with it.
 var prompts = [][2]string{
 	{"What's the best thing you ate this week?", "Reply in a molt; the reef wants a peek."},
 	{"One song on repeat right now. Go.", "Reply in a molt and let the reef know."},
@@ -57,10 +59,10 @@ func compose(ctx context.Context) (string, error) {
 	return prompt(now.YearDay()), nil
 }
 
-// prompt is the day's Shell Prompt as a couplet.
+// prompt is the day's Shell Prompt as a haiku.
 func prompt(yearDay int) string {
 	q := prompts[yearDay%len(prompts)]
-	return botkit.Fit("🐚 Shell Prompt: " + q[0] + "\n" + q[1])
+	return botkit.Fit("🐚 Shell Prompt\n" + q[0] + "\n" + q[1])
 }
 
 func nyLoc() *time.Location {

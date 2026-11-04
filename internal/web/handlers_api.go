@@ -103,17 +103,18 @@ func (app *App) apiAuthenticate(scope string, next http.HandlerFunc) http.Handle
 
 // apiCreateMolt posts a molt as the authenticated key's crab. Body:
 // {"text": "...", "nsfw": false, "form": "haiku"}; form names a writing form
-// (see /forms), checked by the same rules as the web composer. It's optional
-// unless the site requires a form (MOLT_FORMS=required), when a post without
-// one is refused with "Pick a form.".
+// (see /forms), checked by the same rules as the web composer. A body that
+// names no form takes the crab's default, a haiku unless their settings say
+// otherwise; "form": "" asks for a plain note, which a site that requires a
+// form (MOLT_FORMS=required) refuses with "Pick a form.".
 // It validates and rate-limits exactly like the web compose box, then
 // publishes through the same path.
 func (app *App) apiCreateMolt(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, maxAPIBodyBytes)
 	var in struct {
-		Text string `json:"text"`
-		NSFW bool   `json:"nsfw"`
-		Form string `json:"form"`
+		Text string  `json:"text"`
+		NSFW bool    `json:"nsfw"`
+		Form *string `json:"form"`
 	}
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
@@ -121,18 +122,22 @@ func (app *App) apiCreateMolt(w http.ResponseWriter, r *http.Request) {
 		apiError(w, http.StatusBadRequest, `body must be JSON: {"text": "..."}`)
 		return
 	}
+	c := currentCrab(r)
+	form := app.startForm(c)
+	if in.Form != nil {
+		form = *in.Form
+	}
 	in.Text = strings.ReplaceAll(in.Text, "\r\n", "\n")
-	if check := app.checkMolt(moltForm{Content: in.Text, NSFW: in.NSFW, Form: in.Form}); check.Message != "" {
+	if check := app.checkMolt(moltForm{Content: in.Text, NSFW: in.NSFW, Form: form}); check.Message != "" {
 		apiError(w, http.StatusUnprocessableEntity, check.Message)
 		return
 	}
-	c := currentCrab(r)
 	if !app.writes.allow(c.ID, "molt") {
 		w.Header().Set("Retry-After", "3600")
 		apiError(w, http.StatusTooManyRequests, "rate limit reached, try again later")
 		return
 	}
-	m, err := app.store.CreateMolt(r.Context(), c, in.Text, store.WithNSFW(in.NSFW), store.WithForm(in.Form))
+	m, err := app.store.CreateMolt(r.Context(), c, in.Text, store.WithNSFW(in.NSFW), store.WithForm(form))
 	if err != nil {
 		app.apiServerError(w, r, err)
 		return

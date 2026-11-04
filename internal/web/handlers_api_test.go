@@ -59,7 +59,7 @@ func TestAPICreateMolt(t *testing.T) {
 
 	// Happy path: the molt is created and posted as the bot.
 	status, body := h.apiPost("/api/v1/molts", writeKey,
-		`{"text":"Daily Scuttle: high tide 6:42a, low 12:58p. Sunny, 54F. %nyc"}`)
+		`{"text":"Daily Scuttle: high tide 6:42a, low 12:58p. Sunny, 54F. %nyc","form":""}`)
 	if status != http.StatusCreated {
 		t.Fatalf("create molt: %d %s", status, body)
 	}
@@ -176,7 +176,7 @@ func TestAPIKeyRevokedByPasswordChange(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if status, body := h.apiPost("/api/v1/molts", key, `{"text":"before"}`); status != http.StatusCreated {
+	if status, body := h.apiPost("/api/v1/molts", key, `{"text":"before","form":""}`); status != http.StatusCreated {
 		t.Fatalf("before password change: got %d want 201 (%s)", status, body)
 	}
 
@@ -224,7 +224,7 @@ func TestAPIMentionRespectsBlocks(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if status, body := h.apiPost("/api/v1/molts", key, `{"text":"hey @blocker"}`); status != http.StatusCreated {
+	if status, body := h.apiPost("/api/v1/molts", key, `{"text":"hey @blocker","form":""}`); status != http.StatusCreated {
 		t.Fatalf("post: got %d want 201 (%s)", status, body)
 	}
 	notes, err := h.store.Notifications(ctx, blocker.ID, 50)

@@ -1216,6 +1216,15 @@ func TestNSFW(t *testing.T) {
 	if fresh, _ := s.CrabByID(ctx, karen.ID); fresh.ShowNSFW || len(fresh.MutedWords) != 0 {
 		t.Fatalf("filters not cleared: %+v", fresh.ContentFilters)
 	}
+
+	for _, id := range []string{"couplet", FormNote, ""} {
+		if err := s.SetDefaultForm(ctx, karen, id); err != nil {
+			t.Fatal(err)
+		}
+		if fresh, _ := s.CrabByID(ctx, karen.ID); fresh.DefaultForm != id || karen.DefaultForm != id {
+			t.Fatalf("default form %q stored as %q", id, fresh.DefaultForm)
+		}
+	}
 }
 
 func TestChangeUsername(t *testing.T) {

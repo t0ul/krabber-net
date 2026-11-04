@@ -1,8 +1,9 @@
 // Command gm is the @gm Krabber bot: a sunrise "good morning" molt for the
 // reef. It greets the day, names the weekday, tries for the local first-light
 // time (NOAA-adjacent sunrise-sunset.org, keyless; dropped if it fails), and
-// adds a rotating reef musing. The molt is a couplet: the greeting, then the
-// musing, rhymed with the reef. Scheduled once a day around NYC sunrise.
+// adds a rotating reef musing. The molt is a haiku, as every krab's molts
+// are by default: the day, the light on the reef, the musing. Scheduled once
+// a day around NYC sunrise.
 package main
 
 import (
@@ -22,26 +23,27 @@ const (
 	nycLon = "-73.9654"
 )
 
-// form is the writing form every @gm molt takes.
-const form = "couplet"
+// form is the writing form every @gm molt takes: the haiku every krab's
+// molts start as.
+const form = "haiku"
 
 // musings rotate by day of year so every morning reads a little different.
-// Each is the couplet's second line, so it rhymes with "reef".
+// Each is the haiku's last line.
 var musings = []string{
-	"Low tide, big plans, and the to-do list brief.",
-	"Claws out, let's go: no time for grief.",
-	"Scuttle with purpose; keep worry brief.",
-	"The reef is yours, so act like the chief.",
-	"Fresh current, fresh start, a new leaf.",
-	"Molt something worth reading, leaf by leaf.",
-	"Pinch the day gently; be a gentle thief.",
-	"Sand in the legs, salt in the blood, in brief.",
-	"Sideways is forward; that's my belief.",
-	"Be the crab you want to sea, chief.",
-	"Shell on, shields up, and shrug off the grief.",
-	"Find your tidepool people; that's relief.",
-	"Small crab, big wake, and that's the whole brief.",
-	"Every tide turns, and so does grief.",
+	"low tide, big plans",
+	"claws out, let's go",
+	"scuttle with purpose",
+	"the reef is yours",
+	"fresh current, fresh start",
+	"molt something worth reading",
+	"pinch the day, gently",
+	"salt in the blood",
+	"sideways is still forward",
+	"be the crab you want to sea",
+	"shell on, shields up",
+	"find your tidepool people",
+	"small crab, big wake",
+	"every tide turns",
 }
 
 func main() { botkit.Run("gm", form, compose) }
@@ -52,17 +54,14 @@ func compose(ctx context.Context) (string, error) {
 	return greeting(now, sunriseLine(ctx, loc)), nil
 }
 
-// greeting is the morning's couplet: the day (with the sunrise, when the
-// lookup gave one) on the reef, then the day's musing to rhyme with it.
-// Widest first: with the sunrise, then without.
+// greeting is the morning's haiku: the day, the first light on the reef
+// (or just the reef, when the lookup failed), and the day's musing.
 func greeting(now time.Time, sun string) string {
-	base := fmt.Sprintf("gm crabs 🦀 %s on the reef.", now.Weekday())
-	musing := musings[now.YearDay()%len(musings)]
-	withSun := base
+	reef := "another morning on the reef"
 	if sun != "" {
-		withSun = fmt.Sprintf("gm crabs 🦀 %s, %s on the reef.", sun, now.Weekday())
+		reef = sun + " on the reef"
 	}
-	return botkit.Fit(withSun+"\n"+musing, base+"\n"+musing)
+	return botkit.Fit(fmt.Sprintf("gm crabs 🦀 %s\n%s\n%s", now.Weekday(), reef, musings[now.YearDay()%len(musings)]))
 }
 
 // sunriseLine returns something like "first light 6:58am" for NYC, or "" if

@@ -65,9 +65,9 @@
             <div class="mini-compose-textarea">
                 <textarea name="content" rows="3" class="my-2 w-100" placeholder="How are you feeling?" aria-label="Molt text" required></textarea>
             </div>
-            {{ template "form-feedback" (freshCheck .FormsRequired) }}
+            {{ template "form-feedback" (freshCheck .StartForm) }}
             <div class="mini-molt-actions d-flex flex-row justify-content-end w-100 compose-button-row">
-                {{ template "form-picker" (dict "Selected" "" "Required" .FormsRequired) }}
+                {{ template "form-picker" (dict "Selected" .StartForm "Required" .FormsRequired) }}
                 {{ template "nsfw-toggle" "nsfw-compose" }}
                 {{ template "counter" }}
                 <button type="submit" class="btn btn-primary rounded-pill"><strong>Molt</strong></button>
@@ -93,9 +93,9 @@
                     <div class="mini-compose-textarea">
                         <textarea name="content" rows="5" class="my-2 w-100" placeholder="How are you feeling?" aria-label="Molt text" required></textarea>
                     </div>
-                    {{ template "form-feedback" (freshCheck .FormsRequired) }}
+                    {{ template "form-feedback" (freshCheck .StartForm) }}
                     <div class="mini-molt-actions d-flex flex-row justify-content-end w-100 compose-button-row">
-                        {{ template "form-picker" (dict "Selected" "" "Required" .FormsRequired) }}
+                        {{ template "form-picker" (dict "Selected" .StartForm "Required" .FormsRequired) }}
                         {{ template "nsfw-toggle" "nsfw-compose-modal" }}
                         {{ template "counter" }}
                         <button type="submit" class="btn btn-primary rounded-pill"><strong>Molt</strong></button>
@@ -121,7 +121,7 @@
         <textarea name="content" rows="5" class="my-2 w-100" placeholder="Remember to be kind" aria-label="Your quote" required autofocus>{{ with .Form }}{{ .Content }}{{ end }}</textarea>
         {{ with .Form }}{{ with .FieldErrors.content }}<div class="text-primary small mb-2">{{ . }}</div>{{ end }}{{ end }}
     </div>
-    {{ with .Form }}{{ template "form-feedback" .Check }}{{ else }}{{ template "form-feedback" (freshCheck .FormsRequired) }}{{ end }}
+    {{ with .Form }}{{ template "form-feedback" .Check }}{{ else }}{{ template "form-feedback" (freshCheck .StartForm) }}{{ end }}
     {{ template "quoted-molt" .Molt }}
     <div class="mini-molt-actions d-flex flex-row justify-content-end w-100 compose-button-row">
         {{ template "form-picker" (dict "Selected" .Form.Form "Required" .FormsRequired) }}
@@ -154,7 +154,7 @@
         <textarea name="content" rows="5" class="my-2 w-100" placeholder="Remember to be kind" aria-label="Molt text" required autofocus>{{ with .Form }}{{ .Content }}{{ end }}</textarea>
         {{ with .Form }}{{ with .FieldErrors.content }}<div class="text-primary small mb-2">{{ . }}</div>{{ end }}{{ end }}
     </div>
-    {{ with .Form }}{{ template "form-feedback" .Check }}{{ else }}{{ template "form-feedback" (freshCheck .FormsRequired) }}{{ end }}
+    {{ with .Form }}{{ template "form-feedback" .Check }}{{ else }}{{ template "form-feedback" (freshCheck .StartForm) }}{{ end }}
     <div class="mini-molt-actions d-flex flex-row justify-content-end w-100 compose-button-row">
         {{ template "form-picker" (dict "Selected" .Form.Form "Required" .FormsRequired) }}
         {{ template "counter" }}

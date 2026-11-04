@@ -8,8 +8,8 @@ import (
 	"github.com/t0ul/krabber-net/internal/botkit"
 )
 
-// Every alert molt is an envelope that fits a molt, whatever the feed says.
-func TestAnnounceIsAnEnvelope(t *testing.T) {
+// Every alert molt is a haiku that fits a molt, whatever the feed says.
+func TestAnnounceIsAHaiku(t *testing.T) {
 	long := strings.Repeat("M11 buses are detoured around 34th St because of a water main break. ", 6)
 	for _, tc := range []struct {
 		name     string
@@ -17,9 +17,9 @@ func TestAnnounceIsAnEnvelope(t *testing.T) {
 		headline string
 		want     []string
 	}{
-		{"routes and headline", []string{"M11", "M23"}, "M11 buses are detoured.", []string{"M11, M23.", "detoured. %bus"}},
-		{"no headline", []string{"M20"}, "", []string{"M20.", "Check before you board. %bus"}},
-		{"many routes", []string{"M11", "M12", "M20", "M23", "M42", "M50", "M57", "M66"}, "Delays.", []string{"M50 +2 more.", "Delays. %bus"}},
+		{"routes and headline", []string{"M11", "M23"}, "M11 buses are detoured.", []string{"\nM11, M23\n", "detoured. %bus"}},
+		{"no headline", []string{"M20"}, "", []string{"\nM20\n", "check before you board %bus"}},
+		{"many routes", []string{"M11", "M12", "M20", "M23", "M42", "M50", "M57", "M66"}, "Delays.", []string{"M50 +2 more\n", "Delays. %bus"}},
 		{"long headline", []string{"M11"}, long, []string{"… %bus"}},
 	} {
 		m := announce(tc.routes, tc.headline)

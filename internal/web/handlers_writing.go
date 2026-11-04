@@ -45,23 +45,35 @@ func pickable(group string, required bool) []writing.Form {
 }
 
 // freshCheck is what a composer's feedback box shows before anything is
-// written: nothing, or when forms are required, the rules of the form the
+// written: nothing for a plain note, otherwise the rules of the form the
 // picker starts on.
-func freshCheck(required bool) moltCheck {
-	if !required {
+func freshCheck(id string) moltCheck {
+	f, ok := writing.ByID(id)
+	if !ok || f.ID == "" {
 		return moltCheck{}
 	}
-	f, _ := writing.ByID(defaultForm)
 	return moltCheck{Form: f, Results: f.Check(""), Blank: true}
 }
 
-// startOn gives a fresh quote or edit form the default form when forms are
-// required and it has none yet, so the picker and the checklist agree.
-func (app *App) startOn(f moltForm) moltForm {
-	if app.cfg.FormsRequired() && f.Form == "" {
-		f.Form = defaultForm
+// startForm is the form a krab's new molts start on: their default, a haiku
+// unless they chose otherwise in their settings. A choice the catalogue no
+// longer has, or a plain note where forms are required, falls back to a
+// haiku.
+func (app *App) startForm(c *store.Crab) string {
+	if c == nil {
+		return ""
 	}
-	return f
+	id := c.DefaultForm
+	switch id {
+	case "":
+		id = defaultForm
+	case store.FormNote:
+		id = ""
+	}
+	if f, ok := writing.ByID(id); !ok || (app.cfg.FormsRequired() && !formAllowed(f)) {
+		return defaultForm
+	}
+	return id
 }
 
 // checkMolt checks a molt's text against the writing form it names: the
