@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"html"
 	"io"
+	"math"
 	"net/http"
 	"regexp"
 	"sort"
@@ -100,10 +101,10 @@ func Parse(data []byte) ([]Alert, error) {
 		for _, p := range al.GetActivePeriod() {
 			var start, end time.Time
 			if p.GetStart() != 0 {
-				start = time.Unix(int64(p.GetStart()), 0)
+				start = unix(p.GetStart())
 			}
 			if p.GetEnd() != 0 {
-				end = time.Unix(int64(p.GetEnd()), 0)
+				end = unix(p.GetEnd())
 			}
 			periods = append(periods, [2]time.Time{start, end})
 		}
@@ -195,4 +196,13 @@ func english(ts *gtfs.TranslatedString) string {
 		}
 	}
 	return first
+}
+
+// unix is a feed's POSIX time in seconds. A value too large for an int64
+// can only be the far future, so it's held to the largest one.
+func unix(sec uint64) time.Time {
+	if sec > math.MaxInt64 {
+		sec = math.MaxInt64
+	}
+	return time.Unix(int64(sec), 0)
 }

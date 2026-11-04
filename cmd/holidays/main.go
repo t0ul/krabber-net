@@ -30,7 +30,7 @@ var fillers = []string{"for the kids", "tomorrow", "all day", "crabs"}
 
 func main() { botkit.Run("holidays", form, compose) }
 
-func compose(ctx context.Context) (string, error) {
+func compose(_ context.Context) (string, error) {
 	tomorrow := time.Now().In(nyLoc()).AddDate(0, 0, 1)
 	return headsUp(tomorrow), nil
 }

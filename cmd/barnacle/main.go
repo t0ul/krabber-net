@@ -57,7 +57,7 @@ var fillers = []string{"tell us", "crabs", "hey"}
 
 func main() { botkit.Run("barnacle", form, compose) }
 
-func compose(ctx context.Context) (string, error) {
+func compose(_ context.Context) (string, error) {
 	now := time.Now().In(nyLoc())
 	return prompt(now.YearDay()), nil
 }
