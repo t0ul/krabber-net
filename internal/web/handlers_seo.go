@@ -16,6 +16,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/t0ul/krabber-net/internal/store"
+	"github.com/t0ul/krabber-net/internal/writing"
 )
 
 const (
@@ -58,7 +59,16 @@ func excerpt(text string, n int) string {
 			break
 		}
 	}
-	return strings.TrimRight(string(r[:cut]), " ,;:.!?-") + "…"
+	return strings.TrimRight(string(r[:cut]), " ,;:.!?-/") + "…"
+}
+
+// inline is a molt's text for a title or description. A poem keeps its line
+// breaks as " / ", the way verse is quoted inline; anything else runs on.
+func inline(m store.Molt) string {
+	if !verse(m.Form) {
+		return m.Content
+	}
+	return strings.Join(writing.Lines(m.Content), " / ")
 }
 
 // moltTitle names a molt's page: who wrote it and how it starts. An NSFW
@@ -71,14 +81,14 @@ func moltTitle(m store.Molt) string {
 	if name == "" {
 		name = m.Author
 	}
-	return name + ": " + excerpt(m.Content, titleChars)
+	return name + ": " + excerpt(inline(m), titleChars)
 }
 
 func moltDescription(m store.Molt) string {
 	if m.NSFW {
 		return "A molt by @" + m.Author + " on Krabber, marked NSFW."
 	}
-	return excerpt(m.Content, descriptionChars)
+	return excerpt(inline(m), descriptionChars)
 }
 
 // profileDescription introduces a krab: name, username and bio, if any.
