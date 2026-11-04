@@ -4,6 +4,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="htmx-config" content='{"allowEval":false,"allowScriptTags":false,"includeIndicatorStyles":false,"selfRequestsOnly":true}'>
     <title>{{ template "title" . }} · Krabber</title>
+    {{ with .Description }}<meta name="description" content="{{ . }}">{{ end }}
     <link rel='icon' href='{{ asset "img/favicon.svg" }}' type='image/svg+xml'>
     <link rel="manifest" href="{{ asset "manifest.webmanifest" }}">
     <link rel="apple-touch-icon" href="{{ asset "img/apple-touch-icon.png" }}">

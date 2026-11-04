@@ -1,7 +1,8 @@
 // Command gm is the @gm Krabber bot: a sunrise "good morning" molt for the
 // reef. It greets the day, names the weekday, tries for the local first-light
 // time (NOAA-adjacent sunrise-sunset.org, keyless; dropped if it fails), and
-// adds a rotating reef musing. Scheduled once a day around NYC sunrise.
+// adds a rotating reef musing. The molt is a couplet: the greeting, then the
+// musing, rhymed with the reef. Scheduled once a day around NYC sunrise.
 package main
 
 import (
@@ -21,47 +22,50 @@ const (
 	nycLon = "-73.9654"
 )
 
+// form is the writing form every @gm molt takes.
+const form = "couplet"
+
 // musings rotate by day of year so every morning reads a little different.
+// Each is the couplet's second line, so it rhymes with "reef".
 var musings = []string{
-	"Low tide, big plans.",
-	"Claws out, let's go.",
-	"Scuttle with purpose today.",
-	"The reef is yours.",
-	"Fresh current, fresh start.",
-	"Molt something worth reading.",
-	"Pinch the day, gently.",
-	"Sand between the legs, salt in the blood.",
-	"Sideways is still forward.",
-	"Be the crab you want to sea.",
-	"Shell on, shields up.",
-	"Find your tidepool people.",
-	"Small crab, big wake.",
-	"Every tide turns. So can your day.",
+	"Low tide, big plans, and the to-do list brief.",
+	"Claws out, let's go: no time for grief.",
+	"Scuttle with purpose; keep worry brief.",
+	"The reef is yours, so act like the chief.",
+	"Fresh current, fresh start, a new leaf.",
+	"Molt something worth reading, leaf by leaf.",
+	"Pinch the day gently; be a gentle thief.",
+	"Sand in the legs, salt in the blood, in brief.",
+	"Sideways is forward; that's my belief.",
+	"Be the crab you want to sea, chief.",
+	"Shell on, shields up, and shrug off the grief.",
+	"Find your tidepool people; that's relief.",
+	"Small crab, big wake, and that's the whole brief.",
+	"Every tide turns, and so does grief.",
 }
 
-func main() { botkit.Run("gm", compose) }
+func main() { botkit.Run("gm", form, compose) }
 
 func compose(ctx context.Context) (string, error) {
 	loc := nyLoc()
 	now := time.Now().In(loc)
-	base := fmt.Sprintf("gm crabs 🦀 %s on the reef.", now.Weekday())
-	musing := musings[now.YearDay()%len(musings)]
-
-	sun := sunriseLine(ctx, loc) // "" if the lookup fails; we just drop it
-
-	withSun := base
-	if sun != "" {
-		withSun = base + " " + sun
-	}
-	// Widest first: base + sunrise + musing, then base + sunrise, then base.
-	return botkit.Fit(
-		withSun+" "+musing,
-		withSun,
-		base,
-	), nil
+	return greeting(now, sunriseLine(ctx, loc)), nil
 }
 
-// sunriseLine returns something like "First light 6:58am." for NYC, or "" if
+// greeting is the morning's couplet: the day (with the sunrise, when the
+// lookup gave one) on the reef, then the day's musing to rhyme with it.
+// Widest first: with the sunrise, then without.
+func greeting(now time.Time, sun string) string {
+	base := fmt.Sprintf("gm crabs 🦀 %s on the reef.", now.Weekday())
+	musing := musings[now.YearDay()%len(musings)]
+	withSun := base
+	if sun != "" {
+		withSun = fmt.Sprintf("gm crabs 🦀 %s, %s on the reef.", sun, now.Weekday())
+	}
+	return botkit.Fit(withSun+"\n"+musing, base+"\n"+musing)
+}
+
+// sunriseLine returns something like "first light 6:58am" for NYC, or "" if
 // the (keyless) lookup fails — the molt still posts without it.
 func sunriseLine(ctx context.Context, loc *time.Location) string {
 	ctx, cancel := context.WithTimeout(ctx, 8*time.Second)
@@ -97,7 +101,7 @@ func sunriseLine(ctx context.Context, loc *time.Location) string {
 		return ""
 	}
 	// "3:04pm" lowercased, trimmed leading zero already absent with %-less format.
-	return "First light " + t.In(loc).Format("3:04pm") + "."
+	return "first light " + t.In(loc).Format("3:04pm")
 }
 
 // nyLoc returns America/New_York, or UTC if the zone can't be loaded.

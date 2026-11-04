@@ -1,8 +1,10 @@
 // Package botkit is the shared spine for the Krabber bots (@gm, @barnacle,
-// @holidays, …). Each bot is a tiny cmd/<bot> that composes one molt's text;
-// botkit handles reading the API key from SSM (or API_KEY locally), posting to
-// the Krabber API with the bearer key, and the Lambda-vs-local run modes. This
-// mirrors how cmd/scuttle works, without copying its plumbing into every bot.
+// @holidays, …). Each bot is a tiny cmd/<bot> that composes one molt's text
+// in a writing form (a couplet, a three-panel joke); botkit checks the text
+// against the form's rules, handles reading the API key from SSM (or API_KEY
+// locally), posting to the Krabber API with the bearer key, and the
+// Lambda-vs-local run modes. This mirrors how cmd/scuttle works, without
+// copying its plumbing into every bot.
 //
 // Local use (prints only, never posts):
 //
@@ -30,6 +32,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
+
+	"github.com/t0ul/krabber-net/internal/writing"
 )
 
 // MoltMax is the Krabber molt character limit.
@@ -60,9 +64,9 @@ func NewClient(ctx context.Context) (*Client, error) {
 	}, nil
 }
 
-// Post publishes one molt.
-func (c *Client) Post(ctx context.Context, text string) error {
-	payload, err := json.Marshal(map[string]string{"text": text})
+// Post publishes one molt in a writing form ("" for a plain note).
+func (c *Client) Post(ctx context.Context, text, form string) error {
+	payload, err := json.Marshal(map[string]string{"text": text, "form": form})
 	if err != nil {
 		return err
 	}
@@ -86,11 +90,13 @@ func (c *Client) Post(ctx context.Context, text string) error {
 	return nil
 }
 
-// Run is a bot's main(): it calls compose to build the molt text, then on Lambda
-// (EventBridge) or a one-shot local run posts it. With DRY_RUN set it prints the
-// text and never touches the API (so no key is needed). An empty text from
-// compose is a no-op (nothing to say right now), not an error.
-func Run(name string, compose func(ctx context.Context) (string, error)) {
+// Run is a bot's main(): it calls compose to build the molt text, checks it
+// against the writing form every molt of this bot takes (so a site that
+// requires a form never silences it), then on Lambda (EventBridge) or a
+// one-shot local run posts it. With DRY_RUN set it prints the text and never
+// touches the API (so no key is needed). An empty text from compose is a
+// no-op (nothing to say right now), not an error.
+func Run(name, form string, compose func(ctx context.Context) (string, error)) {
 	do := func(ctx context.Context) error {
 		text, err := compose(ctx)
 		if err != nil {
@@ -100,15 +106,18 @@ func Run(name string, compose func(ctx context.Context) (string, error)) {
 			log.Printf("[%s] nothing to post", name)
 			return nil
 		}
+		if err := Check(text, form); err != nil {
+			return err
+		}
 		if os.Getenv("DRY_RUN") != "" {
-			log.Printf("[%s] dry-run (%d chars): %s", name, utf8.RuneCountInString(text), text)
+			log.Printf("[%s] dry-run (%s, %d chars): %s", name, form, utf8.RuneCountInString(text), text)
 			return nil
 		}
 		c, err := NewClient(ctx)
 		if err != nil {
 			return err
 		}
-		if err := c.Post(ctx, text); err != nil {
+		if err := c.Post(ctx, text, form); err != nil {
 			return fmt.Errorf("post: %w", err)
 		}
 		log.Printf("[%s] posted: %s", name, text)
@@ -124,6 +133,24 @@ func Run(name string, compose func(ctx context.Context) (string, error)) {
 	if err := do(ctx); err != nil {
 		log.Fatal(err)
 	}
+}
+
+// Check reports why the API would refuse text as a molt in form: the form
+// isn't in the catalogue, the text is too long for it, or it breaks one of
+// the form's exact rules (a line count, a blank line between panels). Hints
+// such as rhyme and syllables never fail a bot.
+func Check(text, form string) error {
+	f, ok := writing.ByID(form)
+	if !ok {
+		return fmt.Errorf("%q is not a writing form krabber.net knows", form)
+	}
+	if n := utf8.RuneCountInString(text); n > f.MaxChars {
+		return fmt.Errorf("%d characters is too long for a %s (up to %d)", n, strings.ToLower(f.Name), f.MaxChars)
+	}
+	if broken := writing.Broken(f.Check(text)); len(broken) > 0 {
+		return fmt.Errorf("not a %s: %s (%s)", strings.ToLower(f.Name), broken[0].Rule, broken[0].Note)
+	}
+	return nil
 }
 
 // Fit returns the first candidate within MoltMax (by rune count), else the last

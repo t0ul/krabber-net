@@ -1,5 +1,7 @@
 // Command devseed creates the table in DynamoDB Local and adds a few activated
-// sample crabs (password "crabcakes123") that follow each other. Dev only.
+// sample crabs (password "crabcakes123") that follow each other. Every seeded
+// molt takes a writing form, so the seeds also stand when the site requires
+// one (MOLT_FORMS=required). Dev only.
 package main
 
 import (
@@ -13,7 +15,46 @@ import (
 	"github.com/t0ul/krabber-net/internal/auth"
 	"github.com/t0ul/krabber-net/internal/platform"
 	"github.com/t0ul/krabber-net/internal/store"
+	"github.com/t0ul/krabber-net/internal/writing"
 )
+
+// A seeded molt: its text and the writing form it takes.
+type seed struct{ text, form string }
+
+// ready is SpongeBob's molt, an envelope; the seeded likes and replies hang
+// off it.
+var ready = seed{"I'm ready!\nI'm ready! I'm ready!\nI'm ready! I'm ready! I'm ready!\nI'm ready!", "envelope"}
+
+// molts are the first molt of each crab.
+var molts = map[string]seed{
+	"mrkrabs":   {"I like money, I like it a lot,\nmore than anything else I've got.", "couplet"},
+	"spongebob": ready,
+	"plankton":  {"The Krabby Patty formula will be MINE,\nand the Chum Bucket will finally have a line.", "couplet"},
+	"sandy":     {"Karate Island\nhere I come, claws up, hi-yah\nTexas can wait, y'all", "haiku"},
+	"patrick":   {"The inner machinations of my mind are an enigma.", "metaphor"},
+	"squidward": {"the reef at sunrise\nall of you, still here, still loud\nI hate all of you", "haiku"},
+}
+
+// The thread under SpongeBob's molt: Plankton's reply, SpongeBob's answer,
+// and Squidward's quote.
+var (
+	barnacles = seed{"Ugh.\n\nBarnacles, every single morning.\n\nSix a.m.", "three-panel"}
+	rocks     = seed{"Barnacles are just krabs who love their rocks!", "metaphor"}
+	sinceSix  = seed{"He has been saying this since six in the morning, like a foghorn with a day job.", "simile"}
+)
+
+// mustFit stops the seed if a molt breaks its form's exact rules, so a
+// change to the catalogue shows up here and not as a refused edit later.
+func mustFit(sd seed) seed {
+	f, ok := writing.ByID(sd.form)
+	if !ok {
+		log.Fatalf("seed %q: no form %q", sd.text, sd.form)
+	}
+	if broken := writing.Broken(f.Check(sd.text)); len(broken) > 0 {
+		log.Fatalf("seed %q is not a %s: %s (%s)", sd.text, f.Name, broken[0].Rule, broken[0].Note)
+	}
+	return sd
+}
 
 func main() {
 	endpoint := os.Getenv("DYNAMO_ENDPOINT")
@@ -96,15 +137,6 @@ func mustCrabs(ctx context.Context, s *store.Store, hash []byte, names ...string
 // seedMolts adds a few molts, likes, a remolt and a short reply thread the first time the
 // table is seeded, so feeds, counts and trending have something to show.
 func seedMolts(ctx context.Context, s *store.Store, crabs []*store.Crab) {
-	lines := map[string]string{
-		"mrkrabs":   "I like money.",
-		"spongebob": "I'm ready! I'm ready! I'm ready!",
-		"plankton":  "The Krabby Patty formula will be MINE.",
-		"sandy":     "Karate island, here I come.",
-		"patrick":   "The inner machinations of my mind are an enigma.",
-		"squidward": "the reef at sunrise\nall of you, still here, still loud\nI hate all of you",
-	}
-	forms := map[string]string{"squidward": "haiku"}
 	byName := map[string]*store.Molt{}
 	created := map[string]bool{}
 	for _, c := range crabs {
@@ -113,11 +145,12 @@ func seedMolts(ctx context.Context, s *store.Store, crabs []*store.Crab) {
 		} else if len(existing) > 0 {
 			continue
 		}
-		line := lines[c.UserName]
-		if line == "" {
+		sd, ok := molts[c.UserName]
+		if !ok {
 			continue
 		}
-		m, err := s.CreateMolt(ctx, c, line, store.WithForm(forms[c.UserName]))
+		sd = mustFit(sd)
+		m, err := s.CreateMolt(ctx, c, sd.text, store.WithForm(sd.form))
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -130,30 +163,30 @@ func seedMolts(ctx context.Context, s *store.Store, crabs []*store.Crab) {
 		byName[c.UserName] = m
 		created[c.UserName] = true
 	}
-	ready := byName["spongebob"]
-	if ready == nil || !created["spongebob"] {
+	readyMolt := byName["spongebob"]
+	if readyMolt == nil || !created["spongebob"] {
 		return
 	}
 	for _, c := range crabs {
-		if _, err := s.ToggleLike(ctx, c, ready); err != nil {
+		if _, err := s.ToggleLike(ctx, c, readyMolt); err != nil {
 			log.Fatal(err)
 		}
 	}
-	if _, err := s.Remolt(ctx, crabs[0], ready); err != nil && !errors.Is(err, store.ErrAlreadyExists) {
+	if _, err := s.Remolt(ctx, crabs[0], readyMolt); err != nil && !errors.Is(err, store.ErrAlreadyExists) {
 		log.Fatal(err)
 	}
-	ready, err := s.MoltByKey(ctx, ready.PK, ready.SK)
+	readyMolt, err := s.MoltByKey(ctx, readyMolt.PK, readyMolt.SK)
 	if err != nil {
 		log.Fatal(err)
 	}
-	barnacles, err := s.Reply(ctx, crabs[2], ready, "Ugh. Barnacles.")
+	ugh, err := s.Reply(ctx, crabs[2], readyMolt, mustFit(barnacles).text, store.WithForm(barnacles.form))
 	if err != nil {
 		log.Fatal(err)
 	}
-	if _, err := s.Reply(ctx, crabs[1], barnacles, "Barnacles are just krabs who love their rocks!"); err != nil {
+	if _, err := s.Reply(ctx, crabs[1], ugh, mustFit(rocks).text, store.WithForm(rocks.form)); err != nil {
 		log.Fatal(err)
 	}
-	quote, err := s.Quote(ctx, crabs[2], ready, "He has been saying this since six in the morning.")
+	quote, err := s.Quote(ctx, crabs[2], readyMolt, mustFit(sinceSix).text, store.WithForm(sinceSix.form))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -170,14 +203,14 @@ func seedMolts(ctx context.Context, s *store.Store, crabs []*store.Crab) {
 // once per actor, so running the seed again adds nothing.
 func seedNotifications(ctx context.Context, s *store.Store, crabs []*store.Crab) {
 	sponge := crabs[1]
-	molts, err := s.MoltsByOwner(ctx, sponge.ID, 100)
+	own, err := s.MoltsByOwner(ctx, sponge.ID, 100)
 	if err != nil {
 		log.Fatal(err)
 	}
-	var ready *store.Molt
-	for i := range molts {
-		if !molts[i].Remolt && molts[i].Content == "I'm ready! I'm ready! I'm ready!" {
-			ready = &molts[i]
+	var readyMolt *store.Molt
+	for i := range own {
+		if !own[i].Remolt && own[i].Content == ready.text {
+			readyMolt = &own[i]
 		}
 	}
 	add := func(n store.Notification) {
@@ -189,13 +222,13 @@ func seedNotifications(ctx context.Context, s *store.Store, crabs []*store.Crab)
 	for _, c := range []*store.Crab{crabs[0], crabs[2]} {
 		add(store.Notification{Type: store.NotifyFollow, ActorID: c.ID, Actor: c.UserName})
 	}
-	if ready == nil {
+	if readyMolt == nil {
 		return
 	}
 	for _, c := range crabs[2:4] {
-		add(store.Notification{Type: store.NotifyLike, ActorID: c.ID, Actor: c.UserName, MoltID: ready.ID, Snippet: store.Snippet(ready.Content)})
+		add(store.Notification{Type: store.NotifyLike, ActorID: c.ID, Actor: c.UserName, MoltID: readyMolt.ID, Snippet: store.Snippet(readyMolt.Content)})
 	}
-	add(store.Notification{Type: store.NotifyRemolt, ActorID: crabs[0].ID, Actor: crabs[0].UserName, MoltID: ready.ID, Snippet: store.Snippet(ready.Content)})
+	add(store.Notification{Type: store.NotifyRemolt, ActorID: crabs[0].ID, Actor: crabs[0].UserName, MoltID: readyMolt.ID, Snippet: store.Snippet(readyMolt.Content)})
 }
 
 func followerIDs(ctx context.Context, s *store.Store, c *store.Crab) []string {

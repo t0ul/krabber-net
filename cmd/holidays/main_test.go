@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/t0ul/krabber-net/internal/botkit"
 )
 
 // Observed federal-holiday dates for 2026, verified against the official OPM
@@ -64,8 +66,20 @@ func TestHeadsUp(t *testing.T) {
 	if m := headsUp(d("2026-09-21")); !strings.Contains(m, "Yom Kippur") || !strings.Contains(m, "%nyc") || strings.Contains(m, "%fed") {
 		t.Errorf("yom kippur eve: %q", m)
 	}
+	// Thanksgiving is federal; the school list leaves federal days out.
+	if m := headsUp(d("2026-11-26")); !strings.Contains(m, "Thanksgiving") || !strings.Contains(m, "%fed") || strings.Contains(m, "%nyc") {
+		t.Errorf("thanksgiving eve: %q", m)
+	}
 	// Ordinary day -> nothing.
 	if m := headsUp(d("2026-10-23")); m != "" {
 		t.Errorf("ordinary day should be empty, got %q", m)
+	}
+	// Every heads-up is a three-panel joke.
+	for _, day := range []string{"2026-12-25", "2026-09-21", "2026-11-26", "2026-01-19", "2026-12-28"} {
+		if m := headsUp(d(day)); m == "" {
+			t.Errorf("%s should get a heads-up", day)
+		} else if err := botkit.Check(m, form); err != nil {
+			t.Errorf("%s: %v\n%s", day, err, m)
+		}
 	}
 }

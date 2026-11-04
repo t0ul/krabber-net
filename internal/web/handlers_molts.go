@@ -89,7 +89,7 @@ func (app *App) moltCreatePost(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if c := checkMolt(f); c.Message != "" {
+	if c := app.checkMolt(f); c.Message != "" {
 		app.rejectMolt(w, r, c)
 		return
 	}
@@ -484,7 +484,7 @@ func (app *App) replyCreatePost(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if c := checkMolt(f); c.Message != "" {
+	if c := app.checkMolt(f); c.Message != "" {
 		app.rejectMolt(w, r, c)
 		return
 	}

@@ -2926,3 +2926,109 @@ func currentCrabByName(t *testing.T, h *harness, name string) *store.Crab {
 	}
 	return c
 }
+
+// TestFormsRequired runs the site as a poetry-only microblog: every molt,
+// reply, quote, edit and API post must take a writing form.
+func TestFormsRequired(t *testing.T) {
+	h := newHarnessWith(t, func(c *config.Config) { c.MoltForms = config.MoltFormsRequired }, nil)
+
+	// Signed out, the welcome page and its description say what the site is for.
+	if _, body, _ := h.get("/"); !strings.Contains(body, "every molt is a poem") || !strings.Contains(body, `href="/forms"`) ||
+		!strings.Contains(body, `<meta name="description" content="`) || !strings.Contains(body, "poem or another written form") {
+		t.Error("the welcome page should say every molt is a poem or another written form, and link to /forms")
+	}
+
+	h.signupAndActivate("basho", "basho@krabber.test", "old-silent-pond")
+	h.login("basho@krabber.test", "old-silent-pond")
+	tok := h.csrf("/trench")
+
+	// The composer offers no plain note and starts on a haiku, rules showing.
+	if _, body, _ := h.get("/trench"); strings.Contains(body, `<option value=""`) || !strings.Contains(body, `<option value="haiku" selected`) ||
+		!strings.Contains(body, "Three lines.") || !strings.Contains(body, "kb-rule-advice") {
+		t.Error("the required-mode picker should drop the Note, preselect haiku and show its rules")
+	}
+	if _, body, _ := h.get("/forms"); strings.Contains(body, "has no rules") || !strings.Contains(body, "no plain notes") {
+		t.Error("the forms page should say there are no plain notes")
+	}
+
+	// A plain molt is refused, in the composer's feedback box, and not stored.
+	status, body, hdr := h.post("/molt/create", url.Values{"csrf_token": {tok}, "content": {"just a thought"}}, "HX-Request", "true")
+	if status != http.StatusUnprocessableEntity || hdr.Get("HX-Retarget") != "find .kb-feedback" || !strings.Contains(body, "Pick a form.") {
+		t.Errorf("a plain molt: %d %v %s", status, hdr, body)
+	}
+	if status, body, _ := h.post("/molt/create", url.Values{"csrf_token": {tok}, "content": {"just a thought"}, "form": {""}}); status != http.StatusUnprocessableEntity || !strings.Contains(body, "Pick a form.") {
+		t.Errorf("a plain molt without htmx: %d %s", status, body)
+	}
+	if molts, _ := h.store.MoltsByOwner(context.Background(), currentID(t, h, "basho"), 1); len(molts) != 0 {
+		t.Fatal("the refused molt was stored")
+	}
+
+	// A haiku posts, and the form's own rules still apply.
+	haiku := "low tide at sunrise\na krab raises one wet claw\nhello to the gulls"
+	status, body, _ = h.post("/molt/create", url.Values{"csrf_token": {tok}, "content": {haiku}, "form": {"haiku"}}, "HX-Request", "true")
+	if status != http.StatusOK || !strings.Contains(body, `kb-form-badge">Haiku<`) {
+		t.Fatalf("a haiku: %d %s", status, body)
+	}
+	molts, _ := h.store.MoltsByOwner(context.Background(), currentID(t, h, "basho"), 1)
+	haikuID := molts[0].ID
+	if status, body, _ := h.post("/molt/create", url.Values{"csrf_token": {tok}, "content": {"two lines\nonly"}, "form": {"haiku"}}, "HX-Request", "true"); status != http.StatusUnprocessableEntity || !strings.Contains(body, "Not quite a haiku yet") {
+		t.Errorf("a two-line haiku: %d %s", status, body)
+	}
+
+	// Replies, quotes and edits need a form too.
+	if status, body, _ := h.post("/molt/reply/"+haikuID, url.Values{"csrf_token": {tok}, "content": {"nice"}}, "HX-Request", "true"); status != http.StatusUnprocessableEntity || !strings.Contains(body, "Pick a form.") {
+		t.Errorf("a plain reply: %d %s", status, body)
+	}
+	couplet := "The tide goes out, the tide comes in,\nthe krab just sits and wears a grin."
+	if status, body, _ := h.post("/molt/reply/"+haikuID, url.Values{"csrf_token": {tok}, "content": {couplet}, "form": {"couplet"}}, "HX-Request", "true"); status != http.StatusOK || !strings.Contains(body, `kb-form-badge">Couplet<`) {
+		t.Errorf("a couplet reply: %d %s", status, body)
+	}
+	if status, body, _ := h.post("/molt/quote/"+haikuID, url.Values{"csrf_token": {tok}, "content": {"this one"}}, "HX-Request", "true"); status != http.StatusUnprocessableEntity || !strings.Contains(body, "Pick a form.") {
+		t.Errorf("a plain quote: %d %s", status, body)
+	}
+	if _, body, _ := h.get("/molt/edit/" + haikuID); strings.Contains(body, `<option value=""`) || !strings.Contains(body, `<option value="haiku" selected`) {
+		t.Error("the edit form should keep the haiku selected and offer no Note")
+	}
+	if _, body, _ := h.get("/molt/quote/" + haikuID); !strings.Contains(body, `<option value="haiku" selected`) || !strings.Contains(body, "Three lines.") {
+		t.Error("a fresh quote form should start on a haiku, rules showing")
+	}
+	if status, body, _ := h.post("/molt/edit/"+haikuID, url.Values{"csrf_token": {tok}, "content": {"not a haiku"}, "form": {""}}); status != http.StatusUnprocessableEntity || !strings.Contains(body, "Pick a form.") {
+		t.Errorf("editing into a plain molt: %d %s", status, body)
+	}
+
+	// The API gets the same answer in its error body.
+	key, _, err := h.store.CreateAPIKey(context.Background(), currentCrabByName(t, h, "basho"), "verse bot", []string{store.ScopeWriteMolts})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status, body := h.apiPost("/api/v1/molts", key, `{"text":"just a thought"}`); status != http.StatusUnprocessableEntity || !strings.Contains(body, `{"error":"Pick a form."}`) {
+		t.Errorf("API plain molt: %d %s", status, body)
+	}
+	if status, body := h.apiPost("/api/v1/molts", key, `{"text":"low tide at sunrise\na krab raises one wet claw\nhello to the gulls","form":"haiku"}`); status != http.StatusCreated {
+		t.Errorf("API haiku: %d %s", status, body)
+	}
+	if molts, _ := h.store.MoltsByOwner(context.Background(), currentID(t, h, "basho"), 1); molts[0].Form != "haiku" {
+		t.Errorf("the API molt's form is %q", molts[0].Form)
+	}
+}
+
+// TestFormsOptional is today's behaviour, the default: a plain note is fine
+// and the welcome page keeps its copy.
+func TestFormsOptional(t *testing.T) {
+	h := newHarness(t)
+	if _, body, _ := h.get("/"); !strings.Contains(body, "dumb blogging platform powered by krabs") || strings.Contains(body, "every molt is a poem") {
+		t.Error("the default welcome page should keep its copy")
+	}
+	h.signupAndActivate("basho", "basho@krabber.test", "old-silent-pond")
+	h.login("basho@krabber.test", "old-silent-pond")
+	tok := h.csrf("/trench")
+	if _, body, _ := h.get("/trench"); !strings.Contains(body, `<option value="" selected`) || strings.Contains(body, `<option value="haiku" selected`) || strings.Contains(body, "Three lines.") {
+		t.Error("the default picker should start on a plain Note, with no rules showing")
+	}
+	if _, body, _ := h.get("/forms"); !strings.Contains(body, "has no rules") {
+		t.Error("the forms page should still explain the plain note")
+	}
+	if status, _, _ := h.post("/molt/create", url.Values{"csrf_token": {tok}, "content": {"just a thought"}}, "HX-Request", "true"); status != http.StatusOK {
+		t.Errorf("a plain molt: %d", status)
+	}
+}

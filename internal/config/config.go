@@ -50,6 +50,12 @@ type Config struct {
 	// bill bounded; 0 means no cap. Accounts that never activate don't count.
 	MaxKrabs int
 
+	// MoltForms is whether a molt must take a writing form: MoltFormsOptional
+	// (a plain note is fine) or MoltFormsRequired (every molt is a poem or
+	// another form from the catalogue, so the site runs as a poetry-only
+	// microblog).
+	MoltForms string
+
 	// LogAllRequests logs every request with its DynamoDB units instead of a
 	// 5% sample (always on in dev).
 	LogAllRequests bool
@@ -62,8 +68,17 @@ const (
 	SignupClosed = "closed"
 )
 
+// Molt form modes.
+const (
+	MoltFormsOptional = "optional"
+	MoltFormsRequired = "required"
+)
+
 // IsDev reports whether the server runs locally over plain HTTP.
 func (c *Config) IsDev() bool { return c.Env == "dev" }
+
+// FormsRequired reports whether every molt must take a writing form.
+func (c *Config) FormsRequired() bool { return c.MoltForms == MoltFormsRequired }
 
 // TurnstileEnabled reports whether bot checks are configured.
 func (c *Config) TurnstileEnabled() bool { return c.TurnstileSiteKey != "" && c.TurnstileSecret != "" }
@@ -116,6 +131,7 @@ var fromSSM = map[string]bool{
 	"TURNSTILE_SECRET":              true,
 	"SIGNUP_MODE":                   true,
 	"MAX_KRABS":                     true,
+	"MOLT_FORMS":                    true,
 }
 
 func loadSSM(ctx context.Context, client SSMGetter, prefix string) (map[string]string, error) {
@@ -153,6 +169,7 @@ func parse(env map[string]string) (*Config, error) {
 		TurnstileSiteKey:  env["TURNSTILE_SITE_KEY"],
 		TurnstileSecret:   env["TURNSTILE_SECRET"],
 		SignupMode:        strings.ToLower(valueOr(env["SIGNUP_MODE"], SignupOpen)),
+		MoltForms:         strings.ToLower(valueOr(env["MOLT_FORMS"], MoltFormsOptional)),
 		LogAllRequests:    env["LOG_ALL_REQUESTS"] == "true",
 		OriginVerifySecrets: nonEmpty(
 			env["ORIGIN_VERIFY_SECRET"],
@@ -217,6 +234,12 @@ func parse(env map[string]string) (*Config, error) {
 	case SignupOpen, SignupInvite, SignupClosed:
 	default:
 		errs = append(errs, fmt.Errorf("SIGNUP_MODE must be open, invite or closed, got %q", c.SignupMode))
+	}
+
+	switch c.MoltForms {
+	case MoltFormsOptional, MoltFormsRequired:
+	default:
+		errs = append(errs, fmt.Errorf("MOLT_FORMS must be optional or required, got %q", c.MoltForms))
 	}
 
 	if (c.TurnstileSiteKey == "") != (c.TurnstileSecret == "") {

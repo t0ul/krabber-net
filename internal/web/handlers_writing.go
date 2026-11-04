@@ -20,13 +20,69 @@ type moltCheck struct {
 	Message string // why the text can't be posted; "" when it can
 }
 
+// formAllowed reports whether a molt may take form f when forms are required
+// (MOLT_FORMS=required): any form in the catalogue, letters and essays
+// included. For a poetry-only site, make it f.Group == writing.Poetry.
+func formAllowed(f writing.Form) bool { return f.ID != "" }
+
+// defaultForm is the form the composer starts on when forms are required.
+const defaultForm = "haiku"
+
+// pickable lists the forms the composer offers under a group: all of them,
+// or only those formAllowed admits when forms are required.
+func pickable(group string, required bool) []writing.Form {
+	forms := writing.InGroup(group)
+	if !required {
+		return forms
+	}
+	var out []writing.Form
+	for _, f := range forms {
+		if formAllowed(f) {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
+// freshCheck is what a composer's feedback box shows before anything is
+// written: nothing, or when forms are required, the rules of the form the
+// picker starts on.
+func freshCheck(required bool) moltCheck {
+	if !required {
+		return moltCheck{}
+	}
+	f, _ := writing.ByID(defaultForm)
+	return moltCheck{Form: f, Results: f.Check(""), Blank: true}
+}
+
+// startOn gives a fresh quote or edit form the default form when forms are
+// required and it has none yet, so the picker and the checklist agree.
+func (app *App) startOn(f moltForm) moltForm {
+	if app.cfg.FormsRequired() && f.Form == "" {
+		f.Form = defaultForm
+	}
+	return f
+}
+
 // checkMolt checks a molt's text against the writing form it names: the
 // form must exist, the text can't be blank or longer than the form allows,
 // and no exact rule may be broken. Hints (syllables, rhyme) never stop a molt.
-func checkMolt(f moltForm) moltCheck {
+// When forms are required, a plain note is refused as well.
+func (app *App) checkMolt(f moltForm) moltCheck {
+	return checkMoltForm(f, app.cfg.FormsRequired())
+}
+
+// checkMoltForm is checkMolt with the site's mode spelled out.
+func checkMoltForm(f moltForm, required bool) moltCheck {
 	form, ok := writing.ByID(f.Form)
 	if !ok {
 		return moltCheck{Message: "That is not a form Krabber knows."}
+	}
+	if required && !formAllowed(form) {
+		if form.ID == "" {
+			return moltCheck{Message: "Pick a form."}
+		}
+		return moltCheck{Message: fmt.Sprintf("Pick another form: %s is not written here.", strings.ToLower(formSubject(form)))}
 	}
 	c := moltCheck{Form: form, Results: form.Check(f.Content), Blank: !validator.NotBlank(f.Content)}
 	switch {
@@ -74,7 +130,7 @@ func (app *App) moltCheckPost(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	c := checkMolt(f)
+	c := app.checkMolt(f)
 	if c.Blank { // nothing to say about an empty box; the rules alone show
 		c.Message = ""
 	}

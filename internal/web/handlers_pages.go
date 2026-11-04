@@ -25,7 +25,12 @@ func (app *App) home(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/trench", http.StatusSeeOther)
 		return
 	}
-	app.render(w, r, http.StatusOK, "welcome.html", app.newTemplateData(r))
+	data := app.newTemplateData(r)
+	data.Description = "Krabber is an open-source dumb blogging platform powered by krabs."
+	if data.FormsRequired {
+		data.Description = "Krabber is an open-source dumb blogging platform where every molt is a poem or another written form: a haiku, a sonnet, a letter, a three-panel joke."
+	}
+	app.render(w, r, http.StatusOK, "welcome.html", data)
 }
 
 // renderFeed renders a page whose main content is a list of molts.

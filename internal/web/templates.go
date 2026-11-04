@@ -39,6 +39,8 @@ type templateData struct {
 	TurnstileSiteKey string
 	SignupMode       string // config.SignupOpen, SignupInvite or SignupClosed
 	SignupFull       bool   // MAX_KRABS reached
+	FormsRequired    bool   // MOLT_FORMS=required: every molt takes a writing form
+	Description      string // the page's <meta name="description">, when it has one
 	Form             any
 	Query            string
 	CurrentPath      string
@@ -249,10 +251,12 @@ var templateFuncs = template.FuncMap{
 	"forms":          writing.Forms,
 	"formGroups":     writing.Groups,
 	"formsIn":        writing.InGroup,
+	"pickable":       pickable,
+	"defaultForm":    func() string { return defaultForm },
 	"formOf":         formOf,
 	"verse":          verse,
 	"folded":         folded,
-	"emptyCheck":     func() moltCheck { return moltCheck{} },
+	"freshCheck":     freshCheck,
 }
 
 func avatarSrc(code string) string {
@@ -345,6 +349,7 @@ func (app *App) newTemplateData(r *http.Request) templateData {
 		CSRFToken:        csrfToken(r),
 		TurnstileSiteKey: app.cfg.TurnstileSiteKey,
 		SignupMode:       app.cfg.SignupMode,
+		FormsRequired:    app.cfg.FormsRequired(),
 		CurrentPath:      r.URL.Path,
 	}
 	if c := currentCrab(r); c != nil {

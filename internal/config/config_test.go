@@ -47,6 +47,20 @@ func TestParseDevDefaults(t *testing.T) {
 	if !c.IsDev() || c.MailSender != "console" || c.TurnstileEnabled() || c.SignupMode != SignupOpen {
 		t.Fatalf("dev defaults: %+v", c)
 	}
+	if c.MoltForms != MoltFormsOptional || c.FormsRequired() {
+		t.Fatalf("forms should be optional by default: %+v", c)
+	}
+}
+
+func TestMoltForms(t *testing.T) {
+	env := map[string]string{"APP_ENV": "dev", "TABLE_NAME": "krabber-dev", "BASE_URL": "http://localhost:5000", "MOLT_FORMS": "Required"}
+	if c, err := parse(env); err != nil || c.MoltForms != MoltFormsRequired || !c.FormsRequired() {
+		t.Fatalf("required: %+v %v", c, err)
+	}
+	env["MOLT_FORMS"] = "sometimes"
+	if _, err := parse(env); err == nil || !strings.Contains(err.Error(), "MOLT_FORMS") {
+		t.Fatalf("bad mode: %v", err)
+	}
 }
 
 func TestSignupMode(t *testing.T) {
