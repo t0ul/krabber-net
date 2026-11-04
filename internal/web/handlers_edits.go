@@ -20,7 +20,10 @@ func (app *App) editPage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *App) renderEdit(w http.ResponseWriter, r *http.Request, status int, m *store.Molt, f moltForm) {
-	f.Check = checkMolt(f)
+	if status == http.StatusOK {
+		f = app.startOn(f)
+	}
+	f.Check = app.checkMolt(f)
 	if status == http.StatusOK { // a fresh form has nothing to complain about yet
 		f.Check.Message = ""
 	}
@@ -41,7 +44,7 @@ func (app *App) editPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	f.CheckField(f.Content != m.Content || f.Form != m.Form, "content", "No changes were made")
-	if !f.Valid() || checkMolt(f).Message != "" {
+	if !f.Valid() || app.checkMolt(f).Message != "" {
 		app.renderEdit(w, r, http.StatusUnprocessableEntity, m, f)
 		return
 	}

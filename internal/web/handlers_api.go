@@ -102,8 +102,10 @@ func (app *App) apiAuthenticate(scope string, next http.HandlerFunc) http.Handle
 }
 
 // apiCreateMolt posts a molt as the authenticated key's crab. Body:
-// {"text": "...", "nsfw": false, "form": "haiku"}; form is optional and names
-// a writing form (see /forms), checked by the same rules as the web composer.
+// {"text": "...", "nsfw": false, "form": "haiku"}; form names a writing form
+// (see /forms), checked by the same rules as the web composer. It's optional
+// unless the site requires a form (MOLT_FORMS=required), when a post without
+// one is refused with "Pick a form.".
 // It validates and rate-limits exactly like the web compose box, then
 // publishes through the same path.
 func (app *App) apiCreateMolt(w http.ResponseWriter, r *http.Request) {
@@ -120,7 +122,7 @@ func (app *App) apiCreateMolt(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	in.Text = strings.ReplaceAll(in.Text, "\r\n", "\n")
-	if check := checkMolt(moltForm{Content: in.Text, NSFW: in.NSFW, Form: in.Form}); check.Message != "" {
+	if check := app.checkMolt(moltForm{Content: in.Text, NSFW: in.NSFW, Form: in.Form}); check.Message != "" {
 		apiError(w, http.StatusUnprocessableEntity, check.Message)
 		return
 	}

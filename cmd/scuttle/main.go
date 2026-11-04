@@ -1,7 +1,8 @@
 // Command scuttle is the @scuttle bot: once or twice a day it reads the
 // Manhattan tide (NOAA) and sky (NWS) and posts one molt to krabber.net through
-// the Krabber API. Both feeds are keyless US-gov APIs, so the only secret is
-// the Krabber API key, read from SSM at runtime.
+// the Krabber API, as a haiku: the tides, the sky, the sign-off. Both feeds
+// are keyless US-gov APIs, so the only secret is the Krabber API key, read
+// from SSM at runtime.
 //
 // On Lambda it runs on an EventBridge schedule. Run it locally against a dev
 // server to see the molt it would post:
@@ -20,11 +21,14 @@ import (
 	"os"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
+
+	"github.com/t0ul/krabber-net/internal/botkit"
 )
 
 // Defaults point at Central Park / The Battery, the usual Manhattan references
@@ -35,6 +39,7 @@ const (
 	defaultStation = "8518750" // The Battery, NY
 	defaultUA      = "krabber-scuttle (+https://krabber.net)"
 	moltMax        = 280
+	moltForm       = "haiku" // the writing form every Daily Scuttle takes
 )
 
 type scuttle struct {
@@ -127,8 +132,11 @@ func (s *scuttle) run(ctx context.Context) error {
 	}
 
 	text := compose(tides, wx)
+	if err := botkit.Check(text, moltForm); err != nil {
+		return err
+	}
 	if os.Getenv("AWS_LAMBDA_RUNTIME_API") == "" {
-		log.Printf("would post (%d chars): %s", len(text), text)
+		log.Printf("would post (%s, %d chars): %s", moltForm, utf8.RuneCountInString(text), text)
 	}
 	if err := s.post(ctx, text); err != nil {
 		return fmt.Errorf("post molt: %w", err)
@@ -243,8 +251,9 @@ func (s *scuttle) weather(ctx context.Context) (*weather, error) {
 // Compose and post
 // ---------------------------------------------------------------------------
 
-// compose builds one molt, trimming to fit: it drops the wind, then extra tide
-// events, before it ever cuts a word.
+// compose builds one molt as a haiku: the tides, then the sky, then the
+// sign-off. It trims to fit: it drops the wind, then extra tide events,
+// before it ever cuts a word, and never a line.
 func compose(tides []tideEvent, wx *weather) string {
 	tideStr := func(n int) string {
 		parts := make([]string, 0, n)
@@ -260,9 +269,9 @@ func compose(tides []tideEvent, wx *weather) string {
 		}
 		return strings.Join(parts, ", ")
 	}
-	wxStr := func(withWind bool) string {
+	skyStr := func(withWind bool) string {
 		if wx == nil {
-			return ""
+			return "the sky keeps its own counsel"
 		}
 		s := fmt.Sprintf("%s, %d%s", wx.forecast, wx.temp, wx.unit)
 		if withWind && wx.windSpeed != "" {
@@ -270,6 +279,7 @@ func compose(tides []tideEvent, wx *weather) string {
 		}
 		return s
 	}
+	const signOff = "that's your Daily Scuttle %nyc"
 
 	// Widest version first, then progressively smaller, and take the first that fits.
 	for _, v := range []struct {
@@ -278,21 +288,17 @@ func compose(tides []tideEvent, wx *weather) string {
 	}{
 		{len(tides), true}, {len(tides), false}, {2, false}, {1, false},
 	} {
-		m := "Daily Scuttle: " + tideStr(v.tideN)
-		if w := wxStr(v.withWind); w != "" {
-			m += ". " + w
-		}
-		m += ". %nyc"
-		if len(m) <= moltMax {
+		if m := tideStr(v.tideN) + "\n" + skyStr(v.withWind) + "\n" + signOff; utf8.RuneCountInString(m) <= moltMax {
 			return m
 		}
 	}
-	// Tide only, one event: the shortest we build. Hard-trim as a last resort.
-	m := "Daily Scuttle: " + tideStr(1) + ". %nyc"
-	if len(m) > moltMax {
-		m = m[:moltMax]
+	// One tide and no wind is the shortest we build. Cut the sky as a last
+	// resort, so the three lines stay.
+	tide, sky := tideStr(1), skyStr(false)
+	if room := moltMax - utf8.RuneCountInString(tide) - utf8.RuneCountInString(signOff) - 2; room < utf8.RuneCountInString(sky) {
+		sky = botkit.Truncate(sky, max(room, 1))
 	}
-	return m
+	return tide + "\n" + sky + "\n" + signOff
 }
 
 // clock formats a time like "6:42a" or "12:58p".
@@ -302,7 +308,7 @@ func clock(t time.Time) string {
 }
 
 func (s *scuttle) post(ctx context.Context, text string) error {
-	payload, err := json.Marshal(map[string]string{"text": text})
+	payload, err := json.Marshal(map[string]string{"text": text, "form": moltForm})
 	if err != nil {
 		return err
 	}

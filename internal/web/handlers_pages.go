@@ -26,7 +26,11 @@ func (app *App) home(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	data := app.newTemplateData(r)
-	app.describe(r, &data, "Krabber is an open-source microblog with a chronological feed and no ads, tracking or algorithm. Write a molt, or a haiku, sonnet, letter or essay.", "website")
+	description := "Krabber is an open-source microblog with a chronological feed and no ads, tracking or algorithm. Write a molt, or a haiku, sonnet, letter or essay."
+	if data.FormsRequired {
+		description = "Krabber is an open-source microblog where every molt is a poem or another written form: a haiku, a sonnet, a letter, a three-panel joke. No ads, tracking or algorithm."
+	}
+	app.describe(r, &data, description, "website")
 	app.render(w, r, http.StatusOK, "welcome.html", data)
 }
 

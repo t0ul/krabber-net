@@ -74,6 +74,7 @@ python3 scripts/cost_model.py 1000 5000 10000   # daily active krabs
 | `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET` | Cloudflare Turnstile on signup and resend; off when unset |
 | `SIGNUP_MODE` | `open` (default; an invite code is optional), `invite` (a krab's invite code is required) or `closed` |
 | `MAX_KRABS` | Close signups once this many krabs can sign in (0, the default, means no cap); see the cost table in PLAN.md section 2.2 |
+| `MOLT_FORMS` | `optional` (default: a molt may take a writing form from `/forms`, or be a plain note) or `required` (every molt, reply, quote and API post must take a form; the composer offers no plain note and the welcome page says the site is for poems and other written forms) |
 | `LOG_ALL_REQUESTS` | `true` logs every request with its DynamoDB read and write units, instead of 5% of successful ones (dev always logs all) |
 | `DYNAMO_ENDPOINT` | DynamoDB Local URL; dev only |
 | `PORT` | Listen port, 5000 by default (Beanstalk's) |

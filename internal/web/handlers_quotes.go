@@ -17,7 +17,10 @@ func (app *App) renderQuote(w http.ResponseWriter, r *http.Request, status int, 
 	if !ok {
 		return
 	}
-	f.Check = checkMolt(f)
+	if status == http.StatusOK {
+		f = app.startOn(f)
+	}
+	f.Check = app.checkMolt(f)
 	switch {
 	case status == http.StatusOK: // a fresh form has nothing to complain about yet
 		f.Check.Message = ""
@@ -54,7 +57,7 @@ func (app *App) quoteCreatePost(w http.ResponseWriter, r *http.Request) {
 	}
 	// The checklist in the re-shown form says what's wrong, so there's no
 	// field error to add.
-	if checkMolt(f).Message != "" {
+	if app.checkMolt(f).Message != "" {
 		app.renderQuote(w, r, http.StatusUnprocessableEntity, f)
 		return
 	}

@@ -34,7 +34,12 @@
   <!-- Sales pitch -->
   <div class="d-flex flex w-100 justify-content-center scroll-destination">
     <div class="w-75">
+      {{ if .FormsRequired }}
+      <h2 class="text-light-darker mt-lg-4 pb-3">Krabber is an open-source dumb blogging platform where every molt is a poem, or another written form.</h2>
+      <p class="text-light-darker">A haiku, a sonnet, a limerick, a letter, a three-panel joke: pick a form and the composer checks your lines as you write. <a href="/forms">See the forms.</a></p>
+      {{ else }}
       <h2 class="text-light-darker mt-lg-4 pb-3">Krabber is an open-source dumb blogging platform powered by krabs.</h2>
+      {{ end }}
 
       <!-- Feature list-->
       <div id="feature-showcase" class="mt-4 row row-cols-1 row-cols-lg-2 scroll-destination-mobile">
