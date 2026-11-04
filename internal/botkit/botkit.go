@@ -1,6 +1,6 @@
 // Package botkit is the shared spine for the Krabber bots (@gm, @barnacle,
 // @holidays, …). Each bot is a tiny cmd/<bot> that composes one molt's text
-// in a writing form (a couplet, a three-panel joke); botkit checks the text
+// in a writing form (a haiku, like every krab's molts by default); botkit checks the text
 // against the form's rules, handles reading the API key from SSM (or API_KEY
 // locally), posting to the Krabber API with the bearer key, and the
 // Lambda-vs-local run modes. This mirrors how cmd/scuttle works, without
@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"net/http"
 	"os"
 	"strings"
@@ -137,8 +138,8 @@ func Run(name, form string, compose func(ctx context.Context) (string, error)) {
 
 // Check reports why the API would refuse text as a molt in form: the form
 // isn't in the catalogue, the text is too long for it, or it breaks one of
-// the form's exact rules (a line count, a blank line between panels). Hints
-// such as rhyme and syllables never fail a bot.
+// the form's rules, the sound ones included: a bot counts with the same
+// counter as the site, so it can hit five-seven-five every time.
 func Check(text, form string) error {
 	f, ok := writing.ByID(form)
 	if !ok {
@@ -147,10 +148,70 @@ func Check(text, form string) error {
 	if n := utf8.RuneCountInString(text); n > f.MaxChars {
 		return fmt.Errorf("%d characters is too long for a %s (up to %d)", n, strings.ToLower(f.Name), f.MaxChars)
 	}
-	if broken := writing.Broken(f.Check(text)); len(broken) > 0 {
+	if broken := writing.Broken(f.Check(text), false); len(broken) > 0 {
 		return fmt.Errorf("not a %s: %s (%s)", strings.ToLower(f.Name), broken[0].Rule, broken[0].Note)
 	}
 	return nil
+}
+
+// FitLine fits a line to n syllables by the site's own counter. The first
+// candidate that counts n wins. Otherwise the candidate nearest below n is
+// padded with fillers (the largest that fits, each joined with a comma) up
+// to n; when every candidate runs over, the shortest is cut word by word
+// from its end until it fits, then padded. Build candidates best first.
+func FitLine(n int, fillers []string, candidates ...string) string {
+	best, bestN := "", -1
+	shortest, shortN := "", math.MaxInt
+	for _, c := range candidates {
+		k := writing.LineSyllables(c)
+		if k == n {
+			return c
+		}
+		if k < n && k > bestN {
+			best, bestN = c, k
+		}
+		if k < shortN {
+			shortest, shortN = c, k
+		}
+	}
+	line := best
+	if bestN < 0 {
+		line = shortest
+		for writing.LineSyllables(line) > n {
+			words := strings.Fields(line)
+			if len(words) <= 1 {
+				break
+			}
+			line = strings.TrimRight(strings.Join(words[:len(words)-1], " "), ",;:")
+		}
+	}
+	for {
+		need := n - writing.LineSyllables(line)
+		if need <= 0 {
+			break
+		}
+		pick, pickN := "", 0
+		for _, f := range fillers {
+			if k := writing.LineSyllables(f); k > 0 && k <= need && k > pickN {
+				pick, pickN = f, k
+			}
+		}
+		if pick == "" {
+			break
+		}
+		if strings.TrimSpace(line) == "" {
+			line = pick
+		} else {
+			line = strings.TrimRight(line, ",;: ") + ", " + pick
+		}
+	}
+	return line
+}
+
+// Haiku fits three lines to five, seven and five syllables, each from its
+// own candidates (see FitLine).
+func Haiku(fillers []string, first, second, third []string) string {
+	return FitLine(5, fillers, first...) + "\n" + FitLine(7, fillers, second...) + "\n" + FitLine(5, fillers, third...)
 }
 
 // Fit returns the first candidate within MoltMax (by rune count), else the last

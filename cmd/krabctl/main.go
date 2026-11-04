@@ -10,6 +10,7 @@
 //	AWS_PROFILE=krabber-admin TABLE_NAME=krabber-prod go run ./cmd/krabctl apikey scuttle "scuttle bot"
 //	AWS_PROFILE=krabber-admin TABLE_NAME=krabber-prod go run ./cmd/krabctl apikeys scuttle
 //	AWS_PROFILE=krabber-admin TABLE_NAME=krabber-prod go run ./cmd/krabctl apikey-revoke scuttle <key-id>
+//	AWS_PROFILE=krabber-admin TABLE_NAME=krabber-prod go run ./cmd/krabctl form scuttle couplet
 package main
 
 import (
@@ -26,6 +27,7 @@ import (
 	"github.com/t0ul/krabber-net/internal/platform"
 	"github.com/t0ul/krabber-net/internal/store"
 	"github.com/t0ul/krabber-net/internal/trophies"
+	"github.com/t0ul/krabber-net/internal/writing"
 )
 
 const usage = `usage: krabctl role <username> <admin|moderator|none>
@@ -35,7 +37,8 @@ const usage = `usage: krabctl role <username> <admin|moderator|none>
        krabctl profile <username> <display> [bio]       set a crab's display name (and bio)
        krabctl apikey <username> <name> [scope]  mint an API key (shown once); default scope write:molts
        krabctl apikeys <username>                list a crab's API keys
-       krabctl apikey-revoke <username> <key-id> stop a key working`
+       krabctl apikey-revoke <username> <key-id> stop a key working
+       krabctl form <username> <form-id|note>    the form the crab's molts start as (a haiku unless set)`
 
 func main() {
 	args := os.Args[1:]
@@ -69,6 +72,8 @@ func main() {
 		runAPIKeys(ctx, s, args)
 	case "apikey-revoke":
 		runAPIKeyRevoke(ctx, s, args)
+	case "form":
+		runForm(ctx, s, args)
 	default:
 		log.Fatal(usage)
 	}
@@ -276,4 +281,29 @@ func runAPIKeyRevoke(ctx context.Context, s *store.Store, args []string) {
 		log.Fatal(err)
 	}
 	fmt.Printf("@%s key %s revoked\n", c.UserName, args[2])
+}
+
+// runForm sets the writing form a crab's molts start as: for bot accounts,
+// which never see the settings page. An API post that names no form takes
+// it; "note" means a plain note.
+func runForm(ctx context.Context, s *store.Store, args []string) {
+	if len(args) != 3 {
+		log.Fatal(usage)
+	}
+	name, id := args[1], args[2]
+	lookup := id
+	if id == store.FormNote {
+		lookup = ""
+	}
+	if _, ok := writing.ByID(lookup); !ok || id == "" {
+		log.Fatalf("%q is not a writing form (see /forms) or note", id) //nolint:gosec // the operator's own argument
+	}
+	c, err := s.CrabByUsername(ctx, name)
+	if err != nil {
+		log.Fatalf("find %q: %v", name, err) //nolint:gosec // the operator's own argument
+	}
+	if err := s.SetDefaultForm(ctx, c, id); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("%s's molts now start as %s\n", c.UserName, id)
 }

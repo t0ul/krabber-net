@@ -817,6 +817,97 @@ body.kb-shell,
   color: var(--light-faded);
 }
 
+/* The shaped composer: one box per line of a poem, with the rhyme letter
+   before it and the syllables heard against the count wanted after it, or
+   one labelled box per part of a letter, a post or a joke. */
+.kb-shape {
+  margin: 0.5rem 0;
+}
+
+.kb-line {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.3rem;
+}
+
+.kb-field {
+  background: none;
+  color: inherit;
+  border: none;
+  border-bottom: 1px solid var(--dark-less);
+  border-radius: 0;
+  outline: none;
+  padding: 0.15rem 0;
+  font: inherit;
+  width: 100%;
+  min-width: 0;
+}
+
+.kb-field:focus {
+  border-bottom-color: var(--light-faded);
+}
+
+.kb-line-input {
+  flex: 1;
+  font-family: Georgia, "Times New Roman", serif;
+  font-style: italic;
+}
+
+.kb-line-sealed {
+  color: var(--light-faded);
+}
+
+.kb-line-rhyme {
+  width: 1.1rem;
+  flex-shrink: 0;
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: bold;
+  color: var(--light-faded);
+}
+
+.kb-line-meter {
+  min-width: 2.6rem;
+  flex-shrink: 0;
+  text-align: right;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--light-faded);
+}
+
+.kb-meter-ok, .kb-rhyme-ok {
+  color: #3fb950;
+}
+
+.kb-meter-off, .kb-rhyme-off {
+  color: var(--primary);
+}
+
+.kb-line-add {
+  font-size: 0.8rem;
+}
+
+.kb-part {
+  display: block;
+  margin-bottom: 0.6rem;
+}
+
+.kb-part-label {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--light-faded);
+}
+
+textarea.kb-part-field {
+  resize: vertical;
+}
+
+.kb-feedback-vouch .kb-vouch {
+  font-size: inherit;
+  vertical-align: baseline;
+}
+
 .kb-form-badge {
   font-size: 0.72rem;
   text-transform: lowercase;

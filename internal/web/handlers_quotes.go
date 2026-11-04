@@ -17,8 +17,8 @@ func (app *App) renderQuote(w http.ResponseWriter, r *http.Request, status int, 
 	if !ok {
 		return
 	}
-	if status == http.StatusOK {
-		f = app.startOn(f)
+	if status == http.StatusOK { // a fresh quote starts on the krab's default form
+		f.Form = app.startForm(currentCrab(r))
 	}
 	f.Check = app.checkMolt(f)
 	switch {

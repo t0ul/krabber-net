@@ -251,54 +251,41 @@ func (s *scuttle) weather(ctx context.Context) (*weather, error) {
 // Compose and post
 // ---------------------------------------------------------------------------
 
-// compose builds one molt as a haiku: the tides, then the sky, then the
-// sign-off. It trims to fit: it drops the wind, then extra tide events,
-// before it ever cuts a word, and never a line.
-func compose(tides []tideEvent, wx *weather) string {
-	tideStr := func(n int) string {
-		parts := make([]string, 0, n)
-		for i, t := range tides {
-			if i >= n {
-				break
-			}
-			label := "low"
-			if t.high {
-				label = "high"
-			}
-			parts = append(parts, label+" "+clock(t.when))
-		}
-		return strings.Join(parts, ", ")
-	}
-	skyStr := func(withWind bool) string {
-		if wx == nil {
-			return "the sky keeps its own counsel"
-		}
-		s := fmt.Sprintf("%s, %d%s", wx.forecast, wx.temp, wx.unit)
-		if withWind && wx.windSpeed != "" {
-			s += ", wind " + wx.windSpeed
-		}
-		return s
-	}
-	const signOff = "that's your Daily Scuttle %nyc"
+// fillers pad a line that comes up short.
+var fillers = []string{"on the Battery", "over the harbor", "says the sky", "all day", "today", "now"}
 
-	// Widest version first, then progressively smaller, and take the first that fits.
-	for _, v := range []struct {
-		tideN    int
-		withWind bool
-	}{
-		{len(tides), true}, {len(tides), false}, {2, false}, {1, false},
-	} {
-		if m := tideStr(v.tideN) + "\n" + skyStr(v.withWind) + "\n" + signOff; utf8.RuneCountInString(m) <= moltMax {
-			return m
+// compose builds one molt as a haiku the site counts as five-seven-five:
+// the tides, then the sky, then the sign-off. The tide line names the first
+// two events (or the one there is), the sky line drops the wind, then the
+// temperature, until it fits.
+func compose(tides []tideEvent, wx *weather) string {
+	event := func(i int) (label, at string) {
+		label = "low"
+		if tides[i].high {
+			label = "high"
 		}
+		return label, clock(tides[i].when)
 	}
-	// One tide and no wind is the shortest we build. Cut the sky as a last
-	// resort, so the three lines stay.
-	tide, sky := tideStr(1), skyStr(false)
-	if room := moltMax - utf8.RuneCountInString(tide) - utf8.RuneCountInString(signOff) - 2; room < utf8.RuneCountInString(sky) {
-		sky = botkit.Truncate(sky, max(room, 1))
+	var tideLines []string
+	if len(tides) >= 2 {
+		l1, t1 := event(0)
+		l2, t2 := event(1)
+		tideLines = append(tideLines, fmt.Sprintf("%s tide %s, %s %s", l1, t1, l2, t2))
 	}
-	return tide + "\n" + sky + "\n" + signOff
+	if len(tides) >= 1 {
+		l1, t1 := event(0)
+		tideLines = append(tideLines, fmt.Sprintf("%s tide at %s", l1, t1), fmt.Sprintf("%s tide %s", l1, t1))
+	}
+	sky := []string{"the sky keeps its own counsel"}
+	if wx != nil {
+		base := fmt.Sprintf("%s, %d%s", wx.forecast, wx.temp, wx.unit)
+		sky = []string{base}
+		if wx.windSpeed != "" {
+			sky = []string{base + ", wind " + wx.windSpeed, base}
+		}
+		sky = append(sky, wx.forecast)
+	}
+	return botkit.Haiku(fillers, tideLines, sky, []string{"Daily Scuttle %nyc"})
 }
 
 // clock formats a time like "6:42a" or "12:58p".

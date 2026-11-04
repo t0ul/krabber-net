@@ -4,7 +4,7 @@
 {{ template "shell-top" . }}
     {{ template "heading" "Writing forms" }}
     <div class="px-3 py-3 kb-legal kb-forms">
-        <p>Every molt can take a form. Pick one from the dropdown when you write and the composer checks your text against its rules as you go. Exact rules (three lines, a blank line between panels) have to be met before you can post. Rules about sound (syllables, rhyme) are guesses from spelling, so they only nudge: the mark shows what the computer heard, and you decide.</p>
+        <p>Every molt can take a form. Pick one from the dropdown when you write: the composer lays the form out (a box per line of a haiku, a setup, a build and a punchline for a joke), measures each line as you type, and checks your text against the rules as you go. Exact rules (three lines, a blank line between panels) have to be met before you can post. Rules about sound (syllables, rhyme) are counted from spelling, so the count can be wrong: they hold a molt back too, but once you've counted it yourself you can post it anyway.</p>
         {{ if .FormsRequired }}<p class="text-muted small">Every molt here takes a form: there are no plain notes.</p>
         {{ else }}<p class="text-muted small">A plain molt, a <strong>Note</strong>, has no rules and up to 280 characters.</p>{{ end }}
         {{ range formGroups }}

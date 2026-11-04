@@ -15,6 +15,7 @@ import (
 	"github.com/t0ul/krabber-net/internal/store"
 	"github.com/t0ul/krabber-net/internal/trophies"
 	"github.com/t0ul/krabber-net/internal/validator"
+	"github.com/t0ul/krabber-net/internal/writing"
 )
 
 const (
@@ -258,6 +259,34 @@ func (app *App) settingsContentPost(w http.ResponseWriter, r *http.Request) {
 	c := *currentCrab(r)
 	filters := store.ContentFilters{ShowNSFW: f.ShowNSFW, MutedWords: parseMutedWords(f.MutedWords)}
 	if err := app.store.SetContentFilters(r.Context(), &c, filters); err != nil {
+		app.serverError(w, r, err)
+		return
+	}
+	app.sessions.Put(r.Context(), sessionFlash, "Changes saved.")
+	http.Redirect(w, r, "/settings", http.StatusSeeOther)
+}
+
+// settingsWritingPost saves the writing form the crab's molts start on: a
+// form from the catalogue, or a plain note where the site allows one.
+func (app *App) settingsWritingPost(w http.ResponseWriter, r *http.Request) {
+	var f struct {
+		DefaultForm string `form:"default_form"`
+	}
+	if err := app.decodePostForm(w, r, &f); err != nil {
+		app.clientError(w, http.StatusBadRequest)
+		return
+	}
+	id := f.DefaultForm
+	if id == store.FormNote {
+		id = ""
+	}
+	form, ok := writing.ByID(id)
+	if f.DefaultForm == "" || !ok || (app.cfg.FormsRequired() && !formAllowed(form)) {
+		app.clientError(w, http.StatusBadRequest)
+		return
+	}
+	c := *currentCrab(r)
+	if err := app.store.SetDefaultForm(r.Context(), &c, f.DefaultForm); err != nil {
 		app.serverError(w, r, err)
 		return
 	}

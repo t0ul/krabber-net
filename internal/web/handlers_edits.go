@@ -20,8 +20,8 @@ func (app *App) editPage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *App) renderEdit(w http.ResponseWriter, r *http.Request, status int, m *store.Molt, f moltForm) {
-	if status == http.StatusOK {
-		f = app.startOn(f)
+	if status == http.StatusOK && f.Form == "" && app.cfg.FormsRequired() {
+		f.Form = app.startForm(currentCrab(r)) // a note has to become something
 	}
 	f.Check = app.checkMolt(f)
 	if status == http.StatusOK { // a fresh form has nothing to complain about yet

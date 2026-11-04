@@ -27,23 +27,35 @@
 {{end}}
 
 {{/* The composer's feedback box: the chosen form's rules with a mark on each
-     (✓ followed, ✗ broken, ~ a hint missed, · advice), and why the molt can't
-     be posted yet. It asks for a fresh check when app.js sends kb:check, and a
-     refused post lands here (HX-Retarget). Takes a moltCheck. */}}
+     (✓ followed, ✗ broken, ~ a nudge missed, · advice), why the molt can't be
+     posted yet, and a way to post anyway when only the counted sound (syllables,
+     rhyme) is in doubt. It carries each line's measure for the shaped composer's
+     meters. It asks for a fresh check when app.js sends kb:check, and a refused
+     post lands here (HX-Retarget). Takes a moltCheck. */}}
 {{define "form-feedback"}}
-<div class="kb-feedback{{ if .Message }} kb-feedback-refused{{ end }}" hx-post="/molt/check" hx-trigger="kb:check" hx-include="closest form" hx-target="this" hx-swap="outerHTML" hx-sync="this:replace" hx-disabled-elt="this" aria-live="polite">
+<div class="kb-feedback{{ if .Message }} kb-feedback-refused{{ end }}" hx-post="/molt/check" hx-trigger="kb:check" hx-include="closest form" hx-target="this" hx-swap="outerHTML" hx-sync="this:replace" hx-disabled-elt="this" aria-live="polite" data-lines="{{ json .Lines }}">
     {{ if .Form.ID }}{{ $blank := .Blank }}
     <p class="kb-feedback-tagline text-muted small mb-1">{{ .Form.Tagline }} <a href="/forms#{{ .Form.ID }}">How to write one</a></p>
     <ul class="kb-rules list-unstyled small mb-1">
         {{ range .Results }}
-        <li class="kb-rule {{ if or $blank (not .Checked) }}kb-rule-advice{{ else if .OK }}kb-rule-ok{{ else if .Hint }}kb-rule-hint{{ else }}kb-rule-fail{{ end }}">
-            <span class="kb-rule-mark" aria-hidden="true">{{ if or $blank (not .Checked) }}·{{ else if .OK }}✓{{ else if .Hint }}~{{ else }}✗{{ end }}</span>{{ .Rule }}{{ if and .Checked (not $blank) .Note }} <span class="text-muted">({{ .Note }})</span>{{ end }}
+        <li class="kb-rule {{ if or $blank (not .Checked) }}kb-rule-advice{{ else if .OK }}kb-rule-ok{{ else if .Soft }}kb-rule-hint{{ else }}kb-rule-fail{{ end }}">
+            <span class="kb-rule-mark" aria-hidden="true">{{ if or $blank (not .Checked) }}·{{ else if .OK }}✓{{ else if .Soft }}~{{ else }}✗{{ end }}</span>{{ .Rule }}{{ if and .Checked (not $blank) .Note }} <span class="text-muted">({{ .Note }})</span>{{ end }}
         </li>
         {{ end }}
     </ul>
     {{ end }}
     {{ with .Message }}<p class="kb-feedback-message text-primary small mb-1">{{ . }}</p>{{ end }}
+    {{ if .Overridable }}<p class="kb-feedback-vouch text-muted small mb-1">Syllables and rhymes are counted from spelling, so the count can be wrong. If you've counted it yourself, <button type="submit" name="override" value="true" class="btn btn-link btn-sm p-0 align-baseline kb-vouch">post it anyway</button>.</p>{{ end }}
 </div>
+{{end}}
+
+{{/* The text box of a composer: the textarea that's posted, and the shaped
+     box app.js builds over it from the form's shape (one line each for a
+     haiku, setup, build and punchline for a joke). Takes a dict: Rows and
+     Placeholder for the textarea, Label for its aria-label, and Autofocus. */}}
+{{define "molt-text"}}
+<textarea name="content" rows="{{ .Rows }}" class="my-2 w-100" placeholder="{{ .Placeholder }}" aria-label="{{ .Label }}" required{{ if .Autofocus }} autofocus{{ end }}>{{ .Content }}</textarea>
+<div class="kb-shape" hidden></div>
 {{end}}
 
 {{/* Crabber's NSFW switch; takes the input's ID. */}}
@@ -63,11 +75,11 @@
         <form hx-post="/molt/create" hx-target="#molt-list" hx-swap="afterbegin" hx-disabled-elt="find button" data-reset-on-success data-swap-errors>
             <input type='hidden' name='csrf_token' value='{{ .CSRFToken }}'>
             <div class="mini-compose-textarea">
-                <textarea name="content" rows="3" class="my-2 w-100" placeholder="How are you feeling?" aria-label="Molt text" required></textarea>
+                {{ template "molt-text" (dict "Rows" 3 "Placeholder" "How are you feeling?" "Label" "Molt text" "Content" "" "Autofocus" false) }}
             </div>
-            {{ template "form-feedback" (freshCheck .FormsRequired) }}
+            {{ template "form-feedback" (freshCheck .StartForm) }}
             <div class="mini-molt-actions d-flex flex-row justify-content-end w-100 compose-button-row">
-                {{ template "form-picker" (dict "Selected" "" "Required" .FormsRequired) }}
+                {{ template "form-picker" (dict "Selected" .StartForm "Required" .FormsRequired) }}
                 {{ template "nsfw-toggle" "nsfw-compose" }}
                 {{ template "counter" }}
                 <button type="submit" class="btn btn-primary rounded-pill"><strong>Molt</strong></button>
@@ -88,14 +100,16 @@
                 <a href="/krabs/{{ .CrabName }}">{{ template "avatar" .Avatar }}</a>
             </div>
             <div class="mini-molt-text-box w-100 h-100 px-2 col">
-                <form method="POST" action="/molt/create">
+                {{/* Posts over htmx when it can, so a refusal lands in the box below
+                     and the molt goes to the top of the feed; a plain post works too. */}}
+                <form method="POST" action="/molt/create" hx-post="/molt/create" hx-swap="none" hx-disabled-elt="find button" data-reset-on-success data-swap-errors data-molt-modal>
                     <input type='hidden' name='csrf_token' value='{{ .CSRFToken }}'>
                     <div class="mini-compose-textarea">
-                        <textarea name="content" rows="5" class="my-2 w-100" placeholder="How are you feeling?" aria-label="Molt text" required></textarea>
+                        {{ template "molt-text" (dict "Rows" 5 "Placeholder" "How are you feeling?" "Label" "Molt text" "Content" "" "Autofocus" false) }}
                     </div>
-                    {{ template "form-feedback" (freshCheck .FormsRequired) }}
+                    {{ template "form-feedback" (freshCheck .StartForm) }}
                     <div class="mini-molt-actions d-flex flex-row justify-content-end w-100 compose-button-row">
-                        {{ template "form-picker" (dict "Selected" "" "Required" .FormsRequired) }}
+                        {{ template "form-picker" (dict "Selected" .StartForm "Required" .FormsRequired) }}
                         {{ template "nsfw-toggle" "nsfw-compose-modal" }}
                         {{ template "counter" }}
                         <button type="submit" class="btn btn-primary rounded-pill"><strong>Molt</strong></button>
@@ -118,10 +132,10 @@
 <form method="POST" action="/molt/quote/{{ .Molt.ID }}" hx-post="/molt/quote/{{ .Molt.ID }}" hx-target="this" hx-swap="outerHTML" hx-disabled-elt="find button" data-swap-errors>
     <input type='hidden' name='csrf_token' value='{{ .CSRFToken }}'>
     <div class="mini-compose-reply-textarea">
-        <textarea name="content" rows="5" class="my-2 w-100" placeholder="Remember to be kind" aria-label="Your quote" required autofocus>{{ with .Form }}{{ .Content }}{{ end }}</textarea>
+        {{ template "molt-text" (dict "Rows" 5 "Placeholder" "Remember to be kind" "Label" "Your quote" "Content" .Form.Content "Autofocus" true) }}
         {{ with .Form }}{{ with .FieldErrors.content }}<div class="text-primary small mb-2">{{ . }}</div>{{ end }}{{ end }}
     </div>
-    {{ with .Form }}{{ template "form-feedback" .Check }}{{ else }}{{ template "form-feedback" (freshCheck .FormsRequired) }}{{ end }}
+    {{ with .Form }}{{ template "form-feedback" .Check }}{{ else }}{{ template "form-feedback" (freshCheck .StartForm) }}{{ end }}
     {{ template "quoted-molt" .Molt }}
     <div class="mini-molt-actions d-flex flex-row justify-content-end w-100 compose-button-row">
         {{ template "form-picker" (dict "Selected" .Form.Form "Required" .FormsRequired) }}
@@ -151,10 +165,10 @@
 <form method="POST" action="/molt/edit/{{ .Molt.ID }}" hx-post="/molt/edit/{{ .Molt.ID }}" hx-target="this" hx-swap="outerHTML" hx-disabled-elt="find button" data-swap-errors>
     <input type='hidden' name='csrf_token' value='{{ .CSRFToken }}'>
     <div class="mini-compose-reply-textarea">
-        <textarea name="content" rows="5" class="my-2 w-100" placeholder="Remember to be kind" aria-label="Molt text" required autofocus>{{ with .Form }}{{ .Content }}{{ end }}</textarea>
+        {{ template "molt-text" (dict "Rows" 5 "Placeholder" "Remember to be kind" "Label" "Molt text" "Content" .Form.Content "Autofocus" true) }}
         {{ with .Form }}{{ with .FieldErrors.content }}<div class="text-primary small mb-2">{{ . }}</div>{{ end }}{{ end }}
     </div>
-    {{ with .Form }}{{ template "form-feedback" .Check }}{{ else }}{{ template "form-feedback" (freshCheck .FormsRequired) }}{{ end }}
+    {{ with .Form }}{{ template "form-feedback" .Check }}{{ else }}{{ template "form-feedback" (freshCheck .StartForm) }}{{ end }}
     <div class="mini-molt-actions d-flex flex-row justify-content-end w-100 compose-button-row">
         {{ template "form-picker" (dict "Selected" .Form.Form "Required" .FormsRequired) }}
         {{ template "counter" }}

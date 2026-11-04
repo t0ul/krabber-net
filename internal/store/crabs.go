@@ -45,6 +45,11 @@ type Crab struct {
 	ContentFilters
 	Appearance
 
+	// DefaultForm is the writing form the crab's molts start on: a form ID,
+	// FormNote for a plain note, or "" for the site's default (a haiku). Any
+	// molt can still take another form.
+	DefaultForm string `dynamodbav:"default_form,omitempty"`
+
 	UsernameChangedAt int64 `dynamodbav:"username_changed_at,omitempty"` // Unix seconds of the last rename
 
 	InviteCode string `dynamodbav:"invite_code,omitempty"` // this crab's code for inviting others
@@ -585,6 +590,29 @@ func (s *Store) SetVerified(ctx context.Context, c *Crab, on bool) error {
 		return fmt.Errorf("set verified: %w", err)
 	}
 	c.Verified = on
+	return nil
+}
+
+// FormNote is the DefaultForm of a crab whose molts start as plain notes.
+const FormNote = "note"
+
+// SetDefaultForm saves the writing form the crab's molts start on: a form
+// ID, FormNote, or "" for the site's default.
+func (s *Store) SetDefaultForm(ctx context.Context, c *Crab, id string) error {
+	in := &dynamodb.UpdateItemInput{
+		TableName:           s.tableName(),
+		Key:                 keyOf(c.PK, c.SK),
+		UpdateExpression:    aws.String("REMOVE default_form"),
+		ConditionExpression: aws.String("attribute_exists(PK)"),
+	}
+	if id != "" {
+		in.UpdateExpression = aws.String("SET default_form = :f")
+		in.ExpressionAttributeValues = map[string]types.AttributeValue{":f": &types.AttributeValueMemberS{Value: id}}
+	}
+	if _, err := s.db.UpdateItem(ctx, in); err != nil {
+		return fmt.Errorf("set default form: %w", err)
+	}
+	c.DefaultForm = id
 	return nil
 }
 

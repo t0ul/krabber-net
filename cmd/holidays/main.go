@@ -1,9 +1,9 @@
 // Command holidays is the @holidays Krabber bot: a day-before heads-up for days
 // off. It posts when TOMORROW is a U.S. federal holiday (computed, tagged %fed)
 // and/or a scheduled NYC public-school closure (from an embedded, hand-kept list,
-// tagged %nyc). The heads-up is a three-panel joke: the day, what it means,
-// and the punchline (sleep in). If tomorrow is an ordinary day it posts
-// nothing. Scheduled once a morning.
+// tagged %nyc). The heads-up is a haiku, as every krab's molts are by
+// default: the day, what it is, and the advice (sleep in). If tomorrow is an
+// ordinary day it posts nothing. Scheduled once a morning.
 package main
 
 import (
@@ -21,8 +21,12 @@ import (
 //go:embed nyc_school_closed.txt
 var nycClosuresRaw string
 
-// form is the writing form every heads-up takes.
-const form = "three-panel"
+// form is the writing form every heads-up takes: a haiku, counted
+// five-seven-five by the site's own counter.
+const form = "haiku"
+
+// fillers pad a line that comes up short.
+var fillers = []string{"for the kids", "tomorrow", "all day", "crabs"}
 
 func main() { botkit.Run("holidays", form, compose) }
 
@@ -39,31 +43,20 @@ func headsUp(day time.Time) string {
 	fedName := federalHolidays(day.Year())[key]
 	nycName := nycClosures()[key]
 
+	first := []string{fmt.Sprintf("Heads up 🦀 for %s", pretty)}
+	federal := []string{fedName + " is federal", fedName + ", a federal day", fedName + ", federal", fedName + ", day off", fedName}
 	switch {
 	case fedName != "" && nycName != "":
-		return panels(
-			fmt.Sprintf("Heads up 🦀 tomorrow (%s) is %s.", pretty, fedName),
-			"A federal holiday, and NYC public schools are closed.",
-			"Sleep in. %fed %nyc")
+		return botkit.Haiku(fillers, first, federal, []string{"all sleep in %fed %nyc"})
 	case fedName != "":
-		return panels(
-			fmt.Sprintf("Heads up 🦀 tomorrow (%s) is %s.", pretty, fedName),
-			"A federal holiday: most crabs are off work.",
-			"Sleep in. %fed")
+		return botkit.Haiku(fillers, first, federal, []string{"most crabs sleep in %fed"})
 	case nycName != "":
-		return panels(
-			fmt.Sprintf("Heads up 🦀 no NYC public school tomorrow (%s).", pretty),
-			fmt.Sprintf("The schools are closed: %s.", nycName),
-			"Small crabs, sleep in. %nyc")
+		return botkit.Haiku(fillers, first,
+			[]string{"no school: " + nycName, "no NYC school: " + nycName, nycName + ": no school", nycName},
+			[]string{"small crabs sleep in %nyc"})
 	default:
 		return "" // ordinary day, nothing to announce
 	}
-}
-
-// panels lays out a three-panel joke: setup, build, punchline, a blank line
-// between each.
-func panels(setup, build, punchline string) string {
-	return setup + "\n\n" + build + "\n\n" + punchline
 }
 
 // nycClosures parses the embedded closure list into date -> label.

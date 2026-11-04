@@ -1,7 +1,9 @@
 package web
 
 import (
+	"encoding/json"
 	"fmt"
+	"html/template"
 	"net/http"
 	"strings"
 
@@ -16,8 +18,36 @@ import (
 type moltCheck struct {
 	Form    writing.Form
 	Results []writing.Result
-	Blank   bool   // nothing written yet, so the rules show without marks
-	Message string // why the text can't be posted; "" when it can
+	Lines   []writing.LineMeasure // each line's syllables and rhyme, for the composer's meters
+	Blank   bool                  // nothing written yet, so the rules show without marks
+	Message string                // why the text can't be posted; "" when it can
+	// Overridable: only sound rules (syllables, rhyme) hold the molt back,
+	// and the writer may post it anyway by vouching for their own count.
+	Overridable bool
+}
+
+// shapesJSON is every form's shape by ID, for the composer's script.
+var shapesJSON = func() template.JS {
+	shapes := map[string]writing.Shape{}
+	for _, f := range writing.Forms() {
+		if !f.Shape.Free() {
+			shapes[f.ID] = f.Shape
+		}
+	}
+	b, err := json.Marshal(shapes)
+	if err != nil {
+		panic(err)
+	}
+	return template.JS(b) //nolint:gosec // our own catalogue, marshalled by encoding/json
+}()
+
+// jsonAttr marshals v for a data attribute; the template escapes it.
+func jsonAttr(v any) string {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return "null"
+	}
+	return string(b)
 }
 
 // formAllowed reports whether a molt may take form f when forms are required
@@ -45,29 +75,42 @@ func pickable(group string, required bool) []writing.Form {
 }
 
 // freshCheck is what a composer's feedback box shows before anything is
-// written: nothing, or when forms are required, the rules of the form the
+// written: nothing for a plain note, otherwise the rules of the form the
 // picker starts on.
-func freshCheck(required bool) moltCheck {
-	if !required {
+func freshCheck(id string) moltCheck {
+	f, ok := writing.ByID(id)
+	if !ok || f.ID == "" {
 		return moltCheck{}
 	}
-	f, _ := writing.ByID(defaultForm)
 	return moltCheck{Form: f, Results: f.Check(""), Blank: true}
 }
 
-// startOn gives a fresh quote or edit form the default form when forms are
-// required and it has none yet, so the picker and the checklist agree.
-func (app *App) startOn(f moltForm) moltForm {
-	if app.cfg.FormsRequired() && f.Form == "" {
-		f.Form = defaultForm
+// startForm is the form a krab's new molts start on: their default, a haiku
+// unless they chose otherwise in their settings. A choice the catalogue no
+// longer has, or a plain note where forms are required, falls back to a
+// haiku.
+func (app *App) startForm(c *store.Crab) string {
+	if c == nil {
+		return ""
 	}
-	return f
+	id := c.DefaultForm
+	switch id {
+	case "":
+		id = defaultForm
+	case store.FormNote:
+		id = ""
+	}
+	if f, ok := writing.ByID(id); !ok || (app.cfg.FormsRequired() && !formAllowed(f)) {
+		return defaultForm
+	}
+	return id
 }
 
 // checkMolt checks a molt's text against the writing form it names: the
 // form must exist, the text can't be blank or longer than the form allows,
-// and no exact rule may be broken. Hints (syllables, rhyme) never stop a molt.
-// When forms are required, a plain note is refused as well.
+// no exact rule may be broken, and the sound rules (syllables, rhyme) must
+// hold unless the writer vouched for their own count (f.Override). When
+// forms are required, a plain note is refused as well.
 func (app *App) checkMolt(f moltForm) moltCheck {
 	return checkMoltForm(f, app.cfg.FormsRequired())
 }
@@ -84,15 +127,20 @@ func checkMoltForm(f moltForm, required bool) moltCheck {
 		}
 		return moltCheck{Message: fmt.Sprintf("Pick another form: %s is not written here.", strings.ToLower(formSubject(form)))}
 	}
-	c := moltCheck{Form: form, Results: form.Check(f.Content), Blank: !validator.NotBlank(f.Content)}
+	c := moltCheck{Form: form, Results: form.Check(f.Content), Lines: form.Measure(f.Content), Blank: !validator.NotBlank(f.Content)}
 	switch {
 	case c.Blank:
 		c.Message = "Molt text cannot be blank."
 	case !validator.MaxChars(f.Content, form.MaxChars):
 		c.Message = fmt.Sprintf("%s can be up to %s characters.", formSubject(form), commas(form.MaxChars))
 	default:
-		if broken := writing.Broken(c.Results); len(broken) > 0 {
-			c.Message = fmt.Sprintf("Not quite %s yet: %s", strings.ToLower(formSubject(form)), broken[0].Rule)
+		if broken := writing.Broken(c.Results, f.Override); len(broken) > 0 {
+			rule := strings.TrimSuffix(broken[0].Rule, ".")
+			if broken[0].Note != "" {
+				rule += " (" + broken[0].Note + ")"
+			}
+			c.Message = fmt.Sprintf("Not quite %s yet: %s.", strings.ToLower(formSubject(form)), rule)
+			c.Overridable = len(writing.Broken(c.Results, true)) == 0
 		}
 	}
 	return c

@@ -30,7 +30,7 @@ var molts = map[string]seed{
 	"mrkrabs":   {"I like money, I like it a lot,\nmore than anything else I've got.", "couplet"},
 	"spongebob": ready,
 	"plankton":  {"The Krabby Patty formula will be MINE,\nand the Chum Bucket will finally have a line.", "couplet"},
-	"sandy":     {"Karate Island\nhere I come, claws up, hi-yah\nTexas can wait, y'all", "haiku"},
+	"sandy":     {"Karate Island calls\nhere I come, claws up high, hi-yah\nTexas can wait, y'all", "haiku"},
 	"patrick":   {"The inner machinations of my mind are an enigma.", "metaphor"},
 	"squidward": {"the reef at sunrise\nall of you, still here, still loud\nI hate all of you", "haiku"},
 }
@@ -50,7 +50,7 @@ func mustFit(sd seed) seed {
 	if !ok {
 		log.Fatalf("seed %q: no form %q", sd.text, sd.form)
 	}
-	if broken := writing.Broken(f.Check(sd.text)); len(broken) > 0 {
+	if broken := writing.Broken(f.Check(sd.text), false); len(broken) > 0 {
 		log.Fatalf("seed %q is not a %s: %s (%s)", sd.text, f.Name, broken[0].Rule, broken[0].Note)
 	}
 	return sd

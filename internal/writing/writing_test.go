@@ -35,8 +35,16 @@ func TestCatalog(t *testing.T) {
 		if utf8.RuneCountInString(f.Example) > f.MaxChars {
 			t.Errorf("form %q: its own example is too long", f.ID)
 		}
-		if broken := Broken(f.Check(f.Example)); len(broken) > 0 {
-			t.Errorf("form %q: its own example breaks %q", f.ID, broken[0].Rule)
+		if broken := Broken(f.Check(f.Example), false); len(broken) > 0 {
+			t.Errorf("form %q: its own example breaks %q (%s)", f.ID, broken[0].Rule, broken[0].Note)
+		}
+		if n := len(f.Shape.Lines); n > 0 && !f.Shape.Grow && n != len(Lines(f.Example)) {
+			t.Errorf("form %q: the example has %d lines, the shape %d", f.ID, len(Lines(f.Example)), n)
+		}
+		for _, m := range f.Measure(f.Example) {
+			if !m.SyllablesOK || !m.RhymeOK {
+				t.Errorf("form %q: the example's own measure is off: %+v", f.ID, m)
+			}
 		}
 		if len(f.Check(f.Example)) != len(f.Rules) {
 			t.Errorf("form %q: Check must report every rule", f.ID)
@@ -136,8 +144,8 @@ func check(t *testing.T, id, text string) (broken, hints []string) {
 	}
 	for _, r := range f.Check(text) {
 		switch {
-		case !r.Checked || r.OK:
-		case r.Hint:
+		case !r.Checked() || r.OK:
+		case r.Soft():
 			hints = append(hints, r.Rule)
 		default:
 			broken = append(broken, r.Rule)
@@ -152,16 +160,66 @@ func TestHaiku(t *testing.T) {
 		t.Errorf("a good haiku: broken %q, hints %q", broken, hints)
 	}
 	broken, _ = check(t, "haiku", "two lines\nonly")
-	if len(broken) != 1 || !strings.Contains(broken[0], "Three lines") {
+	if len(broken) == 0 || !strings.Contains(broken[0], "Three lines") {
 		t.Errorf("a two-line haiku: broken %q", broken)
 	}
-	broken, hints = check(t, "haiku", "this line has too many syllables in it\nseven here, if you count them out\nfive to finish up")
-	if len(broken) != 0 || len(hints) != 1 {
-		t.Errorf("wrong syllables are a hint, not a block: broken %q, hints %q", broken, hints)
+	off := "this line has too many syllables in it\nseven here, if you count them out\nfive to finish up"
+	broken, hints = check(t, "haiku", off)
+	if len(broken) != 1 || len(hints) != 0 || !strings.Contains(broken[0], "syllables") {
+		t.Errorf("wrong syllables hold a haiku back: broken %q, hints %q", broken, hints)
 	}
 	f, _ := ByID("haiku")
-	if r := f.Check("one\ntwo\nthree")[1]; r.Note != "1-1-1 syllables" {
-		t.Errorf("the syllable note should say what was counted: %q", r.Note)
+	if b := Broken(f.Check(off), true); len(b) != 0 {
+		t.Errorf("a vouched-for count lets the haiku through: %q", b[0].Rule)
+	}
+	if b := Broken(f.Check("two lines\nonly"), true); len(b) != 1 {
+		t.Error("vouching never excuses a line count")
+	}
+	if r := f.Check("one\ntwo\nthree")[1]; r.Note != "1-1-1 syllables" || r.Level != Sound {
+		t.Errorf("the syllable note should say what was counted, at the sound level: %+v", r)
+	}
+	// The composer's meters: each line against its count.
+	m := f.Measure("low tide at sunrise\na krab raises one wet\nhello to the gulls, friends")
+	if len(m) != 3 || m[0].Syllables != 5 || !m[0].SyllablesOK || m[1].Syllables != 6 || m[1].SyllablesOK || m[2].Syllables != 6 || m[2].SyllablesOK {
+		t.Errorf("measure: %+v", m)
+	}
+	if len(f.Measure("")) != 0 {
+		t.Error("nothing to measure in an empty text")
+	}
+	if sf, _ := ByID("simile"); sf.Measure("as free as the sea") != nil {
+		t.Error("a sentence has no lines to measure")
+	}
+}
+
+func TestMeasureRhymes(t *testing.T) {
+	c, _ := ByID("couplet")
+	m := c.Measure("The tide goes out, the tide comes in,\nthe krab just sits and wears a grin.")
+	if len(m) != 2 || m[0].Rhyme != "A" || !m[0].RhymeOK || m[1].Rhyme != "A" || !m[1].RhymeOK {
+		t.Errorf("a rhyming couplet: %+v", m)
+	}
+	m = c.Measure("The tide goes out, the tide comes in,\nthe krab just sits there on the sand.")
+	if len(m) != 2 || !m[0].RhymeOK || m[1].RhymeOK || m[1].Rhyme != "B" {
+		t.Errorf("an unrhymed couplet marks the second line: %+v", m)
+	}
+	s, _ := ByID("sonnet")
+	lines := strings.Split(strings.TrimSpace(s.Example), "\n")
+	lines[1], lines[2] = lines[2], lines[1] // AABB: lines 2 and 3 land in the wrong place
+	m = s.Measure(strings.Join(lines, "\n"))
+	// The first line of a letter sets the sound; the lines after it are held to it.
+	if len(m) != 14 || !m[0].RhymeOK || !m[1].RhymeOK || m[2].RhymeOK || m[3].RhymeOK || !m[13].RhymeOK {
+		t.Errorf("a sonnet with two lines swapped: %+v", m[:4])
+	}
+	r, _ := ByID("rhyme")
+	m = r.Measure("Roses by the sea\na krab in the sand\nwaves running free\nand nothing rhymes with orange")
+	if len(m) != 4 || !m[0].RhymeOK || m[1].RhymeOK || !m[2].RhymeOK || m[3].RhymeOK {
+		t.Errorf("verse: a line without a partner is marked: %+v", m)
+	}
+	m = r.Measure("Roses by the sea\na krab in the sand\nwaves running free\na claw in my hand\nthe gulls all agree")
+	if len(m) != 5 || !m[4].RhymeOK {
+		t.Errorf("a fifth line of verse takes the last spec: %+v", m)
+	}
+	if e, _ := ByID("envelope"); !e.Shape.Seal || !e.Shape.Grow || e.Shape.Lines[0].Rhyme != "" {
+		t.Error("an envelope grows, seals, and asks no rhyme")
 	}
 }
 
@@ -169,11 +227,11 @@ func TestCouplet(t *testing.T) {
 	if broken, hints := check(t, "couplet", "The tide goes out, the tide comes in,\nthe krab just sits and wears a grin."); len(broken)+len(hints) != 0 {
 		t.Errorf("a good couplet: %q %q", broken, hints)
 	}
-	if broken, _ := check(t, "couplet", "one line"); len(broken) != 1 {
+	if broken, _ := check(t, "couplet", "one line"); len(broken) == 0 || broken[0] != "Two lines." {
 		t.Errorf("one line: %q", broken)
 	}
-	if _, hints := check(t, "couplet", "The tide goes out and in,\nthe krab just sits there on the sand all day."); len(hints) != 2 {
-		t.Errorf("no rhyme and uneven lines should be two hints: %q", hints)
+	if broken, hints := check(t, "couplet", "The tide goes out and in,\nthe krab just sits there on the sand all day."); len(broken) != 1 || len(hints) != 1 {
+		t.Errorf("no rhyme holds a couplet back, uneven lines only nudge: %q %q", broken, hints)
 	}
 }
 
@@ -182,14 +240,14 @@ func TestSonnet(t *testing.T) {
 	if broken, _ := check(t, "sonnet", f.Example); len(broken) != 0 {
 		t.Errorf("the example sonnet: %q", broken)
 	}
-	if broken, _ := check(t, "sonnet", strings.Repeat("a line\n", 13)); len(broken) != 1 {
+	if broken, _ := check(t, "sonnet", strings.Repeat("a line\n", 13)); len(broken) == 0 || broken[0] != "Fourteen lines." {
 		t.Errorf("thirteen lines: %q", broken)
 	}
 	lines := strings.Split(strings.TrimSpace(f.Example), "\n")
 	lines[1], lines[2] = lines[2], lines[1] // the rhymes stay but the scheme becomes AABB
-	_, hints := check(t, "sonnet", strings.Join(lines, "\n"))
-	if !slices.ContainsFunc(hints, func(h string) bool { return strings.Contains(h, "ABAB") }) {
-		t.Errorf("a broken scheme should be hinted: %q", hints)
+	broken, _ := check(t, "sonnet", strings.Join(lines, "\n"))
+	if !slices.ContainsFunc(broken, func(h string) bool { return strings.Contains(h, "ABAB") }) {
+		t.Errorf("a broken scheme holds the sonnet back: %q", broken)
 	}
 }
 
@@ -198,7 +256,7 @@ func TestLimerickEnvelopeAndRhyme(t *testing.T) {
 	if broken, hints := check(t, "limerick", f.Example); len(broken)+len(hints) != 0 {
 		t.Errorf("the example limerick: %q %q", broken, hints)
 	}
-	if broken, _ := check(t, "limerick", "one\ntwo\nthree\nfour"); len(broken) != 1 {
+	if broken, _ := check(t, "limerick", "one\ntwo\nthree\nfour"); len(broken) == 0 || broken[0] != "Five lines." {
 		t.Errorf("four lines: %q", broken)
 	}
 
@@ -212,18 +270,18 @@ func TestLimerickEnvelopeAndRhyme(t *testing.T) {
 		t.Errorf("a two-line envelope: %q", broken)
 	}
 
-	_, hints := check(t, "rhyme", "Roses by the sea\na krab in the sand\nwaves running free\na claw in my hand")
-	if len(hints) != 0 {
-		t.Errorf("ABAB verse: %q", hints)
+	broken, hints := check(t, "rhyme", "Roses by the sea\na krab in the sand\nwaves running free\na claw in my hand")
+	if len(broken)+len(hints) != 0 {
+		t.Errorf("ABAB verse: %q %q", broken, hints)
 	}
 	rf, _ := ByID("rhyme")
 	if r := rf.Check("Roses by the sea\na krab in the sand\nwaves running free\na claw in my hand")[1]; r.Note != "ABAB" {
 		t.Errorf("the note should show the scheme: %q", r.Note)
 	}
-	if _, hints := check(t, "rhyme", "Roses by the sea\na krab in the sand\nwaves running free\nand nothing rhymes with orange"); len(hints) != 1 {
-		t.Errorf("a line without a partner: %q", hints)
+	if broken, _ := check(t, "rhyme", "Roses by the sea\na krab in the sand\nwaves running free\nand nothing rhymes with orange"); len(broken) != 1 {
+		t.Errorf("a line without a partner holds the verse back: %q", broken)
 	}
-	if broken, _ := check(t, "rhyme", "one\ntwo"); len(broken) != 1 {
+	if broken, _ := check(t, "rhyme", "one\ntwo"); len(broken) == 0 || broken[0] != "At least four lines." {
 		t.Errorf("two lines: %q", broken)
 	}
 }
@@ -318,7 +376,7 @@ func TestPlainNoteChecksNothing(t *testing.T) {
 	if got := f.Check("anything at all"); len(got) != 0 {
 		t.Errorf("the note has no rules to check: %v", got)
 	}
-	if Broken(nil) != nil {
+	if Broken(nil, false) != nil {
 		t.Error("Broken(nil) must be nil")
 	}
 }

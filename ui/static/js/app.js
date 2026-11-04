@@ -47,8 +47,29 @@ document.addEventListener("htmx:afterRequest", function (event) {
       feedback.replaceChildren();
       feedback.classList.remove("kb-feedback-refused");
     }
+    buildShape(form);
+    if (form.hasAttribute("data-molt-modal")) moltFromModal(form, event.detail.xhr);
   }
 });
+
+// The compose modal posts over htmx without a target of its own: the molt it
+// gets back goes to the top of the feed when there is one on the page, and
+// the modal closes; on a page without a feed the Trench shows it.
+function moltFromModal(form, xhr) {
+  var dialog = form.closest("dialog");
+  if (dialog && dialog.open) dialog.close();
+  var list = document.getElementById("molt-list");
+  if (!list || !xhr || !xhr.responseText) {
+    window.location.href = "/trench";
+    return;
+  }
+  list.insertAdjacentHTML("afterbegin", xhr.responseText);
+  if (window.htmx && list.firstElementChild) htmx.process(list.firstElementChild);
+  var empty = document.getElementById("empty-list");
+  if (empty) empty.remove();
+  localizeTimes(list);
+  syncNewMoltsSince(list);
+}
 
 // A molt inserted into an empty list replaces the "nothing here" message.
 document.addEventListener("htmx:afterSwap", function (event) {
@@ -65,7 +86,8 @@ document.addEventListener("htmx:afterSwap", function (event) {
   if (event.target.id === "molt-list") {
     syncNewMoltsSince(list);
   }
-  initCounters(document);
+  initComposers(document);
+  paintMeasures(document);
 });
 
 // A molt prepended to the feed (compose) moves the "new molts" cursor so
@@ -104,12 +126,12 @@ function openModal(dialog) {
     menu.removeAttribute("open");
   });
   if (!dialog.open) dialog.showModal();
-  var textarea = dialog.querySelector("textarea");
-  if (textarea) {
-    textarea.focus();
-    textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+  initComposers(dialog);
+  var field = dialog.querySelector(".kb-shape:not([hidden]) .kb-field") || dialog.querySelector("textarea[name=content]");
+  if (field) {
+    field.focus();
+    if (field.setSelectionRange) field.setSelectionRange(field.value.length, field.value.length);
   }
-  initCounters(dialog);
 }
 
 // A click that starts and ends on the backdrop (the dialog itself) closes it,
@@ -156,13 +178,250 @@ function updateCounter(form) {
   counter.classList.remove("d-none");
   counter.textContent = limit - length;
   counter.classList.toggle("text-primary", length > limit);
-  var button = form.querySelector("button[type=submit]");
+  var button = submitButton(form);
   if (button) button.disabled = !textarea.value.trim() || length > limit;
 }
 
-function initCounters(root) {
+// The form's own Molt / Reply / Save button, not the feedback box's "post it
+// anyway", which is a submit button too.
+function submitButton(form) {
+  return form.querySelector("button[type=submit]:not([name=override])");
+}
+
+// initComposers gives every composer under root its counter and, for a form
+// with a shape, its boxes; a composer already built for its form is left as
+// it is (a check's answer swapping the feedback box must not rebuild it).
+function initComposers(root) {
   root.querySelectorAll("form .mini-character-counter").forEach(function (counter) {
-    updateCounter(counter.closest("form"));
+    var form = counter.closest("form");
+    var box = form.querySelector(".kb-shape");
+    var select = form.querySelector("select[name=form]");
+    if (box && select && box.getAttribute("data-shape") !== select.value) buildShape(form);
+    updateCounter(form);
+  });
+}
+
+// Shaped composers. A form with a shape (three lines for a haiku; setup,
+// build and punchline for a joke) is written in one box per line or part.
+// The boxes carry no name: they write the molt's text into the form's
+// textarea, which is what's posted, so the server sees one text whether or
+// not JavaScript ran. After each check the server's measure of every line
+// (its syllables against the count wanted, the letter of its rhyme) shows
+// beside the line.
+var shapes = {};
+(function () {
+  var el = document.getElementById("kb-shapes");
+  try { shapes = el ? JSON.parse(el.textContent) : {}; } catch (e) { shapes = {}; }
+})();
+
+function shapeOf(form) {
+  var select = form.querySelector("select[name=form]");
+  var shape = select && shapes[select.value];
+  return shape && (shape.lines || shape.parts) ? shape : null;
+}
+
+function lineSpec(shape, index) {
+  if (index < shape.lines.length) return shape.lines[index];
+  return shape.grow ? shape.lines[shape.lines.length - 1] : {};
+}
+
+function syllableTarget(spec) {
+  var s = spec && spec.syllables;
+  if (!s || !s[1]) return "";
+  return s[0] === s[1] ? String(s[0]) : s[0] + "\u2013" + s[1];
+}
+
+function lineRow(shape, index, value) {
+  var row = document.createElement("div");
+  row.className = "kb-line";
+  var rhyme = document.createElement("span");
+  rhyme.className = "kb-line-rhyme";
+  rhyme.setAttribute("aria-hidden", "true");
+  var input = document.createElement("input");
+  input.type = "text";
+  input.className = "kb-field kb-line-input";
+  input.autocomplete = "off";
+  input.placeholder = "Line " + (index + 1);
+  input.setAttribute("aria-label", "Line " + (index + 1));
+  input.value = value || "";
+  var meter = document.createElement("span");
+  meter.className = "kb-line-meter";
+  var target = syllableTarget(lineSpec(shape, index));
+  meter.textContent = target ? "\u00b7/" + target : "";
+  meter.title = target ? "syllables heard / wanted" : "syllables heard";
+  row.append(rhyme, input, meter);
+  return row;
+}
+
+function partBox(spec, index, value) {
+  var wrap = document.createElement("label");
+  wrap.className = "kb-part";
+  var name = document.createElement("span");
+  name.className = "kb-part-label";
+  name.textContent = spec.label;
+  var field = document.createElement(spec.multi ? "textarea" : "input");
+  if (spec.multi) {
+    field.rows = index === 0 ? 2 : 3;
+  } else {
+    field.type = "text";
+    field.autocomplete = "off";
+  }
+  field.className = "kb-field kb-part-field";
+  field.placeholder = spec.hint || "";
+  field.value = value || "";
+  wrap.append(name, field);
+  return wrap;
+}
+
+// assignParts hands the paragraphs of a text to a form's parts: the ones
+// before the part that takes several (a letter's body, an essay) in order,
+// the ones after it from the end, and the rest to that part.
+function assignParts(specs, pieces) {
+  var values = specs.map(function () { return ""; });
+  var m = specs.findIndex(function (spec) { return spec.multi; });
+  if (m === -1) {
+    specs.forEach(function (_, i) { values[i] = pieces[i] || ""; });
+    return values;
+  }
+  var trail = specs.length - m - 1;
+  for (var i = 0; i < m; i++) values[i] = pieces[i] || "";
+  var rest = pieces.slice(m);
+  var tail = rest.length > 1 ? rest.splice(Math.max(1, rest.length - trail), trail) : [];
+  values[m] = rest.join("\n\n");
+  tail.forEach(function (piece, i) { values[m + 1 + i] = piece; });
+  return values;
+}
+
+// sealLines makes an envelope's last line a mirror of its first; a line
+// that was the mirror and no longer is (a line was added after it) starts
+// empty, for the writer's own words.
+function sealLines(box, shape) {
+  var inputs = box.querySelectorAll(".kb-line-input");
+  inputs.forEach(function (input, i) {
+    var sealed = Boolean(shape.seal && inputs.length > 1 && i === inputs.length - 1);
+    if (input.classList.contains("kb-line-sealed") && !sealed) input.value = "";
+    input.readOnly = sealed;
+    input.classList.toggle("kb-line-sealed", sealed);
+    if (sealed) {
+      input.placeholder = "The first line, again";
+      input.tabIndex = -1;
+    } else {
+      input.placeholder = "Line " + (i + 1);
+      input.tabIndex = 0;
+    }
+  });
+}
+
+// addLine adds a line at the end, or, in an envelope, just before the
+// mirror of the first line, which stays last.
+function addLine(form) {
+  var box = form.querySelector(".kb-shape");
+  var shape = shapeOf(form);
+  if (!box || !shape || !shape.lines) return null;
+  var rows = box.querySelectorAll(".kb-line");
+  var row = lineRow(shape, rows.length, "");
+  var before = shape.seal && rows.length ? rows[rows.length - 1] : box.querySelector(".kb-line-add");
+  box.insertBefore(row, before);
+  sealLines(box, shape);
+  syncShape(form, false);
+  return row.querySelector(".kb-line-input");
+}
+
+// buildShape lays the form's boxes out over the textarea's text, or shows
+// the textarea itself for a form without a shape.
+function buildShape(form) {
+  var textarea = form.querySelector("textarea[name=content]");
+  var box = form.querySelector(".kb-shape");
+  var select = form.querySelector("select[name=form]");
+  if (!textarea || !box) return;
+  var shape = shapeOf(form);
+  box.replaceChildren();
+  box.setAttribute("data-shape", select ? select.value : "");
+  if (!shape) {
+    box.hidden = true;
+    textarea.hidden = false;
+    return;
+  }
+  var text = textarea.value;
+  if (shape.lines) {
+    var lines = text.split("\n").map(function (l) { return l.trim(); }).filter(Boolean);
+    var count = shape.lines.length;
+    if (shape.grow) {
+      count = Math.max(count, lines.length);
+    } else if (lines.length > count) { // keep every word: the overflow joins the last line
+      lines = lines.slice(0, count - 1).concat(lines.slice(count - 1).join(" "));
+    }
+    for (var i = 0; i < count; i++) box.append(lineRow(shape, i, lines[i]));
+    if (shape.grow) {
+      var add = document.createElement("button");
+      add.type = "button";
+      add.className = "btn btn-link btn-sm p-0 kb-line-add";
+      add.textContent = "Add a line";
+      box.append(add);
+    }
+    sealLines(box, shape);
+  } else {
+    var pieces = text.split(/\n[ \t]*\n/).map(function (piece) { return piece.trim(); }).filter(Boolean);
+    var values = assignParts(shape.parts, pieces);
+    shape.parts.forEach(function (spec, i) { box.append(partBox(spec, i, values[i])); });
+  }
+  box.hidden = false;
+  textarea.hidden = true;
+  syncShape(form, false);
+}
+
+// syncShape writes the boxes into the textarea: lines joined by a line
+// break, parts by a blank line.
+function syncShape(form, check) {
+  var textarea = form.querySelector("textarea[name=content]");
+  var box = form.querySelector(".kb-shape");
+  var shape = shapeOf(form);
+  if (!textarea || !box || box.hidden || !shape) return;
+  var fields = Array.from(box.querySelectorAll(".kb-field"));
+  var text;
+  if (shape.lines) {
+    if (shape.seal && fields.length > 1) fields[fields.length - 1].value = fields[0].value;
+    text = fields.map(function (f) { return f.value.replace(/\n/g, " "); }).join("\n");
+  } else {
+    text = fields.map(function (f) { return f.value; }).join("\n\n");
+  }
+  textarea.value = text.replace(/\s+$/, "");
+  updateCounter(form);
+  if (check !== false) scheduleCheck(form, 250);
+}
+
+// paintMeasures shows what the server heard in each line, from the feedback
+// box's last answer: the syllables against the count wanted, and the rhyme
+// letter, each coloured by whether it's what the form asks.
+function paintMeasures(root) {
+  root.querySelectorAll(".kb-shape:not([hidden])").forEach(function (box) {
+    var form = box.closest("form");
+    var feedback = form.querySelector(".kb-feedback");
+    var shape = shapeOf(form);
+    if (!feedback || !shape || !shape.lines) return;
+    var measures;
+    try { measures = JSON.parse(feedback.getAttribute("data-lines") || "null"); } catch (e) { measures = null; }
+    var heard = Array.isArray(measures) ? measures : [];
+    var next = 0;
+    box.querySelectorAll(".kb-line").forEach(function (row, index) {
+      var input = row.querySelector(".kb-line-input");
+      var meter = row.querySelector(".kb-line-meter");
+      var rhyme = row.querySelector(".kb-line-rhyme");
+      var spec = lineSpec(shape, index);
+      var target = syllableTarget(spec);
+      var m = input.value.trim() ? heard[next++] : null;
+      if (!m) {
+        meter.textContent = target ? "\u00b7/" + target : "";
+        meter.className = "kb-line-meter";
+        rhyme.textContent = "";
+        rhyme.className = "kb-line-rhyme";
+        return;
+      }
+      meter.textContent = target ? m.syllables + "/" + target : String(m.syllables);
+      meter.className = "kb-line-meter " + (m.syllables_ok ? "kb-meter-ok" : "kb-meter-off");
+      rhyme.textContent = spec.rhyme ? m.rhyme : "";
+      rhyme.className = "kb-line-rhyme " + (m.rhyme_ok ? "kb-rhyme-ok" : "kb-rhyme-off");
+    });
   });
 }
 
@@ -184,22 +443,76 @@ function scheduleCheck(form, delay) {
 
 document.addEventListener("input", function (event) {
   var form = event.target.form;
-  if (!form || event.target.name !== "content") return;
+  if (!form) return;
+  if (event.target.classList.contains("kb-field")) {
+    syncShape(form);
+    return;
+  }
+  if (event.target.name !== "content") return;
   updateCounter(form);
   var select = form.querySelector("select[name=form]");
-  if (select && select.value) scheduleCheck(form, 600);
+  if (select && select.value) scheduleCheck(form, 400);
 });
 
 document.addEventListener("change", function (event) {
   var form = event.target.form;
   if (!form || event.target.name !== "form") return;
+  buildShape(form);
   updateCounter(form);
   scheduleCheck(form, 0);
 });
 
 document.addEventListener("reset", function (event) {
   var form = event.target;
-  setTimeout(function () { updateCounter(form); }, 0);
+  setTimeout(function () {
+    buildShape(form);
+    updateCounter(form);
+  }, 0);
+});
+
+// Enter in a line box moves to the next line (adding one where the form
+// grows); a paste with line breaks in it fills the lines that follow.
+document.addEventListener("keydown", function (event) {
+  var input = event.target;
+  if (event.key !== "Enter" || event.shiftKey || event.ctrlKey || event.metaKey || !input.classList || !input.classList.contains("kb-line-input")) return;
+  event.preventDefault();
+  var rows = Array.from(input.form.querySelectorAll(".kb-line-input"));
+  var next = rows[rows.indexOf(input) + 1];
+  if (next && next.readOnly) next = null;
+  if (!next) {
+    var shape = shapeOf(input.form);
+    if (shape && shape.grow) next = addLine(input.form);
+  }
+  if (next) next.focus();
+});
+
+document.addEventListener("paste", function (event) {
+  var input = event.target;
+  if (!input.classList || !input.classList.contains("kb-line-input") || !event.clipboardData) return;
+  var text = event.clipboardData.getData("text/plain");
+  if (text.indexOf("\n") === -1) return;
+  event.preventDefault();
+  var pieces = text.split("\n").map(function (l) { return l.trim(); }).filter(Boolean);
+  var form = input.form;
+  var shape = shapeOf(form);
+  var rows = Array.from(form.querySelectorAll(".kb-line-input"));
+  var at = rows.indexOf(input);
+  pieces.forEach(function (piece, i) {
+    var target = rows[at + i];
+    if (!target && shape && shape.grow) {
+      target = addLine(form);
+      rows.push(target);
+    }
+    if (target && !target.readOnly) target.value = piece;
+  });
+  syncShape(form);
+});
+
+document.addEventListener("click", function (event) {
+  var add = event.target.closest && event.target.closest(".kb-line-add");
+  if (!add) return;
+  var input = addLine(add.form);
+  if (input) input.focus();
 });
 
 // Escape closes an open modal, including one opened after an htmx response
@@ -215,10 +528,10 @@ document.addEventListener("keydown", function (event) {
     return;
   }
   if (event.key !== "Enter" || !(event.ctrlKey || event.metaKey)) return;
-  var form = event.target.tagName === "TEXTAREA" && event.target.form;
-  if (!form) return;
+  var form = event.target.form;
+  if (!form || !form.querySelector("textarea[name=content]")) return;
   event.preventDefault();
-  var button = form.querySelector("button[type=submit]");
+  var button = submitButton(form);
   if (button && !button.disabled) form.requestSubmit(button);
 });
 
@@ -301,7 +614,7 @@ function localizeTimes(root) {
 
 document.addEventListener("DOMContentLoaded", function () {
   localizeTimes(document);
-  initCounters(document);
+  initComposers(document);
   var filter = document.getElementById("crab-filter");
   if (!filter) return;
   var rows = document.querySelectorAll(".crab-row[data-name]");
