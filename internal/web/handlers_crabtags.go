@@ -20,6 +20,7 @@ func (app *App) crabtagPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	data.Query = tag
+	app.describe(r, &data, "Molts tagged %"+tag+" on Krabber.", "website")
 	data.EmptyMessage = "No molts use %" + tag + " yet."
 	app.renderMolts(w, r, "crabtag.html", data)
 }

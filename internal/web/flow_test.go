@@ -2926,3 +2926,97 @@ func currentCrabByName(t *testing.T, h *harness, name string) *store.Crab {
 	}
 	return c
 }
+
+var moltIDRX = regexp.MustCompile(`data-molt-id="([^"]+)"`)
+
+// Crawlers can find and describe the public pages: the welcome page links
+// the Sea and the writing forms, public pages carry a description, a
+// canonical URL and link-preview tags, and the sitemap lists every profile
+// and the newest molts, leaving out replies and NSFW molts.
+func TestCrawlable(t *testing.T) {
+	h := newHarness(t)
+	h.signupAndActivate("plankton", "plankton@krabber.test", "chum-bucket!")
+	h.login("plankton@krabber.test", "chum-bucket!")
+	tok := h.csrf("/trench")
+	post := func(path string, form url.Values) string {
+		t.Helper()
+		form.Set("csrf_token", tok)
+		status, body, _ := h.post(path, form, "HX-Request", "true")
+		m := moltIDRX.FindStringSubmatch(body)
+		if status != http.StatusOK || m == nil {
+			t.Fatalf("%s: %d %s", path, status, body)
+		}
+		return m[1]
+	}
+	molt := post("/molt/create", url.Values{"content": {"Chum is metabolic fuel\nfor the creature of the deep."}})
+	nsfw := post("/molt/create", url.Values{"content": {"the secret formula, uncovered"}, "nsfw": {"true"}})
+	reply := post("/molt/reply/"+molt, url.Values{"content": {"Karen, take a note."}})
+
+	// The rest is what a stranger (or Googlebot) sees.
+	h.client = h.newClient()
+	base := h.srv.URL
+
+	status, body, _ := h.get("/")
+	if status != http.StatusOK {
+		t.Fatalf("welcome: %d", status)
+	}
+	for _, want := range []string{`href="/sea"`, `href="/forms"`, `<meta name="description" content="`, `<link rel="canonical" href="` + base + `/">`, `<meta property="og:title" content="`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("welcome page is missing %s", want)
+		}
+	}
+
+	status, body, _ = h.get("/molt/view/" + molt)
+	if status != http.StatusOK {
+		t.Fatalf("thread: %d", status)
+	}
+	for _, want := range []string{
+		`<title>plankton: Chum is metabolic fuel for the creature of the deep. · Krabber</title>`,
+		`<meta name="description" content="Chum is metabolic fuel for the creature of the deep.">`,
+		`<link rel="canonical" href="` + base + `/molt/view/` + molt + `">`,
+		`<meta property="og:type" content="article">`,
+		`<meta property="og:url" content="` + base + `/molt/view/` + molt + `">`,
+		`<meta property="og:title" content="plankton: Chum is metabolic fuel for the creature of the deep.">`,
+		`<meta property="og:image" content="` + base + `/static/img/`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("thread page is missing %s", want)
+		}
+	}
+	if _, body, _ := h.get("/molt/view/" + nsfw); strings.Contains(body, `content="the secret formula`) || !strings.Contains(body, `<meta name="description" content="A molt by @plankton`) {
+		t.Error("an NSFW molt's text leaks into its description")
+	}
+
+	if _, body, _ := h.get("/krabs/plankton"); !strings.Contains(body, `<meta name="description" content="plankton (@plankton) on Krabber`) || !strings.Contains(body, `<meta property="og:type" content="profile">`) || !strings.Contains(body, `<link rel="canonical" href="`+base+`/krabs/plankton">`) {
+		t.Error("the profile page lacks its description, canonical URL or og:type")
+	}
+	for _, path := range []string{"/sea", "/forms"} {
+		if _, body, _ := h.get(path); !strings.Contains(body, `<meta name="description" content="`) || !strings.Contains(body, `<link rel="canonical" href="`+base+path+`">`) {
+			t.Errorf("%s lacks its description or canonical URL", path)
+		}
+	}
+
+	status, body, hdr := h.get("/sitemap.xml")
+	if status != http.StatusOK || !strings.HasPrefix(hdr.Get("Content-Type"), "application/xml") || !strings.Contains(hdr.Get("Cache-Control"), "max-age=") {
+		t.Fatalf("sitemap: %d %q %q", status, hdr.Get("Content-Type"), hdr.Get("Cache-Control"))
+	}
+	for _, want := range []string{
+		`<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`,
+		`<loc>` + base + `/</loc>`, `<loc>` + base + `/sea</loc>`, `<loc>` + base + `/forms</loc>`,
+		`<loc>` + base + `/krabs/plankton</loc>`,
+		`<loc>` + base + `/molt/view/` + molt + `</loc><lastmod>`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("sitemap is missing %s", want)
+		}
+	}
+	for _, id := range []string{nsfw, reply} {
+		if strings.Contains(body, id) {
+			t.Errorf("sitemap lists %s (NSFW molts and replies stay out)", id)
+		}
+	}
+
+	if _, body, _ := h.get("/robots.txt"); !strings.Contains(body, "Sitemap: "+base+"/sitemap.xml") {
+		t.Error("robots.txt doesn't name the sitemap")
+	}
+}

@@ -46,6 +46,13 @@ type templateData struct {
 	unreadKnown      bool // the handler set Unread; render doesn't read it again
 	Sidebar          sidebar
 
+	// What crawlers and link previews see on a public page (describe);
+	// empty on pages behind sign-in.
+	Description string
+	Canonical   string // this page's absolute URL
+	OGType      string // Open Graph type: article (a molt), profile (a krab) or website
+	OGImage     string // absolute URL of the site icon
+
 	Notifications []store.Notification
 
 	Molt         store.Molt
@@ -253,6 +260,7 @@ var templateFuncs = template.FuncMap{
 	"verse":          verse,
 	"folded":         folded,
 	"emptyCheck":     func() moltCheck { return moltCheck{} },
+	"moltTitle":      moltTitle,
 }
 
 func avatarSrc(code string) string {

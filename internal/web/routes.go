@@ -10,7 +10,7 @@ import (
 // Routes returns the full handler. Order, outermost first:
 //
 //	recoverPanic → originVerify → withClientIP → logRequests → securityHeaders
-//	  /static/*, /healthz, /robots.txt, /favicon.ico, old /crab… URLs: served directly (no session)
+//	  /static/*, /healthz, /robots.txt, /sitemap.xml, /favicon.ico, old /crab… URLs: served directly (no session)
 //	  /api/*: bearer-auth JSON, no cookie session or CSRF
 //	  everything else: sessions → crossOriginProtection → csrf → authenticate → mux
 func (app *App) Routes() http.Handler {
@@ -104,7 +104,8 @@ func (app *App) Routes() http.Handler {
 	root.HandleFunc("GET /avatar/{code}", app.avatarSVG)
 	root.HandleFunc("GET /banner/{code}", app.bannerSVG)
 	root.HandleFunc("GET /healthz", app.healthz)
-	root.HandleFunc("GET /robots.txt", robots)
+	root.HandleFunc("GET /robots.txt", app.robots)
+	root.HandleFunc("GET /sitemap.xml", app.sitemap)
 	root.HandleFunc("GET /favicon.ico", favicon)
 	root.HandleFunc("GET /sw.js", serveEmbedded("static/js/sw.js", "text/javascript; charset=utf-8"))
 	root.HandleFunc("GET /offline", serveEmbedded("static/offline.html", "text/html; charset=utf-8"))

@@ -25,7 +25,9 @@ func (app *App) home(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/trench", http.StatusSeeOther)
 		return
 	}
-	app.render(w, r, http.StatusOK, "welcome.html", app.newTemplateData(r))
+	data := app.newTemplateData(r)
+	app.describe(r, &data, "Krabber is an open-source microblog with a chronological feed and no ads, tracking or algorithm. Write a molt, or a haiku, sonnet, letter or essay.", "website")
+	app.render(w, r, http.StatusOK, "welcome.html", data)
 }
 
 // renderFeed renders a page whose main content is a list of molts.
@@ -120,6 +122,7 @@ func (app *App) sea(w http.ResponseWriter, r *http.Request) {
 	}
 	// Signed out: always the first page (firstPageSignedOut).
 	data := app.newTemplateData(r)
+	app.describe(r, &data, "The latest molts from every krab on Krabber, newest first.", "website")
 	if molts, more, ok := app.strangersSea.get(); ok {
 		data.Molts, data.MoreForMembers = molts, more
 	} else {
@@ -227,6 +230,7 @@ func (app *App) profileTab(w http.ResponseWriter, r *http.Request, tab string) {
 	data := app.newTemplateData(r)
 	data.Profile = p
 	data.Tab = tab
+	app.describe(r, &data, profileDescription(p), "profile")
 	if _, blocking := blocksOf(r).Blocking[p.ID]; blocking {
 		data.IsBlocking = true
 		data.EmptyMessage = "You blocked @" + p.UserName + ". Unblock them to see their molts."
@@ -510,40 +514,6 @@ func (app *App) privacyPage(w http.ResponseWriter, r *http.Request) {
 	app.render(w, r, http.StatusOK, "privacy.html", data)
 }
 
-// robotsTxt keeps crawlers to public profiles and molts; pages behind sign-in
-// would only redirect them to the login form.
-const robotsTxt = `User-agent: *
-Disallow: /krab/
-Disallow: /krabmin
-Disallow: /settings
-Disallow: /notifications
-Disallow: /trench
-Disallow: /search
-Disallow: /molt/report/
-Disallow: /molt/likes/
-
-# AI training and LLM scrapers aren't welcome anywhere. Advisory only: the
-# well-behaved ones honor this, the rest are caught by the WAF rate and
-# anonymous-IP rules (infra/prod/edge.tf).
-User-agent: GPTBot
-User-agent: ChatGPT-User
-User-agent: OAI-SearchBot
-User-agent: ClaudeBot
-User-agent: anthropic-ai
-User-agent: Claude-Web
-User-agent: CCBot
-User-agent: Google-Extended
-User-agent: PerplexityBot
-User-agent: Bytespider
-User-agent: Amazonbot
-User-agent: Applebot-Extended
-User-agent: Meta-ExternalAgent
-User-agent: Diffbot
-User-agent: Omgilibot
-User-agent: YouBot
-Disallow: /
-`
-
 // serveEmbedded serves one embedded file at a root path: the service worker
 // (which must live at / to control the whole site) and the offline page it
 // keeps. Both are revalidated on every load so an update takes effect.
@@ -557,12 +527,6 @@ func serveEmbedded(name, contentType string) http.HandlerFunc {
 		w.Header().Set("Cache-Control", "no-cache")
 		_, _ = w.Write(body)
 	}
-}
-
-func robots(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.Header().Set("Cache-Control", "public, max-age=86400")
-	_, _ = w.Write([]byte(robotsTxt))
 }
 
 // favicon answers browsers that ask for /favicon.ico without reading the

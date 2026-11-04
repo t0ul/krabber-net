@@ -418,6 +418,7 @@ func (app *App) moltView(w http.ResponseWriter, r *http.Request) {
 	}
 	data := app.newTemplateData(r)
 	data.Molt = molts[0]
+	app.describe(r, &data, moltDescription(data.Molt), "article")
 
 	var parents []store.Molt
 	for p := data.Molt; p.ReplyTo != "" && len(parents) < maxAncestors; {

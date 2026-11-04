@@ -83,7 +83,9 @@ func (app *App) moltCheckPost(w http.ResponseWriter, r *http.Request) {
 
 // formsPage explains every writing form and its rules.
 func (app *App) formsPage(w http.ResponseWriter, r *http.Request) {
-	app.render(w, r, http.StatusOK, "forms.html", app.newTemplateData(r))
+	data := app.newTemplateData(r)
+	app.describe(r, &data, "Every form a molt can take, with its rules and an example: haiku, couplet, limerick, sonnet, simile, metaphor, letter, blog post, essay and the three-panel joke.", "website")
+	app.render(w, r, http.StatusOK, "forms.html", data)
 }
 
 // formOf is the writing form a molt names; the plain note for "", and an
