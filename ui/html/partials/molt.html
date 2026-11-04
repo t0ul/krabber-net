@@ -12,6 +12,12 @@
 
 {{define "nsfw-badge"}}<span class="text-muted">·</span> <span class="nsfw-badge">NSFW</span>{{end}}
 
+{{/* The writing form a molt follows (haiku, letter…); takes the form's ID. */}}
+{{define "form-badge"}}{{ with formOf . }}{{ if .ID }}<span class="text-muted">·</span> <span class="kb-form-badge">{{ .Name }}</span>{{ end }}{{ end }}{{end}}
+
+{{/* "Read the whole essay": a feed shows only the start of a long molt. */}}
+{{define "read-more"}}<a class="kb-read-more zindex-front small" href="/molt/view/{{ .ID }}">Read the whole {{ with formOf .Form }}{{ if .ID }}{{ lower .Name }}{{ else }}molt{{ end }}{{ end }}</a>{{end}}
+
 {{/* Text-only preview of a molt's first link; takes the card. */}}
 {{define "link-card"}}
 <a class="link-card zindex-front rounded-media mb-2" href="{{ .URL }}" target="_blank" rel="nofollow ugc noopener noreferrer">
@@ -66,18 +72,22 @@
                 <span class="mini-molt-username zindex-front">@{{ $m.Author }}</span>
                 <a class="mini-molt-timestamp zindex-front" href="/molt/view/{{ $m.ID }}">· {{ template "time" $m.CreatedAt }}</a>
                 {{ if $m.NSFW }}{{ template "nsfw-badge" }}{{ end }}
+                {{ template "form-badge" $m.Form }}
             </div>
         </div>
+        {{ $fold := and (not .InThread) (folded $m) }}
         <div class="mini-molt-content">
             {{ if $m.Veiled }}
             <details class="kb-nsfw zindex-front mb-2">
                 {{ template "nsfw-veil" }}
-                <p class="mt-2 mb-2"><span class="molt-text clickable" data-href="/molt/view/{{ $m.ID }}">{{ or $m.ContentHTML $m.Content }}</span></p>
+                <p class="mt-2 mb-2"><span class="molt-text clickable{{ if verse $m.Form }} kb-verse{{ end }}{{ if $fold }} kb-folded{{ end }}" data-href="/molt/view/{{ $m.ID }}">{{ or $m.ContentHTML $m.Content }}</span></p>
+                {{ if $fold }}{{ template "read-more" $m }}{{ end }}
                 {{ with $m.YouTube }}{{ template "youtube" . }}{{ end }}
                 {{ with $m.Card }}{{ template "link-card" . }}{{ end }}
             </details>
             {{ else }}
-            <p class="mb-2"><span class="zindex-front molt-text clickable" data-href="/molt/view/{{ $m.ID }}">{{ or $m.ContentHTML $m.Content }}</span></p>
+            <p class="mb-2"><span class="zindex-front molt-text clickable{{ if verse $m.Form }} kb-verse{{ end }}{{ if $fold }} kb-folded{{ end }}" data-href="/molt/view/{{ $m.ID }}">{{ or $m.ContentHTML $m.Content }}</span></p>
+            {{ if $fold }}{{ template "read-more" $m }}{{ end }}
             {{ with $m.YouTube }}{{ template "youtube" . }}{{ end }}
             {{ with $m.Card }}{{ template "link-card" . }}{{ end }}
             {{ end }}
@@ -103,15 +113,16 @@
                 <span class="mini-molt-username">@{{ .Author }}</span>
                 <span class="mini-molt-timestamp">· {{ template "time" .CreatedAt }}</span>
                 {{ if .NSFW }}{{ template "nsfw-badge" }}{{ end }}
+                {{ template "form-badge" .Form }}
             </div>
         </div>
         {{ if .Veiled }}
         <details class="kb-nsfw zindex-front">
             {{ template "nsfw-veil" }}
-            <p class="mt-2 mb-0 molt-text">{{ or .ContentHTML .Content }}</p>
+            <p class="mt-2 mb-0 molt-text{{ if verse .Form }} kb-verse{{ end }}{{ if folded . }} kb-folded{{ end }}">{{ or .ContentHTML .Content }}</p>
         </details>
         {{ else }}
-        <div class="mini-molt-content"><p class="mb-0 molt-text">{{ or .ContentHTML .Content }}</p></div>
+        <div class="mini-molt-content"><p class="mb-0 molt-text{{ if verse .Form }} kb-verse{{ end }}{{ if folded . }} kb-folded{{ end }}">{{ or .ContentHTML .Content }}</p></div>
         {{ end }}
         <a class="absolute-fill" href="/molt/view/{{ .ID }}" aria-label="Open the quoted molt"></a>
     </div>

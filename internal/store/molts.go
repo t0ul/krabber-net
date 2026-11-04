@@ -49,6 +49,7 @@ type Molt struct {
 	Removed   bool      `dynamodbav:"removed,omitempty"` // by a moderator; keeps its index keys so it can be restored
 	Edited    bool      `dynamodbav:"edited,omitempty"`
 	NSFW      bool      `dynamodbav:"nsfw,omitempty"` // set by the author or a moderator; hidden until the viewer reveals it or opts in
+	Form      string    `dynamodbav:"form,omitempty"` // the writing form chosen (a writing.Form ID: haiku, sonnet, letter…); "" for a plain molt
 
 	Remolt     bool   `dynamodbav:"remolt"`
 	RemoltOf   string `dynamodbav:"remolt_of,omitempty"`
@@ -97,6 +98,10 @@ type MoltOption func(*Molt)
 
 // WithNSFW labels the new molt NSFW.
 func WithNSFW(on bool) MoltOption { return func(m *Molt) { m.NSFW = on } }
+
+// WithForm records the writing form the molt follows ("" for none). The
+// store keeps the ID as given; the web layer checks it against the catalogue.
+func WithForm(id string) MoltOption { return func(m *Molt) { m.Form = id } }
 
 func applyOptions(m *Molt, opts []MoltOption) {
 	for _, o := range opts {

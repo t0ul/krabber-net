@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/t0ul/krabber-net/internal/store"
-	"github.com/t0ul/krabber-net/internal/validator"
 )
 
 // quotePage shows the form for quoting the molt in the URL.
@@ -17,6 +16,13 @@ func (app *App) renderQuote(w http.ResponseWriter, r *http.Request, status int, 
 	m, ok := app.moltFromPath(w, r)
 	if !ok {
 		return
+	}
+	f.Check = checkMolt(f)
+	switch {
+	case status == http.StatusOK: // a fresh form has nothing to complain about yet
+		f.Check.Message = ""
+	case f.Check.Blank:
+		f.Check.Message = "Say something about it."
 	}
 	quoted := []store.Molt{*m}
 	app.withDisplay(r, quoted)
@@ -46,20 +52,20 @@ func (app *App) quoteCreatePost(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	f.CheckField(validator.NotBlank(f.Content), "content", "Say something about it.")
-	f.CheckField(validator.MaxChars(f.Content, store.MaxMoltLength), "content", "Molts can be up to 280 characters.")
-	if f.Valid() && !app.underWriteLimit(w, r, "molt") {
+	// The checklist in the re-shown form says what's wrong, so there's no
+	// field error to add.
+	if checkMolt(f).Message != "" {
+		app.renderQuote(w, r, http.StatusUnprocessableEntity, f)
 		return
 	}
-	if !f.Valid() {
-		app.renderQuote(w, r, http.StatusUnprocessableEntity, f)
+	if !app.underWriteLimit(w, r, "molt") {
 		return
 	}
 	quoted, ok := app.moltFromPath(w, r)
 	if !ok {
 		return
 	}
-	m, err := app.store.Quote(r.Context(), currentCrab(r), quoted, f.Content, store.WithNSFW(f.NSFW))
+	m, err := app.store.Quote(r.Context(), currentCrab(r), quoted, f.Content, store.WithNSFW(f.NSFW), store.WithForm(f.Form))
 	switch {
 	case errors.Is(err, store.ErrNotFound), errors.Is(err, store.ErrNotAllowed):
 		app.notFound(w, r)

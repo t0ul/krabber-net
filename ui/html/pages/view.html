@@ -31,17 +31,18 @@
                 {{ if .AuthorVerified }}{{ template "verified" 17 }}{{ end }}<br>
                 <span class="mini-molt-username">@{{ .Author }}</span>
                 {{ if .NSFW }}{{ template "nsfw-badge" }}{{ end }}
+                {{ template "form-badge" .Form }}
             </div>
         </div>
         {{ if .Veiled }}
         <details class="kb-nsfw mb-2">
             {{ template "nsfw-veil" }}
-            <p class="large-molt-text mt-2 mb-2 molt-text">{{ or .ContentHTML .Content }}</p>
+            <p class="large-molt-text mt-2 mb-2 molt-text{{ if verse .Form }} kb-verse{{ end }}">{{ or .ContentHTML .Content }}</p>
             {{ with .YouTube }}{{ template "youtube" . }}{{ end }}
             {{ with .Card }}{{ template "link-card" . }}{{ end }}
         </details>
         {{ else }}
-        <p class="large-molt-text mb-2 molt-text">{{ or .ContentHTML .Content }}</p>
+        <p class="large-molt-text mb-2 molt-text{{ if verse .Form }} kb-verse{{ end }}">{{ or .ContentHTML .Content }}</p>
         {{ with .YouTube }}{{ template "youtube" . }}{{ end }}
         {{ with .Card }}{{ template "link-card" . }}{{ end }}
         {{ end }}
@@ -58,10 +59,12 @@
     </div>
 
     {{ if $d.IsAuthenticated }}
-    <form class="px-3 py-2 border-bottom border-dark" hx-post="/molt/reply/{{ .ID }}" hx-target="#reply-list" hx-swap="beforeend" hx-disabled-elt="find button" data-reset-on-success>
+    <form class="px-3 py-2 border-bottom border-dark" hx-post="/molt/reply/{{ .ID }}" hx-target="#reply-list" hx-swap="beforeend" hx-disabled-elt="find button" data-reset-on-success data-swap-errors>
         <input type='hidden' name='csrf_token' value='{{ $d.CSRFToken }}'>
         <textarea class="form-control mb-2" name="content" rows="2" placeholder="Molt your reply" aria-label="Reply to @{{ .Author }}" required></textarea>
+        {{ template "form-feedback" emptyCheck }}
         <div class="d-flex flex-row justify-content-end">
+            {{ template "form-picker" "" }}
             {{ template "nsfw-toggle" "nsfw-reply" }}
             {{ template "counter" }}
             <button type="submit" class="btn btn-sm btn-primary rounded-pill">Reply</button>

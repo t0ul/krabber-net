@@ -33,11 +33,20 @@ if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/sw.js").catch(function () {});
 }
 
-// Forms marked data-reset-on-success clear after a successful htmx post.
+// Forms marked data-reset-on-success clear after a successful htmx post. Only
+// the form's own post counts: the feedback box inside it makes its own request
+// (the live check), and since its answer swaps the box out, htmx reports that
+// request's end on the form itself. The request's path tells the two apart.
 document.addEventListener("htmx:afterRequest", function (event) {
-  var form = event.target.closest && event.target.closest("form[data-reset-on-success]");
-  if (form && event.detail.successful) {
+  var form = event.target;
+  var path = event.detail.pathInfo && event.detail.pathInfo.requestPath;
+  if (form.matches && form.matches("form[data-reset-on-success]") && event.detail.successful && path === form.getAttribute("hx-post")) {
     form.reset();
+    var feedback = form.querySelector(".kb-feedback");
+    if (feedback) {
+      feedback.replaceChildren();
+      feedback.classList.remove("kb-feedback-refused");
+    }
   }
 });
 
@@ -128,20 +137,27 @@ document.addEventListener("click", function (event) {
   }
 });
 
-// Compose counters count down from 280 and turn red past it; Molt stays
-// disabled while the text is blank or too long, as in Crabber.
-var moltLimit = 280;
+// Compose counters count down from the chosen writing form's limit (280 for
+// a plain molt; a sonnet or an essay gets more) and turn red past it; Molt
+// stays disabled while the text is blank or too long, as in Crabber.
+function moltLimit(form) {
+  var select = form.querySelector("select[name=form]");
+  var option = select && select.options[select.selectedIndex];
+  var max = option ? parseInt(option.getAttribute("data-max"), 10) : 0;
+  return max > 0 ? max : 280;
+}
 
 function updateCounter(form) {
   var textarea = form.querySelector("textarea[name=content]");
   var counter = form.querySelector(".mini-character-counter");
   if (!textarea || !counter) return;
+  var limit = moltLimit(form);
   var length = Array.from(textarea.value).length;
   counter.classList.remove("d-none");
-  counter.textContent = moltLimit - length;
-  counter.classList.toggle("text-primary", length > moltLimit);
+  counter.textContent = limit - length;
+  counter.classList.toggle("text-primary", length > limit);
   var button = form.querySelector("button[type=submit]");
-  if (button) button.disabled = !textarea.value.trim() || length > moltLimit;
+  if (button) button.disabled = !textarea.value.trim() || length > limit;
 }
 
 function initCounters(root) {
@@ -150,9 +166,35 @@ function initCounters(root) {
   });
 }
 
+// Choosing a writing form shows its rules in the form's feedback box, and the
+// text is checked again a moment after typing pauses, while a form is chosen
+// (a plain molt has no rules to check). The box asks the server over htmx.
+var checkTimers = new WeakMap();
+
+// Each answer replaces the box, so the box is looked up when the timer fires:
+// one found earlier may already have been swapped out by a check in flight.
+function scheduleCheck(form, delay) {
+  if (!window.htmx) return;
+  clearTimeout(checkTimers.get(form));
+  checkTimers.set(form, setTimeout(function () {
+    var feedback = form.querySelector(".kb-feedback");
+    if (feedback) htmx.trigger(feedback, "kb:check");
+  }, delay));
+}
+
 document.addEventListener("input", function (event) {
   var form = event.target.form;
-  if (form && event.target.name === "content") updateCounter(form);
+  if (!form || event.target.name !== "content") return;
+  updateCounter(form);
+  var select = form.querySelector("select[name=form]");
+  if (select && select.value) scheduleCheck(form, 600);
+});
+
+document.addEventListener("change", function (event) {
+  var form = event.target.form;
+  if (!form || event.target.name !== "form") return;
+  updateCounter(form);
+  scheduleCheck(form, 0);
 });
 
 document.addEventListener("reset", function (event) {

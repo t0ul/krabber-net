@@ -61,7 +61,9 @@ func (app *App) renderMolts(w http.ResponseWriter, r *http.Request, page string,
 type moltForm struct {
 	Content             string `form:"content"`
 	NSFW                bool   `form:"nsfw"`
+	Form                string `form:"form"` // writing form ID; "" for a plain molt
 	validator.Validator `form:"-"`
+	Check               moltCheck `form:"-"` // filled in when the form is shown again
 }
 
 // decodeMoltForm reads molt text from a posted form. Browsers send textarea
@@ -87,14 +89,14 @@ func (app *App) moltCreatePost(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if !validator.NotBlank(f.Content) || !validator.MaxChars(f.Content, store.MaxMoltLength) {
-		http.Error(w, "Molts must be 1–280 characters.", http.StatusUnprocessableEntity)
+	if c := checkMolt(f); c.Message != "" {
+		app.rejectMolt(w, r, c)
 		return
 	}
 	if !app.underWriteLimit(w, r, "molt") {
 		return
 	}
-	m, err := app.store.CreateMolt(r.Context(), currentCrab(r), f.Content, store.WithNSFW(f.NSFW))
+	m, err := app.store.CreateMolt(r.Context(), currentCrab(r), f.Content, store.WithNSFW(f.NSFW), store.WithForm(f.Form))
 	if err != nil {
 		app.serverError(w, r, err)
 		return
@@ -482,8 +484,8 @@ func (app *App) replyCreatePost(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if !validator.NotBlank(f.Content) || !validator.MaxChars(f.Content, store.MaxMoltLength) {
-		http.Error(w, "Replies must be 1–280 characters.", http.StatusUnprocessableEntity)
+	if c := checkMolt(f); c.Message != "" {
+		app.rejectMolt(w, r, c)
 		return
 	}
 	if !app.underWriteLimit(w, r, "molt") {
@@ -493,7 +495,7 @@ func (app *App) replyCreatePost(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	reply, err := app.store.Reply(r.Context(), currentCrab(r), parent, f.Content, store.WithNSFW(f.NSFW))
+	reply, err := app.store.Reply(r.Context(), currentCrab(r), parent, f.Content, store.WithNSFW(f.NSFW), store.WithForm(f.Form))
 	switch {
 	case errors.Is(err, store.ErrNotFound), errors.Is(err, store.ErrNotAllowed):
 		app.notFound(w, r)

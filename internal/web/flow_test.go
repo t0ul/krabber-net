@@ -2780,3 +2780,149 @@ func TestParseMutedWords(t *testing.T) {
 		t.Fatalf("cap: %d", n)
 	}
 }
+
+func TestWritingForms(t *testing.T) {
+	h := newHarness(t)
+	h.signupAndActivate("basho", "basho@krabber.test", "old-silent-pond")
+	h.signupAndActivate("issa", "issa@krabber.test", "snail-mount-fuji")
+	h.login("basho@krabber.test", "old-silent-pond")
+	tok := h.csrf("/trench")
+
+	// The composer offers every form in a dropdown, with a feedback box that
+	// re-checks the text as it's written, and a page explains the rules.
+	_, body, _ := h.get("/trench")
+	if !strings.Contains(body, `name="form"`) || !strings.Contains(body, `<option value="haiku"`) || !strings.Contains(body, `<option value="three-panel"`) ||
+		!strings.Contains(body, `class="kb-feedback"`) || !strings.Contains(body, `href="/forms"`) {
+		t.Error("the compose box is missing the form dropdown, the feedback box, or the link to the forms page")
+	}
+	if status, body, _ := h.get("/forms"); status != http.StatusOK || !strings.Contains(body, "Haiku") || !strings.Contains(body, "Five, seven, five syllables.") || !strings.Contains(body, "Three-panel joke") {
+		t.Errorf("the forms page: %d", status)
+	}
+
+	// A haiku that isn't one yet is refused, and htmx is told to put the
+	// checklist in the form's feedback box instead of the feed.
+	status, body, hdr := h.post("/molt/create", url.Values{"csrf_token": {tok}, "content": {"two lines\nonly"}, "form": {"haiku"}}, "HX-Request", "true")
+	if status != http.StatusUnprocessableEntity || hdr.Get("HX-Retarget") != "find .kb-feedback" || hdr.Get("HX-Reswap") != "outerHTML" ||
+		!strings.Contains(body, "Three lines.") || !strings.Contains(body, "kb-rule-fail") || !strings.Contains(body, "Not quite a haiku yet") {
+		t.Errorf("a two-line haiku: %d %v %s", status, hdr, body)
+	}
+	if molts, _ := h.store.MoltsByOwner(context.Background(), currentID(t, h, "basho"), 1); len(molts) != 0 {
+		t.Fatal("the refused haiku was stored")
+	}
+	if status, body, _ := h.post("/molt/create", url.Values{"csrf_token": {tok}, "content": {"two lines\nonly"}, "form": {"haiku"}}); status != http.StatusUnprocessableEntity || !strings.Contains(body, "Not quite a haiku yet") {
+		t.Errorf("a two-line haiku without htmx: %d %s", status, body)
+	}
+	if status, body, _ := h.post("/molt/create", url.Values{"csrf_token": {tok}, "content": {"anything"}, "form": {"sestina"}}, "HX-Request", "true"); status != http.StatusUnprocessableEntity || !strings.Contains(body, "not a form Krabber knows") {
+		t.Errorf("an unknown form: %d %s", status, body)
+	}
+
+	// A real haiku posts, carries its form, and shows it.
+	haiku := "low tide at sunrise\na krab raises one wet claw\nhello to the gulls"
+	status, body, _ = h.post("/molt/create", url.Values{"csrf_token": {tok}, "content": {haiku}, "form": {"haiku"}}, "HX-Request", "true")
+	if status != http.StatusOK || !strings.Contains(body, `kb-form-badge">Haiku<`) || !strings.Contains(body, "kb-verse") {
+		t.Fatalf("a haiku: %d %s", status, body)
+	}
+	molts, _ := h.store.MoltsByOwner(context.Background(), currentID(t, h, "basho"), 1)
+	haikuID := molts[0].ID
+	if molts[0].Form != "haiku" || molts[0].Content != haiku {
+		t.Errorf("stored %+v", molts[0])
+	}
+
+	// Long forms go past 280 characters; a plain molt doesn't.
+	paragraph := strings.Repeat("The tide is the only clock a krab needs. ", 18) // ~740 characters
+	essay := "On tides\n\n" + paragraph + "\n\n" + paragraph + "\n\n" + paragraph + "\n\n" + paragraph
+	if status, body, _ := h.post("/molt/create", url.Values{"csrf_token": {tok}, "content": {essay}, "form": {"essay"}}, "HX-Request", "true"); status != http.StatusOK || !strings.Contains(body, `kb-form-badge">Essay<`) {
+		t.Fatalf("an essay of %d characters: %d %s", len(essay), status, body)
+	}
+	if status, body, _ := h.post("/molt/create", url.Values{"csrf_token": {tok}, "content": {strings.Repeat("x", 281)}}, "HX-Request", "true"); status != http.StatusUnprocessableEntity || !strings.Contains(body, "up to 280 characters") {
+		t.Errorf("a 281-character note: %d %s", status, body)
+	}
+	if status, body, _ := h.post("/molt/create", url.Values{"csrf_token": {tok}, "content": {"On tides\n\n" + strings.Repeat("x", 8000)}, "form": {"essay"}}, "HX-Request", "true"); status != http.StatusUnprocessableEntity || !strings.Contains(body, "up to 8,000 characters") {
+		t.Errorf("an over-long essay: %d %s", status, body)
+	}
+	molts, _ = h.store.MoltsByOwner(context.Background(), currentID(t, h, "basho"), 1)
+	essayID := molts[0].ID
+
+	// The feed folds a long molt and links to the whole thing; the thread shows it all.
+	_, body, _ = h.get("/sea")
+	if !strings.Contains(body, "kb-folded") || !strings.Contains(body, "Read the whole essay") || !strings.Contains(body, `kb-form-badge">Haiku<`) {
+		t.Error("the Sea should fold the essay and badge the haiku")
+	}
+	if _, body, _ := h.get("/molt/view/" + essayID); strings.Contains(body, "kb-folded") || !strings.Contains(body, paragraph+"\n\n"+paragraph) || !strings.Contains(body, `kb-form-badge">Essay<`) {
+		t.Error("the thread page should show the whole essay with its badge")
+	}
+
+	// The live check: the checklist for the chosen form, re-armed for the next check.
+	status, body, _ = h.post("/molt/check", url.Values{"csrf_token": {tok}, "content": {"one\ntwo\nthree"}, "form": {"haiku"}}, "HX-Request", "true")
+	if status != http.StatusOK || !strings.Contains(body, "1-1-1 syllables") || !strings.Contains(body, "kb-rule-hint") || !strings.Contains(body, `hx-trigger="kb:check"`) || strings.Contains(body, "<html") {
+		t.Errorf("check: %d %s", status, body)
+	}
+	if status, body, _ := h.post("/molt/check", url.Values{"csrf_token": {tok}, "content": {"anything"}, "form": {""}}, "HX-Request", "true"); status != http.StatusOK || !strings.Contains(body, `class="kb-feedback"`) || strings.Contains(body, "<li") {
+		t.Errorf("check with no form: %d %s", status, body)
+	}
+
+	// Replies take a form too: a three-panel joke for the comments.
+	if status, body, _ := h.post("/molt/reply/"+haikuID, url.Values{"csrf_token": {tok}, "content": {"Setup.\n\nPunchline."}, "form": {"three-panel"}}, "HX-Request", "true"); status != http.StatusUnprocessableEntity || !strings.Contains(body, "Three panels") {
+		t.Errorf("a two-panel joke: %d %s", status, body)
+	}
+	joke := "A krab walks into a bar and orders a drink.\n\nThe bartender slides it down the counter, right past him.\n\n\"Sideways,\" sighs the krab. \"Always sideways.\""
+	if status, body, _ := h.post("/molt/reply/"+haikuID, url.Values{"csrf_token": {tok}, "content": {joke}, "form": {"three-panel"}}, "HX-Request", "true"); status != http.StatusOK || !strings.Contains(body, `kb-form-badge">Three-panel joke<`) {
+		t.Errorf("a three-panel joke: %d %s", status, body)
+	}
+
+	// Editing keeps the form selected and re-checks the new text.
+	if _, body, _ := h.get("/molt/edit/" + haikuID); !strings.Contains(body, `<option value="haiku" selected`) {
+		t.Error("the edit form doesn't preselect the molt's form")
+	}
+	if status, body, _ := h.post("/molt/edit/"+haikuID, url.Values{"csrf_token": {tok}, "content": {"not a haiku"}, "form": {"haiku"}}); status != http.StatusUnprocessableEntity || !strings.Contains(body, "Three lines.") || !strings.Contains(body, "kb-rule-fail") {
+		t.Errorf("editing a haiku into prose: %d", status)
+	}
+	couplet := "The tide goes out, the tide comes in,\nthe krab just sits and wears a grin."
+	if status, _, hdr := h.post("/molt/edit/"+haikuID, url.Values{"csrf_token": {tok}, "content": {couplet}, "form": {"couplet"}}); status != http.StatusSeeOther || hdr.Get("Location") != "/molt/view/"+haikuID {
+		t.Errorf("editing into a couplet: %d", status)
+	}
+	if m, _ := h.store.MoltByID(context.Background(), haikuID); m.Form != "couplet" {
+		t.Errorf("after the edit the form is %q", m.Form)
+	}
+
+	// Quotes: a simile needs its like or as.
+	if status, body, _ := h.post("/molt/quote/"+essayID, url.Values{"csrf_token": {tok}, "content": {"Long."}, "form": {"simile"}}, "HX-Request", "true"); status != http.StatusUnprocessableEntity || !strings.Contains(body, "like or as") || !strings.HasPrefix(strings.TrimSpace(body), "<form") {
+		t.Errorf("a simile without a comparison: %d %s", status, body)
+	}
+	if status, _, hdr := h.post("/molt/quote/"+essayID, url.Values{"csrf_token": {tok}, "content": {"This essay is like the tide: it keeps coming."}, "form": {"simile"}}); status != http.StatusSeeOther || !strings.HasPrefix(hdr.Get("Location"), "/molt/view/") {
+		t.Errorf("a simile quote: %d", status)
+	}
+
+	// The API takes a form as well, with the same rules.
+	key, _, err := h.store.CreateAPIKey(context.Background(), currentCrabByName(t, h, "basho"), "verse bot", []string{store.ScopeWriteMolts})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status, body := h.apiPost("/api/v1/molts", key, `{"text":"two lines\nonly","form":"haiku"}`); status != http.StatusUnprocessableEntity || !strings.Contains(body, "Three lines") {
+		t.Errorf("API haiku: %d %s", status, body)
+	}
+	if status, body := h.apiPost("/api/v1/molts", key, `{"text":"low tide at sunrise\na krab raises one wet claw\nhello to the gulls","form":"haiku"}`); status != http.StatusCreated {
+		t.Errorf("API haiku: %d %s", status, body)
+	}
+	molts, _ = h.store.MoltsByOwner(context.Background(), currentID(t, h, "basho"), 1)
+	if molts[0].Form != "haiku" {
+		t.Errorf("the API molt's form is %q", molts[0].Form)
+	}
+
+	// Another krab sees the forms on the feed, not the compose feedback.
+	h.post("/krab/logout", url.Values{"csrf_token": {tok}})
+	h.login("issa@krabber.test", "snail-mount-fuji")
+	if _, body, _ := h.get("/sea"); !strings.Contains(body, `kb-form-badge">Couplet<`) || !strings.Contains(body, `kb-form-badge">Simile<`) {
+		t.Error("the Sea doesn't show the forms of other krabs' molts")
+	}
+}
+
+// currentCrabByName loads a crab by username.
+func currentCrabByName(t *testing.T, h *harness, name string) *store.Crab {
+	t.Helper()
+	c, err := h.store.CrabByUsername(context.Background(), name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return c
+}

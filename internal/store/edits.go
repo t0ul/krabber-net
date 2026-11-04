@@ -21,10 +21,11 @@ func (m *Molt) Editable(now time.Time) bool {
 }
 
 // EditMolt replaces the text of c's molt m, re-reading its crabtags and
-// mentions and marking it edited. It fails with ErrNotAllowed when m isn't
-// c's or is past EditWindow, and ErrNotFound when m was deleted or changed
-// since it was read.
-func (s *Store) EditMolt(ctx context.Context, c *Crab, m *Molt, content string) (*Molt, error) {
+// mentions and marking it edited. Options change what the edit keeps: the
+// molt's writing form stays unless WithForm says otherwise. It fails with
+// ErrNotAllowed when m isn't c's or is past EditWindow, and ErrNotFound when
+// m was deleted or changed since it was read.
+func (s *Store) EditMolt(ctx context.Context, c *Crab, m *Molt, content string, opts ...MoltOption) (*Molt, error) {
 	if m.AuthorID != c.ID || !m.Editable(s.now()) {
 		return nil, ErrNotAllowed
 	}
@@ -33,11 +34,18 @@ func (s *Store) EditMolt(ctx context.Context, c *Crab, m *Molt, content string) 
 	edited.Tags = richtext.Tags(content)
 	edited.Mentions = richtext.Mentions(content)
 	edited.Edited = true
+	applyOptions(&edited, opts)
 
 	set := "SET content = :c, edited = :t"
 	var remove []string
 	values := map[string]types.AttributeValue{
 		":c": str(content), ":old": str(m.Content), ":t": boolean(true), ":f": boolean(false),
+	}
+	if edited.Form != "" {
+		values[":form"] = str(edited.Form)
+		set += ", form = :form"
+	} else {
+		remove = append(remove, "form")
 	}
 	for attr, list := range map[string][]string{"tags": edited.Tags, "mentions": edited.Mentions} {
 		if len(list) == 0 {

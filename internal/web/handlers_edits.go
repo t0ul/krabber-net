@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/t0ul/krabber-net/internal/store"
-	"github.com/t0ul/krabber-net/internal/validator"
 )
 
 const notEditable = "Molt is no longer editable (must be less than 5 minutes old)"
@@ -17,10 +16,14 @@ func (app *App) editPage(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	app.renderEdit(w, r, http.StatusOK, m, moltForm{Content: m.Content})
+	app.renderEdit(w, r, http.StatusOK, m, moltForm{Content: m.Content, Form: m.Form})
 }
 
 func (app *App) renderEdit(w http.ResponseWriter, r *http.Request, status int, m *store.Molt, f moltForm) {
+	f.Check = checkMolt(f)
+	if status == http.StatusOK { // a fresh form has nothing to complain about yet
+		f.Check.Message = ""
+	}
 	data := app.newTemplateData(r)
 	data.Molt = *m
 	data.Form = f
@@ -37,14 +40,12 @@ func (app *App) editPost(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	f.CheckField(validator.NotBlank(f.Content), "content", "Molt text cannot be blank")
-	f.CheckField(validator.MaxChars(f.Content, store.MaxMoltLength), "content", "Molts can be up to 280 characters.")
-	f.CheckField(f.Content != m.Content, "content", "No changes were made")
-	if !f.Valid() {
+	f.CheckField(f.Content != m.Content || f.Form != m.Form, "content", "No changes were made")
+	if !f.Valid() || checkMolt(f).Message != "" {
 		app.renderEdit(w, r, http.StatusUnprocessableEntity, m, f)
 		return
 	}
-	edited, err := app.store.EditMolt(r.Context(), currentCrab(r), m, f.Content)
+	edited, err := app.store.EditMolt(r.Context(), currentCrab(r), m, f.Content, store.WithForm(f.Form))
 	switch {
 	case errors.Is(err, store.ErrNotAllowed):
 		app.sessions.Put(r.Context(), sessionFlash, notEditable)

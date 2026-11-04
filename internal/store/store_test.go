@@ -1466,3 +1466,63 @@ func TestNewer(t *testing.T) {
 		t.Fatalf("trench since oldest: %d, %v", n, err)
 	}
 }
+
+func TestMoltKeepsItsForm(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+	basho := mustCrab(t, s, "basho")
+
+	haiku := "low tide at sunrise\na krab raises one wet claw\nhello to the gulls"
+	m, err := s.CreateMolt(ctx, basho, haiku, WithForm("haiku"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.MoltByID(ctx, m.ID)
+	if err != nil || got.Form != "haiku" {
+		t.Fatalf("stored form %q, %v", got.Form, err)
+	}
+	plain, err := s.CreateMolt(ctx, basho, "just a molt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := s.MoltByID(ctx, plain.ID); got.Form != "" {
+		t.Fatalf("a plain molt has form %q", got.Form)
+	}
+
+	// An edit keeps the form unless the writer picks another, and can drop it.
+	if _, err := s.EditMolt(ctx, basho, got, haiku+"!"); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ = s.MoltByID(ctx, m.ID); got.Form != "haiku" {
+		t.Fatalf("after a plain edit the form is %q", got.Form)
+	}
+	if _, err := s.EditMolt(ctx, basho, got, "The tide goes out, the tide comes in,\nthe krab just sits and wears a grin.", WithForm("couplet")); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ = s.MoltByID(ctx, m.ID); got.Form != "couplet" {
+		t.Fatalf("after changing the form it is %q", got.Form)
+	}
+	if _, err := s.EditMolt(ctx, basho, got, "just words now", WithForm("")); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ = s.MoltByID(ctx, m.ID); got.Form != "" {
+		t.Fatalf("after dropping the form it is %q", got.Form)
+	}
+
+	// Replies and quotes take a form too, and a molt can be as long as its form allows.
+	reply, err := s.Reply(ctx, basho, got, "Setup.\n\nBuild.\n\nPunch.", WithForm("three-panel"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r, _ := s.MoltByID(ctx, reply.ID); r.Form != "three-panel" {
+		t.Fatalf("reply form %q", r.Form)
+	}
+	long := strings.Repeat("The tide is the only clock a krab needs. ", 150) // ~6,000 characters
+	essay, err := s.CreateMolt(ctx, basho, "On tides\n\n"+long, WithForm("essay"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if e, _ := s.MoltByID(ctx, essay.ID); e.Content != "On tides\n\n"+long {
+		t.Fatal("a long essay didn't come back whole")
+	}
+}

@@ -8,12 +8,12 @@ import (
 	"strings"
 
 	"github.com/t0ul/krabber-net/internal/store"
-	"github.com/t0ul/krabber-net/internal/validator"
 )
 
-// maxAPIBodyBytes caps a JSON request body. A molt is at most 280 characters;
-// this leaves room for the JSON wrapper and multi-byte runes.
-const maxAPIBodyBytes = 4 << 10
+// maxAPIBodyBytes caps a JSON request body. A molt is at most
+// writing.MaxLength characters (280 without a form); this leaves room for
+// the JSON wrapper and multi-byte runes.
+const maxAPIBodyBytes = 40 << 10
 
 // apiError writes a JSON error with the given status.
 func apiError(w http.ResponseWriter, status int, msg string) {
@@ -102,13 +102,16 @@ func (app *App) apiAuthenticate(scope string, next http.HandlerFunc) http.Handle
 }
 
 // apiCreateMolt posts a molt as the authenticated key's crab. Body:
-// {"text": "...", "nsfw": false}. It validates and rate-limits exactly like the
-// web compose box, then publishes through the same path.
+// {"text": "...", "nsfw": false, "form": "haiku"}; form is optional and names
+// a writing form (see /forms), checked by the same rules as the web composer.
+// It validates and rate-limits exactly like the web compose box, then
+// publishes through the same path.
 func (app *App) apiCreateMolt(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, maxAPIBodyBytes)
 	var in struct {
 		Text string `json:"text"`
 		NSFW bool   `json:"nsfw"`
+		Form string `json:"form"`
 	}
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
@@ -117,8 +120,8 @@ func (app *App) apiCreateMolt(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	in.Text = strings.ReplaceAll(in.Text, "\r\n", "\n")
-	if !validator.NotBlank(in.Text) || !validator.MaxChars(in.Text, store.MaxMoltLength) {
-		apiError(w, http.StatusUnprocessableEntity, "text must be 1-280 characters")
+	if check := checkMolt(moltForm{Content: in.Text, NSFW: in.NSFW, Form: in.Form}); check.Message != "" {
+		apiError(w, http.StatusUnprocessableEntity, check.Message)
 		return
 	}
 	c := currentCrab(r)
@@ -127,7 +130,7 @@ func (app *App) apiCreateMolt(w http.ResponseWriter, r *http.Request) {
 		apiError(w, http.StatusTooManyRequests, "rate limit reached, try again later")
 		return
 	}
-	m, err := app.store.CreateMolt(r.Context(), c, in.Text, store.WithNSFW(in.NSFW))
+	m, err := app.store.CreateMolt(r.Context(), c, in.Text, store.WithNSFW(in.NSFW), store.WithForm(in.Form))
 	if err != nil {
 		app.apiServerError(w, r, err)
 		return

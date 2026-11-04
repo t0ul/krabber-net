@@ -102,8 +102,9 @@ func seedMolts(ctx context.Context, s *store.Store, crabs []*store.Crab) {
 		"plankton":  "The Krabby Patty formula will be MINE.",
 		"sandy":     "Karate island, here I come.",
 		"patrick":   "The inner machinations of my mind are an enigma.",
-		"squidward": "I hate all of you.",
+		"squidward": "the reef at sunrise\nall of you, still here, still loud\nI hate all of you",
 	}
+	forms := map[string]string{"squidward": "haiku"}
 	byName := map[string]*store.Molt{}
 	created := map[string]bool{}
 	for _, c := range crabs {
@@ -116,7 +117,7 @@ func seedMolts(ctx context.Context, s *store.Store, crabs []*store.Crab) {
 		if line == "" {
 			continue
 		}
-		m, err := s.CreateMolt(ctx, c, line)
+		m, err := s.CreateMolt(ctx, c, line, store.WithForm(forms[c.UserName]))
 		if err != nil {
 			log.Fatal(err)
 		}

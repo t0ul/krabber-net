@@ -26,6 +26,7 @@ func (app *App) Routes() http.Handler {
 	mux.HandleFunc("GET /krabtag/{tag}", app.firstPageSignedOut(app.crabtagPage))
 	mux.HandleFunc("GET /stats", app.statsPage)
 	mux.HandleFunc("GET /terms", app.termsPage)
+	mux.HandleFunc("GET /forms", app.formsPage)
 	mux.HandleFunc("GET /privacy", app.privacyPage)
 	mux.HandleFunc("/", app.notFound)
 
@@ -73,6 +74,7 @@ func (app *App) Routes() http.Handler {
 	mux.HandleFunc("GET /krabs/{name}/following", app.followingList)
 	mux.HandleFunc("GET /search", app.searchPage)
 	mux.HandleFunc("POST /molt/create", app.requireAuthentication(app.moltCreatePost))
+	mux.HandleFunc("POST /molt/check", app.requireAuthentication(app.moltCheckPost))
 	mux.HandleFunc("POST /molt/like/{id}", app.requireAuthentication(app.moltLikePost))
 	mux.HandleFunc("POST /molt/delete/{id}", app.requireAuthentication(app.moltDeletePost))
 	mux.HandleFunc("POST /molt/nsfw/{id}", app.requireAuthentication(app.moltNSFWPost))

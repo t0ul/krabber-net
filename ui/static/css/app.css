@@ -744,3 +744,152 @@ body.kb-shell,
     border-right: 0 !important;
   }
 }
+
+/* Writing forms: the composer's dropdown and rule checklist, the badge on a
+   molt, verse laid out as verse, and the fold on a long molt in a feed. */
+.kb-form-picker {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: auto;
+  margin-bottom: auto;
+}
+
+.kb-form-select {
+  width: auto;
+  max-width: 11rem;
+  font-size: 0.8rem;
+  height: calc(1.5em + 0.5rem + 2px);
+  padding: 0.25rem 1.5rem 0.25rem 0.5rem;
+  border-color: var(--dark-less);
+}
+
+.kb-forms-help {
+  font-size: 0.8rem;
+  text-decoration: none;
+  border: 1px solid var(--light-faded);
+  border-radius: 999px;
+  width: 1.3rem;
+  height: 1.3rem;
+  line-height: 1.2rem;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.kb-feedback:empty {
+  display: none;
+}
+
+.kb-feedback {
+  padding: 0.25rem 0;
+}
+
+.kb-rules {
+  line-height: 1.35;
+}
+
+.kb-rule {
+  margin-bottom: 0.15rem;
+  padding-left: 1.3rem;
+  text-indent: -1.3rem;
+}
+
+.kb-rule-mark {
+  display: inline-block;
+  width: 1.3rem;
+  text-indent: 0;
+  font-weight: bold;
+}
+
+.kb-rule-ok .kb-rule-mark {
+  color: #3fb950;
+}
+
+.kb-rule-fail {
+  color: var(--primary);
+}
+
+.kb-rule-hint .kb-rule-mark {
+  color: #e3b341;
+}
+
+.kb-rule-advice {
+  color: var(--light-faded);
+}
+
+.kb-form-badge {
+  font-size: 0.72rem;
+  text-transform: lowercase;
+  border: 1px solid var(--light-faded);
+  border-radius: 999px;
+  padding: 0 0.4rem;
+  color: var(--light-faded);
+  white-space: nowrap;
+}
+
+.kb-verse {
+  display: block;
+  font-family: Georgia, "Times New Roman", serif;
+  font-style: italic;
+  border-left: 2px solid var(--primary);
+  padding-left: 0.75rem;
+}
+
+.kb-folded {
+  display: block;
+  max-height: 14em;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(#000 70%, transparent);
+  mask-image: linear-gradient(#000 70%, transparent);
+}
+
+.kb-read-more {
+  display: inline-block;
+  margin-bottom: 0.5rem;
+}
+
+.kb-forms h2 {
+  font-size: 1.25rem;
+  margin-top: 1.5rem;
+}
+
+.kb-form-card {
+  margin-bottom: 1.5rem;
+}
+
+.kb-form-card h3 {
+  font-size: 1.05rem;
+  margin-bottom: 0.25rem;
+}
+
+.kb-form-card ul {
+  padding-left: 1.2rem;
+}
+
+.kb-example {
+  white-space: pre-wrap;
+  font-family: Georgia, "Times New Roman", serif;
+  color: var(--light);
+  background: var(--dark-less);
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  border-left: 2px solid var(--primary);
+}
+
+/* On phones the dropdown, the switch, the counter and the button don't fit
+   one row, so the picker takes a line of its own above them. */
+@media (max-width: 575px) {
+  .compose-button-row {
+    flex-wrap: wrap;
+    max-height: none;
+  }
+
+  .kb-form-picker {
+    flex: 1 0 100%;
+    margin-bottom: 0.4rem;
+  }
+
+  .kb-form-select {
+    max-width: 12rem;
+  }
+}

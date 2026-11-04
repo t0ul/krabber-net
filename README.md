@@ -53,6 +53,7 @@ python3 scripts/cost_model.py 1000 5000 10000   # daily active krabs
 | `scripts/create_table.py` | Create the DynamoDB table with boto3 (`--local` for DynamoDB Local, `--print` for the JSON definition); a Go test keeps it matching `internal/store/schema.go` |
 | `internal/store` | All DynamoDB access; every key format is in `keys.go` |
 | `internal/web` | Routes, handlers, templates, security middleware |
+| `internal/writing` | The writing forms a molt can take (haiku, sonnet, letter, three-panel joke…): their rules, length limits and the checks behind the composer's checklist and `/forms` |
 | `internal/jobs` | Trench fan-out worker and sea refresh |
 | `internal/mail` | Email templates, SES sender, daily cap |
 | `internal/config` | Environment + SSM Parameter Store settings |

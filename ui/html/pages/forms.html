@@ -1,0 +1,22 @@
+{{define "title"}}Writing forms{{end}}
+
+{{define "page"}}
+{{ template "shell-top" . }}
+    {{ template "heading" "Writing forms" }}
+    <div class="px-3 py-3 kb-legal kb-forms">
+        <p>Every molt can take a form. Pick one from the dropdown when you write and the composer checks your text against its rules as you go. Exact rules (three lines, a blank line between panels) have to be met before you can post. Rules about sound (syllables, rhyme) are guesses from spelling, so they only nudge: the mark shows what the computer heard, and you decide.</p>
+        <p class="text-muted small">A plain molt, a <strong>Note</strong>, has no rules and up to 280 characters.</p>
+        {{ range formGroups }}
+        <h2>{{ . }}</h2>
+        {{ range formsIn . }}
+        <section class="kb-form-card" id="{{ .ID }}">
+            <h3>{{ .Name }} <small class="text-muted">· up to {{ commas .MaxChars }} characters</small></h3>
+            <p>{{ .Tagline }}</p>
+            <ul>{{ range .Rules }}<li>{{ . }}</li>{{ end }}</ul>
+            <pre class="kb-example">{{ .Example }}</pre>
+        </section>
+        {{ end }}
+        {{ end }}
+    </div>
+{{ template "shell-bottom" . }}
+{{end}}

@@ -7,6 +7,43 @@
 
 {{define "counter"}}<span class="mini-character-counter text-muted my-auto mr-3 d-none">280</span>{{end}}
 
+{{/* The writing-form dropdown: a plain note, then every form by group. Each
+     option carries its own length, which app.js gives the counter. Takes
+     the selected form's ID. The "?" opens the page that explains the rules. */}}
+{{define "form-picker"}}{{ $sel := . }}
+<span class="kb-form-picker mr-2">
+    <select name="form" class="custom-select custom-select-sm kb-form-select" aria-label="Writing form" title="Writing form">
+        {{ range forms }}{{ if not .ID }}<option value=""{{ if eq $sel "" }} selected{{ end }} data-max="{{ .MaxChars }}">{{ .Name }}</option>{{ end }}{{ end }}
+        {{ range formGroups }}
+        <optgroup label="{{ . }}">
+            {{ range formsIn . }}<option value="{{ .ID }}"{{ if eq $sel .ID }} selected{{ end }} data-max="{{ .MaxChars }}">{{ .Name }}</option>{{ end }}
+        </optgroup>
+        {{ end }}
+    </select>
+    <a href="/forms" class="kb-forms-help text-muted" title="How the writing forms work" aria-label="How the writing forms work">?</a>
+</span>
+{{end}}
+
+{{/* The composer's feedback box: the chosen form's rules with a mark on each
+     (✓ followed, ✗ broken, ~ a hint missed, · advice), and why the molt can't
+     be posted yet. It asks for a fresh check when app.js sends kb:check, and a
+     refused post lands here (HX-Retarget). Takes a moltCheck. */}}
+{{define "form-feedback"}}
+<div class="kb-feedback{{ if .Message }} kb-feedback-refused{{ end }}" hx-post="/molt/check" hx-trigger="kb:check" hx-include="closest form" hx-target="this" hx-swap="outerHTML" hx-sync="this:replace" hx-disabled-elt="this" aria-live="polite">
+    {{ if .Form.ID }}{{ $blank := .Blank }}
+    <p class="kb-feedback-tagline text-muted small mb-1">{{ .Form.Tagline }} <a href="/forms#{{ .Form.ID }}">How to write one</a></p>
+    <ul class="kb-rules list-unstyled small mb-1">
+        {{ range .Results }}
+        <li class="kb-rule {{ if or $blank (not .Checked) }}kb-rule-advice{{ else if .OK }}kb-rule-ok{{ else if .Hint }}kb-rule-hint{{ else }}kb-rule-fail{{ end }}">
+            <span class="kb-rule-mark" aria-hidden="true">{{ if or $blank (not .Checked) }}·{{ else if .OK }}✓{{ else if .Hint }}~{{ else }}✗{{ end }}</span>{{ .Rule }}{{ if and .Checked (not $blank) .Note }} <span class="text-muted">({{ .Note }})</span>{{ end }}
+        </li>
+        {{ end }}
+    </ul>
+    {{ end }}
+    {{ with .Message }}<p class="kb-feedback-message text-primary small mb-1">{{ . }}</p>{{ end }}
+</div>
+{{end}}
+
 {{/* Crabber's NSFW switch; takes the input's ID. */}}
 {{define "nsfw-toggle"}}
 <div class="custom-control custom-switch molt-nsfw-toggle mr-auto">
@@ -21,12 +58,14 @@
         <a href="/krabs/{{ .CrabName }}">{{ template "avatar" .Avatar }}</a>
     </div>
     <div class="mini-molt-text-box w-100 h-100 px-2">
-        <form hx-post="/molt/create" hx-target="#molt-list" hx-swap="afterbegin" hx-disabled-elt="find button" data-reset-on-success>
+        <form hx-post="/molt/create" hx-target="#molt-list" hx-swap="afterbegin" hx-disabled-elt="find button" data-reset-on-success data-swap-errors>
             <input type='hidden' name='csrf_token' value='{{ .CSRFToken }}'>
             <div class="mini-compose-textarea">
                 <textarea name="content" rows="3" class="my-2 w-100" placeholder="How are you feeling?" aria-label="Molt text" required></textarea>
             </div>
+            {{ template "form-feedback" emptyCheck }}
             <div class="mini-molt-actions d-flex flex-row justify-content-end w-100 compose-button-row">
+                {{ template "form-picker" "" }}
                 {{ template "nsfw-toggle" "nsfw-compose" }}
                 {{ template "counter" }}
                 <button type="submit" class="btn btn-primary rounded-pill"><strong>Molt</strong></button>
@@ -52,7 +91,9 @@
                     <div class="mini-compose-textarea">
                         <textarea name="content" rows="5" class="my-2 w-100" placeholder="How are you feeling?" aria-label="Molt text" required></textarea>
                     </div>
+                    {{ template "form-feedback" emptyCheck }}
                     <div class="mini-molt-actions d-flex flex-row justify-content-end w-100 compose-button-row">
+                        {{ template "form-picker" "" }}
                         {{ template "nsfw-toggle" "nsfw-compose-modal" }}
                         {{ template "counter" }}
                         <button type="submit" class="btn btn-primary rounded-pill"><strong>Molt</strong></button>
@@ -78,8 +119,10 @@
         <textarea name="content" rows="5" class="my-2 w-100" placeholder="Remember to be kind" aria-label="Your quote" required autofocus>{{ with .Form }}{{ .Content }}{{ end }}</textarea>
         {{ with .Form }}{{ with .FieldErrors.content }}<div class="text-primary small mb-2">{{ . }}</div>{{ end }}{{ end }}
     </div>
+    {{ with .Form }}{{ template "form-feedback" .Check }}{{ else }}{{ template "form-feedback" emptyCheck }}{{ end }}
     {{ template "quoted-molt" .Molt }}
     <div class="mini-molt-actions d-flex flex-row justify-content-end w-100 compose-button-row">
+        {{ template "form-picker" .Form.Form }}
         {{ template "nsfw-toggle" "nsfw-quote" }}
         {{ template "counter" }}
         <button type="submit" class="btn btn-primary rounded-pill"><strong>Quote</strong></button>
@@ -109,7 +152,9 @@
         <textarea name="content" rows="5" class="my-2 w-100" placeholder="Remember to be kind" aria-label="Molt text" required autofocus>{{ with .Form }}{{ .Content }}{{ end }}</textarea>
         {{ with .Form }}{{ with .FieldErrors.content }}<div class="text-primary small mb-2">{{ . }}</div>{{ end }}{{ end }}
     </div>
+    {{ with .Form }}{{ template "form-feedback" .Check }}{{ else }}{{ template "form-feedback" emptyCheck }}{{ end }}
     <div class="mini-molt-actions d-flex flex-row justify-content-end w-100 compose-button-row">
+        {{ template "form-picker" .Form.Form }}
         {{ template "counter" }}
         <button type="submit" class="btn btn-primary rounded-pill"><strong>Save</strong></button>
     </div>

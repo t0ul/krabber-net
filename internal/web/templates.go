@@ -18,6 +18,7 @@ import (
 	"github.com/t0ul/krabber-net/internal/richtext"
 	"github.com/t0ul/krabber-net/internal/store"
 	"github.com/t0ul/krabber-net/internal/trophies"
+	"github.com/t0ul/krabber-net/internal/writing"
 	"github.com/t0ul/krabber-net/ui"
 )
 
@@ -244,6 +245,14 @@ var templateFuncs = template.FuncMap{
 	"editable":       editable,
 	"avatarSrc":      avatarSrc,
 	"bannerSrc":      bannerSrc,
+	"lower":          strings.ToLower,
+	"forms":          writing.Forms,
+	"formGroups":     writing.Groups,
+	"formsIn":        writing.InGroup,
+	"formOf":         formOf,
+	"verse":          verse,
+	"folded":         folded,
+	"emptyCheck":     func() moltCheck { return moltCheck{} },
 }
 
 func avatarSrc(code string) string {
