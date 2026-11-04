@@ -2,7 +2,7 @@ module github.com/t0ul/krabber-net
 
 go 1.26.0
 
-toolchain go1.26.8
+toolchain go1.26.10
 
 require (
 	github.com/MobilityData/gtfs-realtime-bindings/golang/gtfs v1.0.0
@@ -23,7 +23,7 @@ require (
 	github.com/justinas/nosurf v1.2.0
 	github.com/segmentio/ksuid v1.0.4
 	golang.org/x/crypto v0.57.0
-	golang.org/x/net v0.59.0
+	golang.org/x/net v0.60.0
 	google.golang.org/protobuf v1.36.12
 )
 
