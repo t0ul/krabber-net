@@ -24,7 +24,10 @@ built=$(git ls-files | grep -E '^(bin|dist)/|(^|/)\.terraform/' || true)
 # 2. .gitignore covers them.
 for pattern in '.env' '*.tfvars' '*.tfstate' '*.tfplan' '.terraform/' 'bin/' 'dist/'; do
   probe="${pattern//\*/probe}"
+  # A directory pattern (bin/) only matches a path inside the directory, so
+  # probe one: the directory itself needn't exist for the check to pass.
   probe="${probe%/}"
+  [[ "$pattern" == */ ]] && probe="$probe/probe"
   if ! git check-ignore -q --no-index "$probe" && ! git check-ignore -q --no-index "infra/prod/$probe"; then
     fail ".gitignore doesn't cover $pattern"
   fi
