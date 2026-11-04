@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"strings"
 	"time"
-	"unicode/utf8"
 
 	"github.com/t0ul/krabber-net/internal/botkit"
 	"github.com/t0ul/krabber-net/internal/transit"
@@ -20,10 +19,12 @@ import (
 const (
 	defaultFeed = "http://nycferry.connexionz.net/rtt/public/utility/gtfsrealtime.aspx/alert"
 	maxRoutes   = 4
-	tag         = "%ferry"
-	form        = "haiku" // the writing form every @ferry molt takes
-	lead        = "⛴️ NYC Ferry service change"
+	form        = "haiku" // the writing form every @ferry molt takes, counted five-seven-five by the site
+	lead        = "⛴️ %ferry service change"
 )
+
+// fillers pad a line that comes up short.
+var fillers = []string{"this morning", "right now", "today", "now"}
 
 // routeNames maps NYC Ferry route codes to readable names; unknown codes show
 // as-is.
@@ -56,9 +57,9 @@ func compose(ctx context.Context) (string, error) {
 	return announce(routes, headline), nil
 }
 
-// announce lays the alert out as a haiku: the announcement, the routes, the
-// headline with the tag. The headline is cut to keep the molt within
-// MoltMax; the lines are never dropped.
+// announce lays the alert out as a haiku: the announcement (with the tag),
+// the routes, the headline, each line fitted to its count. A long headline
+// is cut; the point is to say something is up, and the app has the rest.
 func announce(routes []string, headline string) string {
 	where := "every route"
 	if names := friendly(routes); names != "" {
@@ -66,10 +67,9 @@ func announce(routes []string, headline string) string {
 	}
 	headline = strings.Join(strings.Fields(headline), " ")
 	if headline == "" {
-		headline = "check the app before you board"
+		headline = "check before you board"
 	}
-	budget := botkit.MoltMax - utf8.RuneCountInString(lead) - utf8.RuneCountInString(where) - utf8.RuneCountInString(tag) - 3 // two newlines and a space
-	return lead + "\n" + where + "\n" + botkit.Truncate(headline, budget) + " " + tag
+	return botkit.Haiku(fillers, []string{lead}, []string{where}, []string{headline})
 }
 
 // friendly turns route codes into a readable, capped list ("East River, Astoria").

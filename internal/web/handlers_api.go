@@ -106,15 +106,18 @@ func (app *App) apiAuthenticate(scope string, next http.HandlerFunc) http.Handle
 // (see /forms), checked by the same rules as the web composer. A body that
 // names no form takes the crab's default, a haiku unless their settings say
 // otherwise; "form": "" asks for a plain note, which a site that requires a
-// form (MOLT_FORMS=required) refuses with "Pick a form.".
+// form (MOLT_FORMS=required) refuses with "Pick a form.". Syllables and rhyme
+// are counted from spelling and hold a post back; "override": true vouches
+// for the writer's own count.
 // It validates and rate-limits exactly like the web compose box, then
 // publishes through the same path.
 func (app *App) apiCreateMolt(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, maxAPIBodyBytes)
 	var in struct {
-		Text string  `json:"text"`
-		NSFW bool    `json:"nsfw"`
-		Form *string `json:"form"`
+		Text     string  `json:"text"`
+		NSFW     bool    `json:"nsfw"`
+		Form     *string `json:"form"`
+		Override bool    `json:"override"`
 	}
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
@@ -128,7 +131,7 @@ func (app *App) apiCreateMolt(w http.ResponseWriter, r *http.Request) {
 		form = *in.Form
 	}
 	in.Text = strings.ReplaceAll(in.Text, "\r\n", "\n")
-	if check := app.checkMolt(moltForm{Content: in.Text, NSFW: in.NSFW, Form: form}); check.Message != "" {
+	if check := app.checkMolt(moltForm{Content: in.Text, NSFW: in.NSFW, Form: form, Override: in.Override}); check.Message != "" {
 		apiError(w, http.StatusUnprocessableEntity, check.Message)
 		return
 	}

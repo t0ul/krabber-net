@@ -74,12 +74,23 @@ func TestHeadsUp(t *testing.T) {
 	if m := headsUp(d("2026-10-23")); m != "" {
 		t.Errorf("ordinary day should be empty, got %q", m)
 	}
-	// Every heads-up is a haiku.
-	for _, day := range []string{"2026-12-25", "2026-09-21", "2026-11-26", "2026-01-19", "2026-12-28"} {
+	// Every heads-up is a haiku the site counts as five-seven-five: each
+	// federal holiday of the year, each school closure, and both at once.
+	var days []string
+	for date := range federalHolidays(2026) {
+		days = append(days, date)
+	}
+	for date := range nycClosures() {
+		days = append(days, date)
+	}
+	for _, day := range days {
 		if m := headsUp(d(day)); m == "" {
 			t.Errorf("%s should get a heads-up", day)
 		} else if err := botkit.Check(m, form); err != nil {
 			t.Errorf("%s: %v\n%s", day, err, m)
 		}
+	}
+	if m := headsUp(d("2026-12-25")); !strings.HasPrefix(m, "Heads up 🦀 for Fri Dec 25\n") || !strings.HasSuffix(m, "\nmost crabs sleep in %fed") {
+		t.Errorf("christmas eve: %q", m)
 	}
 }

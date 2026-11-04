@@ -21,8 +21,12 @@ import (
 //go:embed nyc_school_closed.txt
 var nycClosuresRaw string
 
-// form is the writing form every heads-up takes.
+// form is the writing form every heads-up takes: a haiku, counted
+// five-seven-five by the site's own counter.
 const form = "haiku"
+
+// fillers pad a line that comes up short.
+var fillers = []string{"for the kids", "tomorrow", "all day", "crabs"}
 
 func main() { botkit.Run("holidays", form, compose) }
 
@@ -39,22 +43,20 @@ func headsUp(day time.Time) string {
 	fedName := federalHolidays(day.Year())[key]
 	nycName := nycClosures()[key]
 
-	first := fmt.Sprintf("Heads up 🦀 tomorrow (%s)", pretty)
+	first := []string{fmt.Sprintf("Heads up 🦀 for %s", pretty)}
+	federal := []string{fedName + " is federal", fedName + ", a federal day", fedName + ", federal", fedName + ", day off", fedName}
 	switch {
 	case fedName != "" && nycName != "":
-		return haiku(first, fedName+": a federal holiday", "schools closed too, sleep in %fed %nyc")
+		return botkit.Haiku(fillers, first, federal, []string{"all sleep in %fed %nyc"})
 	case fedName != "":
-		return haiku(first, fedName+": a federal holiday", "most crabs are off, sleep in %fed")
+		return botkit.Haiku(fillers, first, federal, []string{"most crabs sleep in %fed"})
 	case nycName != "":
-		return haiku(first, "no NYC public school: "+nycName, "small crabs, sleep in %nyc")
+		return botkit.Haiku(fillers, first,
+			[]string{"no school: " + nycName, "no NYC school: " + nycName, nycName + ": no school", nycName},
+			[]string{"small crabs sleep in %nyc"})
 	default:
 		return "" // ordinary day, nothing to announce
 	}
-}
-
-// haiku lays three lines out as one.
-func haiku(a, b, c string) string {
-	return a + "\n" + b + "\n" + c
 }
 
 // nycClosures parses the embedded closure list into date -> label.

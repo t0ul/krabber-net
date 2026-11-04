@@ -1,10 +1,13 @@
 // Package writing is the catalogue of forms a molt can take: a haiku, a
 // sonnet, a simile, a letter, a three-panel joke. Each form has rules in plain
-// words and a Check that tells the writer which rules their text follows.
+// words, a Shape the composer lays it out in, and a Check that tells the
+// writer which rules their text follows.
 //
-// Some rules are exact (three lines, a blank line between panels) and block a
-// molt that breaks them. Rules about sound (syllables, rhyme) are heuristics
-// over English spelling, so they only nudge: a miss is shown, never enforced.
+// Rules come at levels. Exact rules (three lines, a blank line between
+// panels) always hold a molt back. Sound rules (syllables, rhyme) are
+// measured from English spelling, so they hold a molt back until the writer
+// vouches for their own count. Nudges (lines about the same length) only
+// show, and advice is just words.
 package writing
 
 import (
@@ -25,44 +28,97 @@ type Form struct {
 	Name     string
 	Group    string // one of Groups(); "" for the plain note
 	Tagline  string // what the form is for, in a line
-	Example  string // a short example that follows every exact rule
+	Example  string // a short example that follows every rule the check holds a molt to
 	MaxChars int
 	Rules    []string // the rules as shown to the writer, in order
+	Shape    Shape    // how the composer lays the form out
 	rules    []rule
 }
 
+// Shape is how the composer lays a form out as it's written: one box per
+// line, each measured against what the line should sound like (a poem);
+// named boxes joined by blank lines (a letter, a joke, an essay); or, when
+// it has neither, one free box (a sentence, a note).
+type Shape struct {
+	Lines []LineSpec `json:"lines,omitempty"`
+	// Grow lets the writer add lines past those listed (an envelope, rhymed
+	// verse); the added lines take the last spec. 0 means the count is fixed.
+	Grow bool `json:"grow,omitempty"`
+	// Seal repeats the first line as the last (an envelope).
+	Seal  bool       `json:"seal,omitempty"`
+	Parts []PartSpec `json:"parts,omitempty"`
+}
+
+// Free reports whether the form is written in one box.
+func (s Shape) Free() bool { return len(s.Lines) == 0 && len(s.Parts) == 0 }
+
+// LineSpec is what one line of a poem should sound like.
+type LineSpec struct {
+	// Syllables is the count wanted, as a range; [0, 0] when it doesn't matter.
+	Syllables [2]int `json:"syllables,omitempty"`
+	// Rhyme is the letter of the scheme the line rhymes as ("A"), "*" when
+	// it must rhyme with some other line, or "" when rhyme doesn't matter.
+	Rhyme string `json:"rhyme,omitempty"`
+}
+
+// PartSpec is one box of a prose form.
+type PartSpec struct {
+	Label string `json:"label"`
+	Hint  string `json:"hint,omitempty"`  // shown in the empty box
+	Multi bool   `json:"multi,omitempty"` // several lines or paragraphs, not one line
+}
+
+// Level is how firmly a rule holds a molt back.
+type Level int
+
+// The levels, softest first.
+const (
+	Advice Level = iota // words for the writer; nothing is checked
+	Nudge               // checked, but a miss only shows (lines about the same length)
+	Sound               // syllables, rhyme: measured from spelling, so a miss holds the molt back until the writer vouches for the count
+	Exact               // a line count, a greeting: a miss always holds the molt back
+)
+
 // Result is one rule of a form checked against a text.
 type Result struct {
-	Rule    string
-	Checked bool   // a machine can tell; otherwise the rule is advice
-	Hint    bool   // the check is a heuristic, so a miss nudges and doesn't block
-	OK      bool   // followed as far as the check can tell; true when unchecked
-	Note    string // what the check saw, for the writer ("6-7-5 syllables")
+	Rule  string
+	Level Level
+	OK    bool   // followed as far as the check can tell; true for advice
+	Note  string // what the check saw, for the writer ("6-7-5 syllables")
 }
+
+// Checked reports whether a machine could tell; otherwise the rule is advice.
+func (r Result) Checked() bool { return r.Level != Advice }
+
+// Soft reports whether a miss only nudges.
+func (r Result) Soft() bool { return r.Level == Nudge }
 
 type rule struct {
 	text  string
-	hint  bool
+	level Level
 	check func(text string) (ok bool, note string) // nil: advice only
 }
 
 func advice(text string) rule { return rule{text: text} }
 
 func must(text string, check func(string) (bool, string)) rule {
-	return rule{text: text, check: check}
+	return rule{text: text, level: Exact, check: check}
+}
+
+func sound(text string, check func(string) (bool, string)) rule {
+	return rule{text: text, level: Sound, check: check}
 }
 
 func hint(text string, check func(string) (bool, string)) rule {
-	return rule{text: text, hint: true, check: check}
+	return rule{text: text, level: Nudge, check: check}
 }
 
 // Check reports every rule of the form against text, in the order of Rules.
 func (f Form) Check(text string) []Result {
 	out := make([]Result, 0, len(f.rules))
 	for _, r := range f.rules {
-		res := Result{Rule: r.text, Hint: r.hint, OK: true}
+		res := Result{Rule: r.text, Level: r.level, OK: true}
 		if r.check != nil {
-			res.Checked = true
 			res.OK, res.Note = r.check(text)
 		}
 		out = append(out, res)
@@ -70,14 +126,65 @@ func (f Form) Check(text string) []Result {
 	return out
 }
 
-// Broken returns the rules the text breaks for sure: checked, not a hint, and
-// not followed.
-func Broken(results []Result) []Result {
+// Broken returns the rules that hold the text back: every exact rule it
+// misses, and the sound rules it misses unless the writer vouched for the
+// sound (the counts are guesses from spelling, and the writer may know
+// better).
+func Broken(results []Result, vouched bool) []Result {
 	var out []Result
 	for _, r := range results {
-		if r.Checked && !r.Hint && !r.OK {
+		if !r.OK && (r.Level == Exact || (r.Level == Sound && !vouched)) {
 			out = append(out, r)
 		}
+	}
+	return out
+}
+
+// LineMeasure is what the counter hears in one line of a poem.
+type LineMeasure struct {
+	Syllables   int    `json:"syllables"`
+	SyllablesOK bool   `json:"syllables_ok"` // within the line's range; true when the form sets none
+	Rhyme       string `json:"rhyme"`        // the letter the line rhymes as, in the text's own scheme
+	RhymeOK     bool   `json:"rhyme_ok"`     // rhymes as the form wants; true when the form doesn't care
+}
+
+// Measure listens to each line of text as a line of the form: its syllables
+// against the line's count, and whether it rhymes with the lines the form
+// pairs it with. Only forms written line by line measure anything.
+func (f Form) Measure(text string) []LineMeasure {
+	specs := f.Shape.Lines
+	if len(specs) == 0 {
+		return nil
+	}
+	lines := Lines(text)
+	scheme := Scheme(lines)
+	counts := map[byte]int{}
+	for i := range len(scheme) {
+		counts[scheme[i]]++
+	}
+	out := make([]LineMeasure, len(lines))
+	for i, l := range lines {
+		spec := specs[min(i, len(specs)-1)]
+		if i >= len(specs) && !f.Shape.Grow {
+			spec = LineSpec{}
+		}
+		m := LineMeasure{Syllables: LineSyllables(l), SyllablesOK: true, Rhyme: string(scheme[i]), RhymeOK: true}
+		if spec.Syllables[1] > 0 {
+			m.SyllablesOK = m.Syllables >= spec.Syllables[0] && m.Syllables <= spec.Syllables[1]
+		}
+		switch spec.Rhyme {
+		case "":
+		case "*":
+			m.RhymeOK = counts[scheme[i]] > 1
+		default:
+			for j := range i {
+				if partner := specs[min(j, len(specs)-1)]; partner.Rhyme == spec.Rhyme {
+					m.RhymeOK = Rhymes(lines[j], l)
+					break
+				}
+			}
+		}
+		out[i] = m
 	}
 	return out
 }
@@ -119,8 +226,8 @@ func ByID(id string) (Form, bool) {
 	return Form{}, false
 }
 
-func form(id, name, group, tagline string, maxChars int, example string, rules ...rule) Form {
-	f := Form{ID: id, Name: name, Group: group, Tagline: tagline, Example: example, MaxChars: maxChars, rules: rules}
+func form(id, name, group, tagline string, maxChars int, example string, shape Shape, rules ...rule) Form {
+	f := Form{ID: id, Name: name, Group: group, Tagline: tagline, Example: example, MaxChars: maxChars, Shape: shape, rules: rules}
 	for _, r := range rules {
 		f.Rules = append(f.Rules, r.text)
 	}
@@ -592,28 +699,70 @@ func shortPunchline(t string) (bool, string) {
 	return false, "the punchline runs longer than the panel before it"
 }
 
+// metered builds the lines of a poem with a syllable count and a rhyme
+// scheme: counts gives each line's range (one pair for all, or a pair per
+// line), scheme a letter per line ("" for none).
+func metered(scheme string, counts ...[2]int) []LineSpec {
+	n := max(len(scheme), len(counts))
+	out := make([]LineSpec, n)
+	for i := range out {
+		if len(counts) == 1 {
+			out[i].Syllables = counts[0]
+		} else if i < len(counts) {
+			out[i].Syllables = counts[i]
+		}
+		if i < len(scheme) {
+			out[i].Rhyme = string(scheme[i])
+		}
+	}
+	return out
+}
+
+// rhymedLines are n lines that each need a rhyme partner somewhere.
+func rhymedLines(n int, rhyme string) []LineSpec {
+	out := make([]LineSpec, n)
+	for i := range out {
+		out[i].Rhyme = rhyme
+	}
+	return out
+}
+
+var (
+	free      = Shape{}
+	haikuForm = Shape{Lines: metered("", [2]int{5, 5}, [2]int{7, 7}, [2]int{5, 5})}
+	couplet   = Shape{Lines: metered("AA")}
+	limerick  = Shape{Lines: metered("AABBA", [2]int{7, 10}, [2]int{7, 10}, [2]int{4, 7}, [2]int{4, 7}, [2]int{7, 10})}
+	sonnet    = Shape{Lines: metered("ABABCDCDEFEFGG", [2]int{9, 11})}
+	envelope  = Shape{Lines: rhymedLines(4, ""), Grow: true, Seal: true}
+	verse     = Shape{Lines: rhymedLines(4, "*"), Grow: true}
+	letter    = Shape{Parts: []PartSpec{{Label: "Greeting", Hint: "Dear Squidward,"}, {Label: "Letter", Hint: "Say why you're writing, then what you want them to know.", Multi: true}, {Label: "Sign-off", Hint: "Yours,\nSpongeBob", Multi: true}}}
+	blogShape = Shape{Parts: []PartSpec{{Label: "Title", Hint: "Why krabs walk sideways"}, {Label: "Post", Hint: "Paragraphs, with a blank line between them.", Multi: true}}}
+	essayed   = Shape{Parts: []PartSpec{{Label: "Title", Hint: "On tides"}, {Label: "Essay", Hint: "Your thesis, at least two body paragraphs, and a conclusion, a blank line between each.", Multi: true}}}
+	panels    = Shape{Parts: []PartSpec{{Label: "Setup", Hint: "A krab walks into a bar and orders a drink.", Multi: true}, {Label: "Build", Hint: "The bartender slides it down the counter, right past him.", Multi: true}, {Label: "Punchline", Hint: "\"Sideways,\" sighs the krab.", Multi: true}}}
+)
+
 var forms = []Form{
 	{Name: "Note", Tagline: "Just a molt: a thought, a link, whatever's on your mind.", MaxChars: 280},
 
 	form("haiku", "Haiku", Poetry, "Three short lines that catch one moment, the way a photo does.", 280,
-		"low tide at sunrise\na krab raises one wet claw\nhello to the gulls",
+		"low tide at sunrise\na krab raises one wet claw\nhello to the gulls", haikuForm,
 		must("Three lines.", exactLines(3)),
-		hint("Five, seven, five syllables.", syllablePattern(5, 7, 5)),
+		sound("Five, seven, five syllables.", syllablePattern(5, 7, 5)),
 		advice("One moment, in the present tense; a season word if one fits."),
 		advice("No title and no rhyme: let the last line turn the first two.")),
 
 	form("couplet", "Couplet", Poetry, "Two lines that rhyme: a thought with a snap at the end.", 280,
-		"The tide goes out, the tide comes in,\nthe krab just sits and wears a grin.",
+		"The tide goes out, the tide comes in,\nthe krab just sits and wears a grin.", couplet,
 		must("Two lines.", exactLines(2)),
-		hint("The lines end in rhyme.", rhymePairs([]int{2}, [2]int{1, 2})),
+		sound("The lines end in rhyme.", rhymePairs([]int{2}, [2]int{1, 2})),
 		hint("Keep the lines about the same length.", evenLines(3)),
 		advice("Say the ordinary thing in the first line and the surprise in the second.")),
 
 	form("limerick", "Limerick", Poetry, "Five bouncing lines that end on a joke.", 400,
-		"A krab who was tired of the shore\ndecided to look for some more.\nHe packed up his shell,\nand said, \"Wish me well,\"\nand scuttled straight out of the door.",
+		"A krab who was tired of the shore\ndecided to look for some more.\nHe packed up his shell,\nand said, \"Wish me well,\"\nand scuttled straight out of the door.", limerick,
 		must("Five lines.", exactLines(5)),
-		hint("Lines 1, 2 and 5 rhyme; lines 3 and 4 rhyme (AABBA).", rhymePairs([]int{5}, [2]int{1, 2}, [2]int{1, 5}, [2]int{3, 4})),
-		hint("Lines 1, 2 and 5 are long (7–10 syllables); 3 and 4 are short (4–7).", func(t string) (bool, string) {
+		sound("Lines 1, 2 and 5 rhyme; lines 3 and 4 rhyme (AABBA).", rhymePairs([]int{5}, [2]int{1, 2}, [2]int{1, 5}, [2]int{3, 4})),
+		sound("Lines 1, 2 and 5 are long (7–10 syllables); 3 and 4 are short (4–7).", func(t string) (bool, string) {
 			if ok, note := syllableRange(7, 10, 0, 1, 4)(t); !ok {
 				return ok, note
 			}
@@ -625,63 +774,63 @@ var forms = []Form{
 		"When morning drags the water from the sand,\nthe krab comes out to see what tide has left:\na shell, a bottle, and a rubber band,\nand sorts them with a claw that's small but deft.\n"+
 			"The gulls complain, the way that gulls complain,\nthe sun climbs up to do its daily chore,\nand no one asks the krab to come again,\nit only comes to tidy up the shore.\n"+
 			"It cannot read the labels on the glass,\nit cannot tell a treasure from a toy,\nbut every morning, as the hours pass,\nit does the little job it does with joy.\n"+
-			"So if your life feels small beside the sea,\nremember: tides go out, and so can we.",
+			"So if your life feels small beside the sea,\nremember: tides go out, and so can we.", sonnet,
 		must("Fourteen lines.", exactLines(14)),
-		hint("Ten syllables a line: da-DUM, five times.", syllableRange(9, 11)),
-		hint("Rhyme ABAB CDCD EFEF GG, ending on a couplet.", rhymePairs([]int{4, 4, 4, 2}, [2]int{1, 3}, [2]int{2, 4}, [2]int{5, 7}, [2]int{6, 8}, [2]int{9, 11}, [2]int{10, 12}, [2]int{13, 14})),
+		sound("Ten syllables a line: da-DUM, five times.", syllableRange(9, 11)),
+		sound("Rhyme ABAB CDCD EFEF GG, ending on a couplet.", rhymePairs([]int{4, 4, 4, 2}, [2]int{1, 3}, [2]int{2, 4}, [2]int{5, 7}, [2]int{6, 8}, [2]int{9, 11}, [2]int{10, 12}, [2]int{13, 14})),
 		advice("Turn around line nine: answer, twist or widen what came before, and let the couplet land it.")),
 
 	form("envelope", "Envelope", Poetry, "A poem that closes on the line it opened with.", 800,
-		"The sea comes back.\nIt always does, it always did,\nwhatever the moon had hid\nor the long day took, or the cold wind bid.\nThe sea comes back.",
+		"The sea comes back.\nIt always does, it always did,\nwhatever the moon had hid\nor the long day took, or the cold wind bid.\nThe sea comes back.", envelope,
 		must("At least four lines.", atLeastLines(4)),
 		must("The first line comes back as the last, sealing the poem.", enclosed),
 		advice("Rhyme the lines in between if you like (ABBA), and let the return mean something new.")),
 
 	form("rhyme", "Rhymed verse", Poetry, "Any length, any scheme, as long as every line finds its rhyme.", 1200,
-		"The tide rolls in, the tide rolls out,\nthe gulls all argue, shriek and shout,\nthe krab says nothing, holds his ground,\nand that is how the day goes round.",
+		"The tide rolls in, the tide rolls out,\nthe gulls all argue, shriek and shout,\nthe krab says nothing, holds his ground,\nand that is how the day goes round.", verse,
 		must("At least four lines.", atLeastLines(4)),
-		hint("Every line rhymes with another; the scheme shows as you write.", everyLineRhymes),
+		sound("Every line rhymes with another; the scheme shows as you write.", everyLineRhymes),
 		hint("Keep a steady beat: lines of about the same length.", evenLines(4)),
 		advice("Pick a scheme (AABB, ABAB, ABBA) and hold it from stanza to stanza.")),
 
 	form("simile", "Simile", Figures, "Show what something was like by setting it beside something else.", 280,
-		"Her laugh was like a gull over the pier: loud, sudden and gone.",
+		"Her laugh was like a gull over the pier: loud, sudden and gone.", free,
 		must("Compare one thing to another using like or as.", contains(likeOrAs, "has its like or as", "needs a like or an as")),
 		hint("Keep it to a sentence or two.", sentences(2)),
 		advice("Pick a comparison that shows how it felt, not only what it was.")),
 
 	form("metaphor", "Metaphor", Figures, "Say one thing is another, and mean it.", 280,
-		"The city is a tide pool: a thousand small lives waiting for the water to return.",
+		"The city is a tide pool: a thousand small lives waiting for the water to return.", free,
 		hint("Say one thing is another.", contains(linkingVerb, "says what is what", "nothing is said to be anything yet")),
 		hint("No like, no as: that would be a simile.", lacks(likeOrAs, "a like or an as makes it a simile", "no like or as")),
 		advice("One image, carried all the way through.")),
 
 	form("analogy", "Analogy", Figures, "Explain one thing through another the reader already knows.", 280,
-		"Tides are to the shore as deadlines are to a writer: they arrive on schedule and leave everything rearranged.",
+		"Tides are to the shore as deadlines are to a writer: they arrive on schedule and leave everything rearranged.", free,
 		hint("Set the two side by side: A is to B as C is to D, or just as A …, so C ….", contains(analogyRX, "both sides are named", "name both sides: A is to B as C is to D")),
 		hint("Keep it to a sentence or two.", sentences(2)),
 		advice("Say what the two share, and where the likeness stops.")),
 
 	form("letter", "Letter", Prose, "Written to one person, with a greeting and a sign-off.", 2000,
-		"Dear Squidward,\n\nThe reef is quieter without your clarinet. The gulls have stopped complaining and started looking worried. Come home before the tide turns.\n\nYours,\nSpongeBob",
+		"Dear Squidward,\n\nThe reef is quieter without your clarinet. The gulls have stopped complaining and started looking worried. Come home before the tide turns.\n\nYours,\nSpongeBob", letter,
 		must("Open with a greeting on its own line (Dear …, Hi …).", greeting),
 		advice("Say why you're writing, then what you want them to know."),
 		must("Sign off on its own line, with your name (Yours, … / Love, …).", signOff)),
 
 	form("blog", "Blog post", Prose, "A titled piece with a point, for anyone passing by.", 5000,
-		"Why krabs walk sideways\n\nIt isn't stubbornness, and it isn't a dance. Our legs bend that way, and the sand is easier to cross on the diagonal.\n\nSo next time one of us crosses your path, step aside and let us pass. We're not avoiding you. We're just built for the shore.",
+		"Why krabs walk sideways\n\nIt isn't stubbornness, and it isn't a dance. Our legs bend that way, and the sand is easier to cross on the diagonal.\n\nSo next time one of us crosses your path, step aside and let us pass. We're not avoiding you. We're just built for the shore.", blogShape,
 		must("A title on the first line, with a blank line after it.", title),
 		must("At least two paragraphs, separated by blank lines.", paragraphs(2)),
 		advice("Open with the point, close with what to do about it.")),
 
 	form("essay", "Essay", Prose, "A titled argument: a thesis, the case for it, and where it leaves us.", 8000,
-		"On tides\n\nThe tide is the only clock a krab needs, and it keeps better time than the ones on the pier.\n\nFirst, it tells the time: twice a day, without fail, the water comes and goes.\n\nSecond, it tells the weather: a tide that runs high and fast means a storm is on its way.\n\nSo throw away your watch, find a rock, and wait. The sea will tell you everything you need to know.",
+		"On tides\n\nThe tide is the only clock a krab needs, and it keeps better time than the ones on the pier.\n\nFirst, it tells the time: twice a day, without fail, the water comes and goes.\n\nSecond, it tells the weather: a tide that runs high and fast means a storm is on its way.\n\nSo throw away your watch, find a rock, and wait. The sea will tell you everything you need to know.", essayed,
 		must("A title on the first line, with a blank line after it.", title),
 		must("An introduction with your thesis, at least two body paragraphs, and a conclusion: four paragraphs or more.", paragraphs(4)),
 		advice("Each paragraph makes one point and backs it up.")),
 
 	form("three-panel", "Three-panel joke", Humor, "Setup, build, punchline: a comic strip in words, made for replies.", 500,
-		"A krab walks into a bar and orders a drink.\n\nThe bartender slides it down the counter, right past him.\n\n\"Sideways,\" sighs the krab. \"Always sideways.\"",
+		"A krab walks into a bar and orders a drink.\n\nThe bartender slides it down the counter, right past him.\n\n\"Sideways,\" sighs the krab. \"Always sideways.\"", panels,
 		must("Three panels, separated by blank lines: setup, build, punchline.", exactStanzas(3, "panel")),
 		hint("Keep the punchline short: shorter than the panel before it.", shortPunchline),
 		advice("Keep the setup ordinary; the surprise is the third panel's job.")),

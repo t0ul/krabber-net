@@ -19,7 +19,7 @@ func TestSeedsFitTheirForms(t *testing.T) {
 			t.Errorf("%s: no form %q", name, sd.form)
 			continue
 		}
-		if broken := writing.Broken(f.Check(sd.text)); len(broken) > 0 {
+		if broken := writing.Broken(f.Check(sd.text), false); len(broken) > 0 {
 			t.Errorf("%s is not a %s: %s (%s)", name, f.Name, broken[0].Rule, broken[0].Note)
 		}
 	}

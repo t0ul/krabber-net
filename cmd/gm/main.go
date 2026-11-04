@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 	_ "time/tzdata" // embed tz database so America/New_York resolves on Lambda
 
@@ -24,27 +25,30 @@ const (
 )
 
 // form is the writing form every @gm molt takes: the haiku every krab's
-// molts start as.
+// molts start as, counted five-seven-five by the site's own counter.
 const form = "haiku"
 
 // musings rotate by day of year so every morning reads a little different.
-// Each is the haiku's last line.
+// Each is the haiku's last line, five syllables as the site counts them.
 var musings = []string{
-	"low tide, big plans",
-	"claws out, let's go",
+	"low tide and big plans",
+	"claws out, let us go",
 	"scuttle with purpose",
-	"the reef is yours",
+	"the reef is yours, crabs",
 	"fresh current, fresh start",
-	"molt something worth reading",
+	"molt something that sings",
 	"pinch the day, gently",
-	"salt in the blood",
-	"sideways is still forward",
-	"be the crab you want to sea",
-	"shell on, shields up",
-	"find your tidepool people",
-	"small crab, big wake",
+	"salt is in the blood",
+	"sideways still counts",
+	"be the krab you sea",
+	"shell on, shields up, go",
+	"find your tidepool crew",
+	"small crab, a big wake",
 	"every tide turns",
 }
+
+// fillers pad a line that comes up short.
+var fillers = []string{"today", "crabs", "now"}
 
 func main() { botkit.Run("gm", form, compose) }
 
@@ -57,11 +61,15 @@ func compose(ctx context.Context) (string, error) {
 // greeting is the morning's haiku: the day, the first light on the reef
 // (or just the reef, when the lookup failed), and the day's musing.
 func greeting(now time.Time, sun string) string {
-	reef := "another morning on the reef"
+	day := now.Weekday().String()
+	reef := []string{"a new morning on the reef"}
 	if sun != "" {
-		reef = sun + " on the reef"
+		reef = []string{sun + " on the reef", "first light at " + strings.TrimPrefix(sun, "first light ") + " on the reef"}
 	}
-	return botkit.Fit(fmt.Sprintf("gm crabs 🦀 %s\n%s\n%s", now.Weekday(), reef, musings[now.YearDay()%len(musings)]))
+	return botkit.Haiku(fillers,
+		[]string{"gm crabs 🦀 " + day, "gm crabs 🦀 it's " + day},
+		reef,
+		[]string{musings[now.YearDay()%len(musings)]})
 }
 
 // sunriseLine returns something like "first light 6:58am" for NYC, or "" if

@@ -258,6 +258,8 @@ var templateFuncs = template.FuncMap{
 	"verse":          verse,
 	"folded":         folded,
 	"freshCheck":     freshCheck,
+	"shapes":         func() template.JS { return shapesJSON },
+	"json":           jsonAttr,
 	"noteForm":       func() string { return store.FormNote },
 }
 

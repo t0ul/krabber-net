@@ -13,7 +13,6 @@ import (
 	"fmt"
 	"strings"
 	"time"
-	"unicode/utf8"
 
 	"github.com/t0ul/krabber-net/internal/botkit"
 	"github.com/t0ul/krabber-net/internal/transit"
@@ -27,10 +26,12 @@ const (
 	// and the UWS museums (M66/M72/M79). SBS "+" variants match too.
 	defaultRoutes = "M11,M12,M20,M23,M42,M50,M57,M66,M72,M79,M104"
 	maxRoutes     = 6
-	tag           = "%bus"
-	form          = "haiku" // the writing form every @bus molt takes
-	lead          = "🚌 MTA bus service change"
+	form          = "haiku" // the writing form every @bus molt takes, counted five-seven-five by the site
+	lead          = "🚌 MTA %bus service change"
 )
+
+// fillers pad a line that comes up short.
+var fillers = []string{"detours ahead", "heads up", "right now", "today", "now"}
 
 func main() { botkit.Run("bus", form, compose) }
 
@@ -50,9 +51,9 @@ func compose(ctx context.Context) (string, error) {
 	return announce(routes, headline), nil
 }
 
-// announce lays the alert out as a haiku: the announcement, the routes, the
-// headline with the tag. The headline is cut to keep the molt within
-// MoltMax; the lines are never dropped.
+// announce lays the alert out as a haiku: the announcement (with the tag),
+// the routes, the headline, each line fitted to its count. A long headline
+// is cut; the point is to say something is up, and the app has the rest.
 func announce(routes []string, headline string) string {
 	more := ""
 	if len(routes) > maxRoutes {
@@ -64,6 +65,5 @@ func announce(routes []string, headline string) string {
 	if headline == "" {
 		headline = "check before you board"
 	}
-	budget := botkit.MoltMax - utf8.RuneCountInString(lead) - utf8.RuneCountInString(where) - utf8.RuneCountInString(tag) - 3 // two newlines and a space
-	return lead + "\n" + where + "\n" + botkit.Truncate(headline, budget) + " " + tag
+	return botkit.Haiku(fillers, []string{lead}, []string{where}, []string{headline})
 }

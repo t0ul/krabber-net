@@ -18,7 +18,8 @@
     {{ template "search" . }}
 </div>
 </div>
-{{ if .IsAuthenticated }}{{ template "modals" . }}{{ end }}
+{{ if .IsAuthenticated }}{{ template "modals" . }}
+<script type="application/json" id="kb-shapes">{{ shapes }}</script>{{ end }}
 </body>
 </html>
 {{end}}

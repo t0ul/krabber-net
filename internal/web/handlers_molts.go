@@ -61,7 +61,8 @@ func (app *App) renderMolts(w http.ResponseWriter, r *http.Request, page string,
 type moltForm struct {
 	Content             string `form:"content"`
 	NSFW                bool   `form:"nsfw"`
-	Form                string `form:"form"` // writing form ID; "" for a plain molt
+	Form                string `form:"form"`     // writing form ID; "" for a plain molt
+	Override            bool   `form:"override"` // the writer vouches for the sound (syllables, rhyme) the counter doubts
 	validator.Validator `form:"-"`
 	Check               moltCheck `form:"-"` // filled in when the form is shown again
 }
