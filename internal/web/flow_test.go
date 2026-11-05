@@ -29,6 +29,7 @@ import (
 	"github.com/t0ul/krabber-net/internal/mail"
 	"github.com/t0ul/krabber-net/internal/platform"
 	"github.com/t0ul/krabber-net/internal/store"
+	"github.com/t0ul/krabber-net/internal/writing"
 )
 
 // These tests run the whole site over HTTPS against DynamoDB Local, with a
@@ -2536,21 +2537,44 @@ func TestSystemKrab(t *testing.T) {
 
 	// Two servers posting the same molt: only one gets through.
 	for range 2 {
-		h.app.systemMolt(ctx, c, "system#version#abc1234", time.Hour, func() string { return "new version abc1234" })
+		h.app.systemMolt(ctx, c, "system#version#abc1234", time.Hour, func() string { return versionMolt(h.app.version) })
 	}
 	h.app.systemMolt(ctx, c, "system#daily#test", time.Hour, func() string { return h.app.dailyReport(ctx, time.Now().UTC()) })
 	molts, err := h.store.MoltsByOwner(ctx, c.ID, 10)
 	if err != nil || len(molts) != 2 {
 		t.Fatalf("system molts: %d %v", len(molts), err)
 	}
-	report := molts[0].Content
-	for _, want := range []string{"all systems nominal", "2 krabs (2 new)", "abc1234", "%status"} {
+	// Both are haikus the site's own check accepts, and are stored as such.
+	haiku, _ := writing.ByID("haiku")
+	for _, m := range molts {
+		if m.Form != "haiku" {
+			t.Errorf("system molt %q has form %q", m.Content, m.Form)
+		}
+		if broken := writing.Broken(haiku.Check(m.Content), false); len(broken) > 0 {
+			t.Errorf("system molt %q: %s (%s)", m.Content, broken[0].Rule, broken[0].Note)
+		}
+	}
+	report, version := molts[0].Content, molts[1].Content
+	for _, want := range []string{"all's well on the reef", "2 krabs, 2 new", "since yesterday", "%status"} {
 		if !strings.Contains(report, want) {
 			t.Errorf("daily report %q lacks %q", report, want)
 		}
 	}
+	for _, want := range []string{"a new Krabber build", "abc1234", "%status"} {
+		if !strings.Contains(version, want) {
+			t.Errorf("version molt %q lacks %q", version, want)
+		}
+	}
 	if len([]rune(report)) > store.MaxMoltLength {
 		t.Errorf("daily report is %d characters", len([]rune(report)))
+	}
+	if _, body, _ := h.get("/krabs/system"); !strings.Contains(body, `kb-form-badge">Haiku<`) {
+		t.Error("@system's molts should show the haiku badge")
+	}
+	// A text that isn't a haiku is not passed off as one.
+	h.app.systemMolt(ctx, c, "system#prose#test", time.Hour, func() string { return "all systems nominal" })
+	if molts, _ := h.store.MoltsByOwner(ctx, c.ID, 1); molts[0].Content != "all systems nominal" || molts[0].Form != "" {
+		t.Errorf("a prose system molt should post as a plain note: %+v", molts[0])
 	}
 	if _, body, _ := h.get("/krabs/system"); !strings.Contains(body, "Krabber System") || !strings.Contains(body, `aria-label="Verified"`) {
 		t.Error("@system's profile should show the name and the badge")

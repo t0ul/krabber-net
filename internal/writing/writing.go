@@ -446,6 +446,67 @@ func Scheme(lines []string) string {
 	return string(letters)
 }
 
+// FitLine fits a line to n syllables by this package's own counter, for
+// writers that compose from data (the bots, @system). The first candidate
+// that counts n wins. Otherwise the candidate nearest below n is padded with
+// fillers (the largest that fits, each joined with a comma) up to n; when
+// every candidate runs over, the shortest is cut word by word from its end
+// until it fits, then padded. Give candidates best first.
+func FitLine(n int, fillers []string, candidates ...string) string {
+	best, bestN := "", -1
+	shortest, shortN := "", int(^uint(0)>>1)
+	for _, c := range candidates {
+		k := LineSyllables(c)
+		if k == n {
+			return c
+		}
+		if k < n && k > bestN {
+			best, bestN = c, k
+		}
+		if k < shortN {
+			shortest, shortN = c, k
+		}
+	}
+	line := best
+	if bestN < 0 {
+		line = shortest
+		for LineSyllables(line) > n {
+			words := strings.Fields(line)
+			if len(words) <= 1 {
+				break
+			}
+			line = strings.TrimRight(strings.Join(words[:len(words)-1], " "), ",;:")
+		}
+	}
+	for {
+		need := n - LineSyllables(line)
+		if need <= 0 {
+			break
+		}
+		pick, pickN := "", 0
+		for _, f := range fillers {
+			if k := LineSyllables(f); k > 0 && k <= need && k > pickN {
+				pick, pickN = f, k
+			}
+		}
+		if pick == "" {
+			break
+		}
+		if strings.TrimSpace(line) == "" {
+			line = pick
+		} else {
+			line = strings.TrimRight(line, ",;: ") + ", " + pick
+		}
+	}
+	return line
+}
+
+// Haiku fits three lines to five, seven and five syllables, each from its
+// own candidates (see FitLine).
+func Haiku(fillers []string, first, second, third []string) string {
+	return FitLine(5, fillers, first...) + "\n" + FitLine(7, fillers, second...) + "\n" + FitLine(5, fillers, third...)
+}
+
 func plural(n int, what string) string {
 	if n == 1 {
 		return "1 " + what

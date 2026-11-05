@@ -11,14 +11,18 @@ import (
 
 	"github.com/t0ul/krabber-net/internal/auth"
 	"github.com/t0ul/krabber-net/internal/store"
+	"github.com/t0ul/krabber-net/internal/writing"
 )
 
 // @system is a verified krab that molts the site's status: once when a new
 // version goes live, and a daily report. Every server runs this, so each
-// molt is claimed in the table first and only one server posts it.
+// molt is claimed in the table first and only one server posts it. Its
+// molts are haikus, as every krab's are by default, counted five-seven-five
+// by the site's own counter.
 const (
 	systemName  = "system"
 	systemEmail = "system@krabber.net"
+	systemForm  = "haiku"
 	// systemReportHour is when (UTC) the daily report goes out: 9am Eastern.
 	systemReportHour = 13
 	systemTick       = 10 * time.Minute
@@ -31,9 +35,7 @@ func (app *App) RunSystemKrab(ctx context.Context) {
 		app.log.Warn("system krab unavailable", "err", err)
 		return
 	}
-	app.systemMolt(ctx, c, "system#version#"+app.version, 30*24*time.Hour, func() string {
-		return fmt.Sprintf("A new version of Krabber just washed up on shore (%s). %%status", app.version)
-	})
+	app.systemMolt(ctx, c, "system#version#"+app.version, 30*24*time.Hour, func() string { return versionMolt(app.version) })
 	posted := ""
 	t := time.NewTicker(systemTick)
 	defer t.Stop()
@@ -109,7 +111,18 @@ func (app *App) systemMolt(ctx context.Context, c *store.Crab, key string, keep 
 		}
 		return
 	}
-	m, err := app.store.CreateMolt(ctx, c, text())
+	t, form := text(), systemForm
+	// The molt skips the composer's check, so it's held to its form here: a
+	// text that isn't the haiku it claims to be goes out as a plain note, or
+	// not at all where every molt must take a form.
+	if f, ok := writing.ByID(form); !ok || len(writing.Broken(f.Check(t), false)) > 0 {
+		app.log.Warn("system molt is not a haiku", "key", key, "text", t)
+		if app.cfg.FormsRequired() {
+			return
+		}
+		form = ""
+	}
+	m, err := app.store.CreateMolt(ctx, c, t, store.WithForm(form))
 	if err != nil {
 		app.log.Warn("system molt", "key", key, "err", err)
 		return
@@ -138,8 +151,36 @@ func (app *App) dailyReport(ctx context.Context, now time.Time) string {
 	if len(d.recent) == directoryMolts && molts == len(d.recent) {
 		moltCount += "+"
 	}
-	return fmt.Sprintf("Daily report from the reef: all systems nominal.\n%s krabs (%s new), %s molts in the last day. Up %s on %s. %%status",
-		commas(len(d.crabs)), commas(newKrabs), moltCount, uptime(now.Sub(app.started)), app.version)
+	return reportMolt(commas(len(d.crabs)), commas(newKrabs), moltCount, now.Sub(app.started))
+}
+
+// systemFillers pad a line of @system's haiku that comes up short.
+var systemFillers = []string{"all is well", "today", "crabs", "now"}
+
+// versionMolt announces a new version as a haiku. The version is a commit
+// hash, whose letters the counter hears as anything from no syllable to a
+// few, so the middle line has a phrasing for each.
+func versionMolt(version string) string {
+	return writing.Haiku(systemFillers,
+		[]string{"a new Krabber build"},
+		[]string{
+			"just washed up on the shore, " + version,
+			"washed up on the shore, " + version,
+			"washed up on shore, " + version,
+			"washed ashore, " + version,
+			"ashore: " + version,
+		},
+		[]string{"%status: all afloat"})
+}
+
+// reportMolt is the daily report as a haiku: all is well, the day's counts
+// (digits carry no syllables, so the line holds whatever the numbers are),
+// and how long this server has been up.
+func reportMolt(krabs, newKrabs, molts string, up time.Duration) string {
+	return writing.Haiku(systemFillers,
+		[]string{"all's well on the reef"},
+		[]string{fmt.Sprintf("%s krabs, %s new, %s molts since yesterday", krabs, newKrabs, molts)},
+		[]string{"up " + uptime(up) + " %status", "up for " + uptime(up) + " %status"})
 }
 
 func uptime(d time.Duration) string {

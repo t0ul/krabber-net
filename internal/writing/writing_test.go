@@ -380,3 +380,29 @@ func TestPlainNoteChecksNothing(t *testing.T) {
 		t.Error("Broken(nil) must be nil")
 	}
 }
+
+func TestFitLine(t *testing.T) {
+	fillers := []string{"today", "now"}
+	if got := FitLine(5, fillers, "gm crabs 🦀 Monday", "gm crabs 🦀 it's Monday"); got != "gm crabs 🦀 it's Monday" {
+		t.Errorf("the first candidate that counts wins: %q", got)
+	}
+	if got := FitLine(5, fillers, "South Brooklyn"); got != "South Brooklyn, today" {
+		t.Errorf("a short line is padded: %q", got)
+	}
+	if got := FitLine(7, fillers, "no school: Day after Thanksgiving", "Day after Thanksgiving"); got != "Day after Thanksgiving, now" {
+		t.Errorf("the candidate nearest below is padded, not the first: %q", got)
+	}
+	if got := FitLine(5, fillers, "Service on the East River is suspended until further notice."); got != "Service on the East" {
+		t.Errorf("an over-long line is cut from the end: %q", got)
+	}
+	if got := FitLine(5, fillers, ""); got != "today, today, now" {
+		t.Errorf("an empty line is all filler: %q", got)
+	}
+	if got := FitLine(5, nil, "hi"); got != "hi" {
+		t.Errorf("without fillers a short line stays short: %q", got)
+	}
+	h, _ := ByID("haiku")
+	if b := Broken(h.Check(Haiku(fillers, []string{"gm crabs"}, []string{"a new morning on the reef"}, []string{"low tide and big plans"})), false); len(b) != 0 {
+		t.Errorf("a fitted haiku passes the haiku's own check: %s (%s)", b[0].Rule, b[0].Note)
+	}
+}

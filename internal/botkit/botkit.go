@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"math"
 	"net/http"
 	"os"
 	"strings"
@@ -154,64 +153,16 @@ func Check(text, form string) error {
 	return nil
 }
 
-// FitLine fits a line to n syllables by the site's own counter. The first
-// candidate that counts n wins. Otherwise the candidate nearest below n is
-// padded with fillers (the largest that fits, each joined with a comma) up
-// to n; when every candidate runs over, the shortest is cut word by word
-// from its end until it fits, then padded. Build candidates best first.
+// FitLine fits a line to n syllables by the site's own counter; see
+// writing.FitLine. Build candidates best first.
 func FitLine(n int, fillers []string, candidates ...string) string {
-	best, bestN := "", -1
-	shortest, shortN := "", math.MaxInt
-	for _, c := range candidates {
-		k := writing.LineSyllables(c)
-		if k == n {
-			return c
-		}
-		if k < n && k > bestN {
-			best, bestN = c, k
-		}
-		if k < shortN {
-			shortest, shortN = c, k
-		}
-	}
-	line := best
-	if bestN < 0 {
-		line = shortest
-		for writing.LineSyllables(line) > n {
-			words := strings.Fields(line)
-			if len(words) <= 1 {
-				break
-			}
-			line = strings.TrimRight(strings.Join(words[:len(words)-1], " "), ",;:")
-		}
-	}
-	for {
-		need := n - writing.LineSyllables(line)
-		if need <= 0 {
-			break
-		}
-		pick, pickN := "", 0
-		for _, f := range fillers {
-			if k := writing.LineSyllables(f); k > 0 && k <= need && k > pickN {
-				pick, pickN = f, k
-			}
-		}
-		if pick == "" {
-			break
-		}
-		if strings.TrimSpace(line) == "" {
-			line = pick
-		} else {
-			line = strings.TrimRight(line, ",;: ") + ", " + pick
-		}
-	}
-	return line
+	return writing.FitLine(n, fillers, candidates...)
 }
 
 // Haiku fits three lines to five, seven and five syllables, each from its
-// own candidates (see FitLine).
+// own candidates; see writing.Haiku.
 func Haiku(fillers []string, first, second, third []string) string {
-	return FitLine(5, fillers, first...) + "\n" + FitLine(7, fillers, second...) + "\n" + FitLine(5, fillers, third...)
+	return writing.Haiku(fillers, first, second, third)
 }
 
 // Fit returns the first candidate within MoltMax (by rune count), else the last
