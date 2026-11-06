@@ -62,6 +62,7 @@ type moltForm struct {
 	Content             string `form:"content"`
 	NSFW                bool   `form:"nsfw"`
 	Form                string `form:"form"`     // writing form ID; "" for a plain molt
+	Layout              string `form:"layout"`   // how the form is set on the page; see layoutFor
 	Override            bool   `form:"override"` // the writer vouches for the sound (syllables, rhyme) the counter doubts
 	validator.Validator `form:"-"`
 	Check               moltCheck `form:"-"` // filled in when the form is shown again
@@ -97,7 +98,8 @@ func (app *App) moltCreatePost(w http.ResponseWriter, r *http.Request) {
 	if !app.underWriteLimit(w, r, "molt") {
 		return
 	}
-	m, err := app.store.CreateMolt(r.Context(), currentCrab(r), f.Content, store.WithNSFW(f.NSFW), store.WithForm(f.Form))
+	c := currentCrab(r)
+	m, err := app.store.CreateMolt(r.Context(), c, f.Content, store.WithNSFW(f.NSFW), store.WithForm(f.Form), store.WithLayout(layoutFor(c, f.Form, f.Layout)))
 	if err != nil {
 		app.serverError(w, r, err)
 		return
@@ -497,7 +499,8 @@ func (app *App) replyCreatePost(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	reply, err := app.store.Reply(r.Context(), currentCrab(r), parent, f.Content, store.WithNSFW(f.NSFW), store.WithForm(f.Form))
+	c := currentCrab(r)
+	reply, err := app.store.Reply(r.Context(), c, parent, f.Content, store.WithNSFW(f.NSFW), store.WithForm(f.Form), store.WithLayout(layoutFor(c, f.Form, f.Layout)))
 	switch {
 	case errors.Is(err, store.ErrNotFound), errors.Is(err, store.ErrNotAllowed):
 		app.notFound(w, r)

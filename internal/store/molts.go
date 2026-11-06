@@ -48,8 +48,9 @@ type Molt struct {
 	Deleted   bool      `dynamodbav:"deleted"`
 	Removed   bool      `dynamodbav:"removed,omitempty"` // by a moderator; keeps its index keys so it can be restored
 	Edited    bool      `dynamodbav:"edited,omitempty"`
-	NSFW      bool      `dynamodbav:"nsfw,omitempty"` // set by the author or a moderator; hidden until the viewer reveals it or opts in
-	Form      string    `dynamodbav:"form,omitempty"` // the writing form chosen (a writing.Form ID: haiku, sonnet, letter…); "" for a plain molt
+	NSFW      bool      `dynamodbav:"nsfw,omitempty"`   // set by the author or a moderator; hidden until the viewer reveals it or opts in
+	Form      string    `dynamodbav:"form,omitempty"`   // the writing form chosen (a writing.Form ID: haiku, sonnet, letter…); "" for a plain molt
+	Layout    string    `dynamodbav:"layout,omitempty"` // how the form is set on the page (a writing.Layout ID); "" for the form's default
 
 	Remolt     bool   `dynamodbav:"remolt"`
 	RemoltOf   string `dynamodbav:"remolt_of,omitempty"`
@@ -102,6 +103,10 @@ func WithNSFW(on bool) MoltOption { return func(m *Molt) { m.NSFW = on } }
 // WithForm records the writing form the molt follows ("" for none). The
 // store keeps the ID as given; the web layer checks it against the catalogue.
 func WithForm(id string) MoltOption { return func(m *Molt) { m.Form = id } }
+
+// WithLayout records how the molt's form is set on the page ("" for the
+// form's default). Like the form, the web layer checks it.
+func WithLayout(id string) MoltOption { return func(m *Molt) { m.Layout = id } }
 
 func applyOptions(m *Molt, opts []MoltOption) {
 	for _, o := range opts {

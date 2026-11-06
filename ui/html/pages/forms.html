@@ -5,6 +5,7 @@
     {{ template "heading" "Writing forms" }}
     <div class="px-3 py-3 kb-legal kb-forms">
         <p>Every molt can take a form. Pick one from the dropdown when you write: the composer lays the form out (a box per line of a haiku, a setup, a build and a punchline for a joke), measures each line as you type, and checks your text against the rules as you go. Exact rules (three lines, a blank line between panels) have to be met before you can post. Rules about sound (syllables, rhyme) are counted from spelling, so the count can be wrong: they hold a molt back too, but once you've counted it yourself you can post it anyway.</p>
+        <p>Each form can also be set on the page more than one way: a haiku stepped down like a staircase or run onto one line with slashes, a sonnet with its closing couplet set in, a limerick's short lines indented, a joke's panels side by side. Pick a layout beside the form when you write, or choose one for each form in your settings. A layout changes how a molt looks, never its words, so the rules below hold whatever the layout.</p>
         {{ if .FormsRequired }}<p class="text-muted small">Every molt here takes a form: there are no plain notes.</p>
         {{ else }}<p class="text-muted small">A plain molt, a <strong>Note</strong>, has no rules and up to 280 characters.</p>{{ end }}
         {{ range formGroups }}
@@ -14,6 +15,7 @@
             <h3>{{ .Name }} <small class="text-muted">· up to {{ commas .MaxChars }} characters</small></h3>
             <p>{{ .Tagline }}</p>
             <ul>{{ range .Rules }}<li>{{ . }}</li>{{ end }}</ul>
+            {{ with .Layouts }}<p class="small text-muted mb-2">Layouts: {{ range $i, $l := . }}{{ if $i }} · {{ end }}<span title="{{ $l.Note }}">{{ $l.Name }}</span>{{ end }}</p>{{ end }}
             <pre class="kb-example">{{ .Example }}</pre>
         </section>
         {{ end }}

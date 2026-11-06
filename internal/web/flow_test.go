@@ -7,6 +7,7 @@ import (
 	"html"
 	"io"
 	"log/slog"
+	"maps"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
@@ -3270,7 +3271,7 @@ func TestSoundRules(t *testing.T) {
 
 	// The page carries every form's shape for the composer, which has a box to lay it out in.
 	if _, body, _ := h.get("/trench"); !strings.Contains(body, `<script type="application/json" id="kb-shapes">`) ||
-		!strings.Contains(body, `"haiku":{"lines":[{"syllables":[5,5]},{"syllables":[7,7]},{"syllables":[5,5]}]}`) ||
+		!strings.Contains(body, `"haiku":{"lines":[{"syllables":[5,5]},{"syllables":[7,7]},{"syllables":[5,5]}],"layouts":[`) ||
 		!strings.Contains(body, `"three-panel":{"parts":[{"label":"Setup"`) || !strings.Contains(body, `class="kb-shape" hidden`) {
 		t.Error("the trench should carry the shapes and a shaped box")
 	}
@@ -3315,5 +3316,184 @@ func TestSoundRules(t *testing.T) {
 	}
 	if status, body := h.apiPost("/api/v1/molts", key, `{"text":"`+offJSON+`","form":"haiku","override":true}`); status != http.StatusCreated {
 		t.Errorf("API haiku, vouched for: %d %s", status, body)
+	}
+}
+
+// TestLayouts: a poem or a post is set on the page the way its writer
+// chose (a haiku stepped like a staircase, a sonnet's couplet set in, a
+// joke's panels side by side), with a default per form in settings, and a
+// reader can ask to see everything flush left.
+func TestLayouts(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	h.signupAndActivate("basho", "basho@krabber.test", "old-silent-pond")
+	h.signupAndActivate("issa", "issa@krabber.test", "snail-mount-fuji")
+	h.login("basho@krabber.test", "old-silent-pond")
+	tok := h.csrf("/trench")
+	haiku := "low tide at sunrise\na krab raises one wet claw\nhello to the gulls"
+	post := func(content, form, layout string, extra ...string) (int, string) {
+		t.Helper()
+		v := url.Values{"csrf_token": {tok}, "content": {content}, "form": {form}}
+		if layout != "-" {
+			v.Set("layout", layout)
+		}
+		for i := 0; i+1 < len(extra); i += 2 {
+			v.Set(extra[i], extra[i+1])
+		}
+		status, body, _ := h.post("/molt/create", v, "HX-Request", "true")
+		return status, body
+	}
+	newest := func() store.Molt {
+		t.Helper()
+		molts, err := h.store.MoltsByOwner(ctx, currentID(t, h, "basho"), 1)
+		if err != nil || len(molts) == 0 {
+			t.Fatalf("no molts: %v", err)
+		}
+		return molts[0]
+	}
+	expect := func(what, body string, want ...string) {
+		t.Helper()
+		for _, w := range want {
+			if !strings.Contains(body, w) {
+				t.Errorf("%s: missing %q in\n%s", what, w, body)
+			}
+		}
+	}
+
+	// The composer offers the start form's layouts, and the page carries every form's.
+	_, body, _ := h.get("/trench")
+	expect("the composer", body, `name="layout"`, `<option value="stepped"`, `<option value="dropped"`, `"layouts":[{"id":"flush"`, `id="kb-my-layouts"`)
+
+	// A stepped haiku steps down; the form's own rules still apply.
+	status, body := post(haiku, "haiku", "stepped")
+	if status != http.StatusOK || newest().Layout != "stepped" {
+		t.Fatalf("a stepped haiku: %d %q", status, newest().Layout)
+	}
+	expect("stepped", body, `<span class="kb-arranged kb-layout-stepped">`, `<span class="kb-vl kb-in-1">a krab raises one wet claw</span>`, `<span class="kb-vl kb-in-2">hello to the gulls</span>`)
+	if status, body := post("two lines\nonly", "haiku", "stepped"); status != http.StatusUnprocessableEntity || !strings.Contains(body, "Three lines") {
+		t.Errorf("a layout doesn't excuse the form: %d", status)
+	}
+
+	// Dropped line: each line starts where the one above ended, with the
+	// lines above it set invisibly in front (stepped on phones).
+	_, body = post(haiku, "haiku", "dropped")
+	expect("dropped", body, `kb-layout-dropped`, `<span class="kb-ghost" aria-hidden="true">low tide at sunrise a krab raises one wet claw </span>hello to the gulls`)
+
+	// 5 / 7 / 5 on one line, and with the counts beside it.
+	_, body = post(haiku, "haiku", "inline")
+	expect("inline", body, `low tide at sunrise<span class="kb-slash"> / </span>a krab raises one wet claw<span class="kb-slash"> / </span>hello to the gulls`)
+	_, body = post(haiku, "haiku", "counts")
+	expect("counts", body, `<span class="kb-count" title="Syllables heard">5</span>`, `<span class="kb-count" title="Syllables heard">7</span>`)
+	// A haiku posted past the counter shows no counts that would argue with its writer.
+	off := "this line has too many syllables in it\nseven here, if you count them out\nfive to finish up"
+	if status, body := post(off, "haiku", "counts", "override", "true"); status != http.StatusOK || strings.Contains(body, "kb-count") || strings.Contains(body, "kb-arranged") {
+		t.Errorf("counts on a vouched-for haiku: %d %s", status, body)
+	}
+
+	// The form's own default is stored as no layout and drawn as before;
+	// a layout the form doesn't have falls back to it.
+	for _, layout := range []string{"flush", "strip"} {
+		if _, body := post(haiku, "haiku", layout); newest().Layout != "" || strings.Contains(body, "kb-arranged") {
+			t.Errorf("layout %q: stored %q", layout, newest().Layout)
+		}
+	}
+
+	// Other poems.
+	lim, _ := writing.ByID("limerick")
+	_, body = post(lim.Example, "limerick", "lear")
+	expect("Lear's limerick", body, `kb-join">He packed up his shell, and said, `)
+	_, body = post(lim.Example, "limerick", "short-in")
+	expect("short lines in", body, `<span class="kb-vl kb-in-1">He packed up his shell,</span>`)
+	son, _ := writing.ByID("sonnet")
+	_, body = post(son.Example, "sonnet", "couplet-in")
+	expect("couplet in", body, `<span class="kb-vl kb-in-1">So if your life feels small beside the sea,</span>`, `<span class="kb-vl kb-in-0 kb-gap">it does the little job it does with joy.</span>`)
+	env, _ := writing.ByID("envelope")
+	_, body = post(env.Example, "envelope", "framed")
+	expect("framed", body, `<span class="kb-vl kb-in-0">The sea comes back.</span><span class="kb-vl kb-in-1">`)
+
+	// Prose.
+	joke := "A krab walks into a bar and orders a drink.\n\nThe bartender slides it down the counter, right past him.\n\nSideways, sighs the krab."
+	_, body = post(joke, "three-panel", "strip")
+	if !strings.Contains(body, "kb-layout-strip") || strings.Count(body, `class="kb-para kb-panel"`) != 3 {
+		t.Errorf("a strip: %s", body)
+	}
+	let, _ := writing.ByID("letter")
+	_, body = post(let.Example, "letter", "signoff")
+	expect("a signed-off letter", body, `<span class="kb-para kb-signoff">Yours,`+"\n"+`SpongeBob</span>`)
+	blog, _ := writing.ByID("blog")
+	_, body = post(blog.Example, "blog", "indented")
+	expect("an indented post", body, `<span class="kb-para kb-para-title">Why krabs walk sideways</span>`, `<span class="kb-para kb-indent">So next time`)
+
+	// Defaults per form, in settings.
+	_, body, _ = h.get("/settings")
+	expect("settings", body, `name="layout[haiku]"`, `name="layout[sonnet]"`, `<option value="couplet-in"`)
+	if status, _, _ := h.post("/settings/writing", url.Values{"csrf_token": {tok}, "default_form": {"haiku"}, "layout[haiku]": {"stepped"}, "layout[sonnet]": {"couplet-in"}, "layout[couplet]": {"flush"}}); status != http.StatusSeeOther {
+		t.Fatalf("saving layouts: %d", status)
+	}
+	if got := currentCrabByName(t, h, "basho").FormLayouts; !maps.Equal(got, map[string]string{"haiku": "stepped", "sonnet": "couplet-in"}) {
+		t.Errorf("stored layouts %v (a form's own default isn't stored)", got)
+	}
+	for _, bad := range []url.Values{{"layout[haiku]": {"strip"}}, {"layout[sestina]": {"flush"}}} {
+		bad.Set("csrf_token", tok)
+		bad.Set("default_form", "haiku")
+		if status, _, _ := h.post("/settings/writing", bad); status != http.StatusBadRequest {
+			t.Errorf("bad layout %v: %d", bad, status)
+		}
+	}
+	_, body, _ = h.get("/trench")
+	expect("the composer after settings", body, `<option value="stepped" selected`, `"haiku":"stepped"`)
+	// Without JavaScript nothing posts a layout, and the default applies.
+	post(haiku, "haiku", "-")
+	if got := newest(); got.Layout != "stepped" {
+		t.Errorf("a molt with no layout posted takes the krab's default, got %q", got.Layout)
+	}
+
+	// Changing only the layout is an edit.
+	id := newest().ID
+	_, body, _ = h.get("/molt/edit/" + id)
+	expect("the edit form", body, `<option value="stepped" selected`)
+	if status, _, _ := h.post("/molt/edit/"+id, url.Values{"csrf_token": {tok}, "content": {haiku}, "form": {"haiku"}, "layout": {"centered"}}); status != http.StatusSeeOther {
+		t.Errorf("editing the layout: %d", status)
+	}
+	if m, _ := h.store.MoltByID(ctx, id); m.Layout != "centered" || m.Content != haiku {
+		t.Errorf("after the edit: %q %q", m.Layout, m.Content)
+	}
+
+	// The API takes a layout; one the form doesn't have is refused; none gives the krab's default.
+	key, _, err := h.store.CreateAPIKey(ctx, currentCrabByName(t, h, "basho"), "verse bot", []string{store.ScopeWriteMolts})
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := strings.ReplaceAll(haiku, "\n", `\n`)
+	if status, body := h.apiPost("/api/v1/molts", key, `{"text":"`+text+`","form":"haiku","layout":"dropped"}`); status != http.StatusCreated || newest().Layout != "dropped" {
+		t.Errorf("API dropped: %d %s %q", status, body, newest().Layout)
+	}
+	if status, body := h.apiPost("/api/v1/molts", key, `{"text":"`+text+`","form":"haiku","layout":"strip"}`); status != http.StatusUnprocessableEntity || !strings.Contains(body, "doesn't fit a haiku") {
+		t.Errorf("API strip haiku: %d %s", status, body)
+	}
+	if status, _ := h.apiPost("/api/v1/molts", key, `{"text":"`+text+`","form":"haiku"}`); status != http.StatusCreated || newest().Layout != "stepped" {
+		t.Errorf("API with no layout takes the krab's default: %q", newest().Layout)
+	}
+	if status, _ := h.apiPost("/api/v1/molts", key, `{"text":"`+text+`","form":"haiku","layout":""}`); status != http.StatusCreated || newest().Layout != "" {
+		t.Errorf("API with an empty layout takes the form's default: %q", newest().Layout)
+	}
+
+	// The forms page shows each form's layouts.
+	_, body, _ = h.get("/forms")
+	expect("the forms page", body, "Dropped line", "Couplet in", "Indent by rhyme")
+
+	// Another krab sees the layout, unless they'd rather see everything flush left.
+	h.post("/krab/logout", url.Values{"csrf_token": {tok}})
+	h.login("issa@krabber.test", "snail-mount-fuji")
+	tok = h.csrf("/sea")
+	_, body, _ = h.get("/sea")
+	expect("issa's Sea", body, "kb-layout-centered", "kb-layout-strip")
+	_, body, _ = h.get("/settings")
+	expect("the appearance setting", body, `name="plain_layouts"`)
+	if status, _, _ := h.post("/settings/appearance", url.Values{"csrf_token": {tok}, "plain_layouts": {"true"}}); status != http.StatusSeeOther {
+		t.Errorf("plain layouts: %d", status)
+	}
+	if _, body, _ := h.get("/sea"); strings.Contains(body, "kb-arranged") || !strings.Contains(body, "hello to the gulls") {
+		t.Error("with plain layouts the Sea shows every molt as written")
 	}
 }

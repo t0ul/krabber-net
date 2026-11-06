@@ -41,6 +41,9 @@ type templateData struct {
 	SignupFull       bool   // MAX_KRABS reached
 	FormsRequired    bool   // MOLT_FORMS=required: every molt takes a writing form
 	StartForm        string // the form the krab's composers start on; "" for a plain note
+	StartLayout      string // the layout they start in; "" for the form's own
+	FormLayouts      map[string]string
+	MyLayouts        template.JS // the krab's layout for each form, for the composer's script
 	Form             any
 	Query            string
 	CurrentPath      string
@@ -266,6 +269,7 @@ var templateFuncs = template.FuncMap{
 	"moltTitle":      moltTitle,
 	"freshCheck":     freshCheck,
 	"shapes":         func() template.JS { return shapesJSON },
+	"formLayouts":    func(id string) []writing.Layout { return formOf(id).Layouts },
 	"json":           jsonAttr,
 	"noteForm":       func() string { return store.FormNote },
 }
@@ -372,6 +376,9 @@ func (app *App) newTemplateData(r *http.Request) templateData {
 		d.IsAdmin = c.IsAdmin()
 		d.IsModerator = c.IsModerator()
 		d.StartForm = app.startForm(c)
+		d.StartLayout = layoutFor(c, d.StartForm, "")
+		d.FormLayouts = c.FormLayouts
+		d.MyLayouts = layoutDefaults(c)
 	}
 	return d
 }
@@ -389,12 +396,13 @@ func (app *App) withDisplay(r *http.Request, molts []store.Molt) {
 		n, ok := dir.names[name]
 		return n, ok
 	}
-	viewer, showNSFW := "", false
+	viewer, showNSFW, plain := "", false, false
 	if c := currentCrab(r); c != nil {
-		viewer, showNSFW = c.ID, c.ShowNSFW
+		viewer, showNSFW, plain = c.ID, c.ShowNSFW, c.PlainLayouts
 	}
 	for i := range molts {
 		molts[i].ContentHTML = richtext.HTML(molts[i].Content, known)
+		molts[i].ContentHTML = arrange(&molts[i], plain)
 		molts[i].Veiled = molts[i].NSFW && !showNSFW && molts[i].AuthorID != viewer
 		molts[i].YouTube = firstYouTube(molts[i].Content)
 	}

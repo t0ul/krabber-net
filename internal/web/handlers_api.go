@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -106,7 +107,9 @@ func (app *App) apiAuthenticate(scope string, next http.HandlerFunc) http.Handle
 // (see /forms), checked by the same rules as the web composer. A body that
 // names no form takes the crab's default, a haiku unless their settings say
 // otherwise; "form": "" asks for a plain note, which a site that requires a
-// form (MOLT_FORMS=required) refuses with "Pick a form.". Syllables and rhyme
+// form (MOLT_FORMS=required) refuses with "Pick a form.". "layout" names how
+// the form is set on the page (see /forms); without it the krab's default
+// for the form applies. Syllables and rhyme
 // are counted from spelling and hold a post back; "override": true vouches
 // for the writer's own count.
 // It validates and rate-limits exactly like the web compose box, then
@@ -118,6 +121,7 @@ func (app *App) apiCreateMolt(w http.ResponseWriter, r *http.Request) {
 		NSFW     bool    `json:"nsfw"`
 		Form     *string `json:"form"`
 		Override bool    `json:"override"`
+		Layout   *string `json:"layout"`
 	}
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
@@ -135,12 +139,27 @@ func (app *App) apiCreateMolt(w http.ResponseWriter, r *http.Request) {
 		apiError(w, http.StatusUnprocessableEntity, check.Message)
 		return
 	}
+	// A body that names no layout takes the krab's default for the form;
+	// "layout": "" is the form's own; one the form doesn't have is refused.
+	layout := layoutFor(c, form, "")
+	if in.Layout != nil {
+		f := formOf(form)
+		if _, ok := f.Layout(*in.Layout); !ok && *in.Layout != "" {
+			subject := "a plain note"
+			if f.ID != "" {
+				subject = strings.ToLower(formSubject(f))
+			}
+			apiError(w, http.StatusUnprocessableEntity, fmt.Sprintf("That layout doesn't fit %s. See /forms for the layouts each form takes.", subject))
+			return
+		}
+		layout = layoutFor(nil, form, *in.Layout)
+	}
 	if !app.writes.allow(c.ID, "molt") {
 		w.Header().Set("Retry-After", "3600")
 		apiError(w, http.StatusTooManyRequests, "rate limit reached, try again later")
 		return
 	}
-	m, err := app.store.CreateMolt(r.Context(), c, in.Text, store.WithNSFW(in.NSFW), store.WithForm(form))
+	m, err := app.store.CreateMolt(r.Context(), c, in.Text, store.WithNSFW(in.NSFW), store.WithForm(form), store.WithLayout(layout))
 	if err != nil {
 		app.apiServerError(w, r, err)
 		return

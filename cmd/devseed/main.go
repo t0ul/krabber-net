@@ -18,29 +18,30 @@ import (
 	"github.com/t0ul/krabber-net/internal/writing"
 )
 
-// A seeded molt: its text and the writing form it takes.
-type seed struct{ text, form string }
+// A seeded molt: its text, the writing form it takes, and how it's laid out
+// ("" for the form's own layout).
+type seed struct{ text, form, layout string }
 
 // ready is SpongeBob's molt, an envelope; the seeded likes and replies hang
 // off it.
-var ready = seed{"I'm ready!\nI'm ready! I'm ready!\nI'm ready! I'm ready! I'm ready!\nI'm ready!", "envelope"}
+var ready = seed{"I'm ready!\nI'm ready! I'm ready!\nI'm ready! I'm ready! I'm ready!\nI'm ready!", "envelope", "framed"}
 
 // molts are the first molt of each crab.
 var molts = map[string]seed{
-	"mrkrabs":   {"I like money, I like it a lot,\nmore than anything else I've got.", "couplet"},
+	"mrkrabs":   {"I like money, I like it a lot,\nmore than anything else I've got.", "couplet", ""},
 	"spongebob": ready,
-	"plankton":  {"The Krabby Patty formula will be MINE,\nand the Chum Bucket will finally have a line.", "couplet"},
-	"sandy":     {"Karate Island calls\nhere I come, claws up high, hi-yah\nTexas can wait, y'all", "haiku"},
-	"patrick":   {"The inner machinations of my mind are an enigma.", "metaphor"},
-	"squidward": {"the reef at sunrise\nall of you, still here, still loud\nI hate all of you", "haiku"},
+	"plankton":  {"The Krabby Patty formula will be MINE,\nand the Chum Bucket will finally have a line.", "couplet", ""},
+	"sandy":     {"Karate Island calls\nhere I come, claws up high, hi-yah\nTexas can wait, y'all", "haiku", "dropped"},
+	"patrick":   {"The inner machinations of my mind are an enigma.", "metaphor", ""},
+	"squidward": {"the reef at sunrise\nall of you, still here, still loud\nI hate all of you", "haiku", "stepped"},
 }
 
 // The thread under SpongeBob's molt: Plankton's reply, SpongeBob's answer,
 // and Squidward's quote.
 var (
-	barnacles = seed{"Ugh.\n\nBarnacles, every single morning.\n\nSix a.m.", "three-panel"}
-	rocks     = seed{"Barnacles are just krabs who love their rocks!", "metaphor"}
-	sinceSix  = seed{"He has been saying this since six in the morning, like a foghorn with a day job.", "simile"}
+	barnacles = seed{"Ugh.\n\nBarnacles, every single morning.\n\nSix a.m.", "three-panel", ""}
+	rocks     = seed{"Barnacles are just krabs who love their rocks!", "metaphor", ""}
+	sinceSix  = seed{"He has been saying this since six in the morning, like a foghorn with a day job.", "simile", ""}
 )
 
 // mustFit stops the seed if a molt breaks its form's exact rules, so a
@@ -52,6 +53,9 @@ func mustFit(sd seed) seed {
 	}
 	if broken := writing.Broken(f.Check(sd.text), false); len(broken) > 0 {
 		log.Fatalf("seed %q is not a %s: %s (%s)", sd.text, f.Name, broken[0].Rule, broken[0].Note)
+	}
+	if _, ok := f.Layout(sd.layout); sd.layout != "" && !ok {
+		log.Fatalf("seed %q: a %s has no %q layout", sd.text, f.Name, sd.layout)
 	}
 	return sd
 }
@@ -150,7 +154,7 @@ func seedMolts(ctx context.Context, s *store.Store, crabs []*store.Crab) {
 			continue
 		}
 		sd = mustFit(sd)
-		m, err := s.CreateMolt(ctx, c, sd.text, store.WithForm(sd.form))
+		m, err := s.CreateMolt(ctx, c, sd.text, store.WithForm(sd.form), store.WithLayout(sd.layout))
 		if err != nil {
 			log.Fatal(err)
 		}

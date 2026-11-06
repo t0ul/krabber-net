@@ -41,11 +41,13 @@ func (s *Store) EditMolt(ctx context.Context, c *Crab, m *Molt, content string, 
 	values := map[string]types.AttributeValue{
 		":c": str(content), ":old": str(m.Content), ":t": boolean(true), ":f": boolean(false),
 	}
-	if edited.Form != "" {
-		values[":form"] = str(edited.Form)
-		set += ", form = :form"
-	} else {
-		remove = append(remove, "form")
+	for attr, v := range map[string]string{"form": edited.Form, "layout": edited.Layout} {
+		if v == "" {
+			remove = append(remove, attr)
+			continue
+		}
+		values[":"+attr] = str(v)
+		set += ", " + attr + " = :" + attr
 	}
 	for attr, list := range map[string][]string{"tags": edited.Tags, "mentions": edited.Mentions} {
 		if len(list) == 0 {

@@ -13,6 +13,7 @@ package writing
 import (
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -32,8 +33,119 @@ type Form struct {
 	MaxChars int
 	Rules    []string // the rules as shown to the writer, in order
 	Shape    Shape    // how the composer lays the form out
+	Layouts  []Layout // how a molt in the form can be set on the page; the first is the default
 	rules    []rule
 }
+
+// Layout is a way of setting a form on the page: a haiku stepped down like a
+// staircase, a sonnet with its couplet set in, a joke's panels side by side.
+// It changes how a molt looks, never its words, so the form's rules hold
+// whatever the layout. Layouts that set lines one by one say how in data
+// (Indents, Gaps, Join, Frame, ByRhyme), so the page and the composer read
+// the same rule.
+type Layout struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Note string `json:"note"` // what the layout does, in a line
+	Mode string `json:"mode"` // how it's drawn; one of the Mode constants
+	// Indents gives each line its indent, in steps, for forms of a fixed length.
+	Indents []int `json:"indents,omitempty"`
+	// Gaps are the lines (from 0) followed by a stanza break.
+	Gaps []int `json:"gaps,omitempty"`
+	// Join are the lines (from 0) that run on into the next one.
+	Join []int `json:"join,omitempty"`
+	// Frame sets in every line but the first and the last.
+	Frame bool `json:"frame,omitempty"`
+	// ByRhyme sets lines that rhyme at the same indent, alternating.
+	ByRhyme bool `json:"by_rhyme,omitempty"`
+}
+
+// Layout modes: how a layout is drawn.
+const (
+	ModeLines    = "lines"    // each line on its own, at the indent Set gives it
+	ModeDropped  = "dropped"  // each line starts where the one above ended
+	ModeCentered = "centered" // each line centered
+	ModeInline   = "inline"   // one line, its breaks shown as " / " (and stanza breaks " // ")
+	ModeCounts   = "counts"   // each line with the syllables heard beside it
+	ModeSpaced   = "spaced"   // paragraphs with space between them
+	ModeIndented = "indented" // paragraphs with their first lines indented and no space
+	ModeSignOff  = "signoff"  // a letter with its sign-off set to the right
+	ModeStrip    = "strip"    // panels side by side, like a comic strip
+)
+
+// Layout finds one of the form's layouts. An ID the form doesn't have gives
+// its default layout and false; a form without layouts gives an empty one.
+func (f Form) Layout(id string) (Layout, bool) {
+	for _, l := range f.Layouts {
+		if l.ID == id {
+			return l, true
+		}
+	}
+	if len(f.Layouts) > 0 {
+		return f.Layouts[0], false
+	}
+	return Layout{}, false
+}
+
+// LineSet is how one line of a poem is set on the page.
+type LineSet struct {
+	Indent int  `json:"indent"` // steps in from the margin
+	Gap    bool `json:"gap"`    // a stanza break after it
+	Join   bool `json:"join"`   // runs on into the next line
+}
+
+// Set lays a text out in one of the form's layouts: one LineSet for each of
+// Lines(text). The writer's own stanza breaks are kept; a layout the form
+// doesn't have sets every line flush.
+func (f Form) Set(layoutID, text string) []LineSet {
+	l, ok := f.Layout(layoutID)
+	if !ok {
+		l = Layout{}
+	}
+	lines := Lines(text)
+	out := make([]LineSet, len(lines))
+	last := len(out) - 1
+	end := 0
+	for _, st := range Stanzas(text) {
+		end += len(st)
+		if end-1 < last {
+			out[end-1].Gap = true
+		}
+	}
+	var order map[byte]int
+	var scheme string
+	if l.ByRhyme {
+		scheme, order = Scheme(lines), map[byte]int{}
+		for i := range len(scheme) {
+			if _, seen := order[scheme[i]]; !seen {
+				order[scheme[i]] = len(order)
+			}
+		}
+	}
+	for i := range out {
+		switch {
+		case i < len(l.Indents):
+			out[i].Indent = l.Indents[i]
+		case l.Frame:
+			if i > 0 && i < last {
+				out[i].Indent = 1
+			}
+		case l.ByRhyme:
+			out[i].Indent = order[scheme[i]] % 2
+		}
+		if i < last && slices.Contains(l.Gaps, i) {
+			out[i].Gap = true
+		}
+		if i < last && slices.Contains(l.Join, i) {
+			out[i].Join = true
+		}
+	}
+	return out
+}
+
+// Titled reports whether a text opens with a title: a line of its own, up to
+// 80 characters, followed by a blank line.
+func Titled(text string) bool { return titled(text) }
 
 // Shape is how the composer lays a form out as it's written: one box per
 // line, each measured against what the line should sound like (a poem);
@@ -801,6 +913,72 @@ var (
 	essayed   = Shape{Parts: []PartSpec{{Label: "Title", Hint: "On tides"}, {Label: "Essay", Hint: "Your thesis, at least two body paragraphs, and a conclusion, a blank line between each.", Multi: true}}}
 	panels    = Shape{Parts: []PartSpec{{Label: "Setup", Hint: "A krab walks into a bar and orders a drink.", Multi: true}, {Label: "Build", Hint: "The bartender slides it down the counter, right past him.", Multi: true}, {Label: "Punchline", Hint: "\"Sideways,\" sighs the krab.", Multi: true}}}
 )
+
+// Layouts every poem can take, and the prose ones.
+var (
+	flushLayout    = Layout{ID: "flush", Name: "Flush left", Note: "Every line against the margin.", Mode: ModeLines}
+	centeredLayout = Layout{ID: "centered", Name: "Centered", Note: "Every line centeredLayout, as in many anthologies.", Mode: ModeCentered}
+	spacedLayout   = Layout{ID: "spaced", Name: "Spaced paragraphs", Note: "A blank line between paragraphs, as on the web.", Mode: ModeSpaced}
+	indentedLayout = Layout{ID: "indented", Name: "Indented paragraphs", Note: "First lines indented and no gap, as in a printed book.", Mode: ModeIndented}
+)
+
+// named gives a shared layout another name for one form.
+func named(l Layout, name, note string) Layout {
+	l.Name, l.Note = name, note
+	return l
+}
+
+// layouts are each form's layouts, the default first. The simile, metaphor
+// and analogy are a sentence or two, so they have none.
+var layouts = map[string][]Layout{
+	"haiku": {
+		flushLayout,
+		{ID: "stepped", Name: "Stepped", Note: "Each line steps in a little further: a staircase.", Mode: ModeLines, Indents: []int{0, 1, 2}},
+		{ID: "dropped", Name: "Dropped line", Note: "Each line starts where the one above ended; stepped on phones.", Mode: ModeDropped, Indents: []int{0, 1, 2}},
+		centeredLayout,
+		{ID: "inline", Name: "5 / 7 / 5 on one line", Note: "One line with slashes, the way a poem is quoted in prose.", Mode: ModeInline},
+		{ID: "counts", Name: "With syllable counts", Note: "The syllables heard beside each line, when they come to 5, 7, 5.", Mode: ModeCounts},
+	},
+	"couplet": {
+		flushLayout,
+		{ID: "second-in", Name: "Second line in", Note: "The answer steps in under the setup.", Mode: ModeLines, Indents: []int{0, 1}},
+		centeredLayout,
+	},
+	"limerick": {
+		flushLayout,
+		{ID: "short-in", Name: "Short lines in", Note: "Lines 3 and 4, the short ones, set in: the usual print layout.", Mode: ModeLines, Indents: []int{0, 0, 1, 1, 0}},
+		{ID: "lear", Name: "Lear's four lines", Note: "Lines 3 and 4 run together, as Edward Lear often printed them.", Mode: ModeLines, Join: []int{2}},
+	},
+	"sonnet": {
+		named(flushLayout, "One block", "Fourteen lines with no breaks."),
+		{ID: "quatrains", Name: "Quatrains", Note: "A space after each quatrain: 4, 4, 4, 2.", Mode: ModeLines, Gaps: []int{3, 7, 11}},
+		{ID: "couplet-in", Name: "Couplet in", Note: "Quatrains, with the closing couplet set in, as in the 1609 quarto.", Mode: ModeLines, Gaps: []int{3, 7, 11}, Indents: []int{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1}},
+	},
+	"envelope": {
+		flushLayout,
+		{ID: "framed", Name: "Framed", Note: "The returning line stays out; the lines it encloses step in.", Mode: ModeLines, Frame: true},
+	},
+	"rhyme": {
+		flushLayout,
+		{ID: "by-rhyme", Name: "Indent by rhyme", Note: "Lines that rhyme share an indent, from the scheme the site hears.", Mode: ModeLines, ByRhyme: true},
+	},
+	"letter": {
+		named(spacedLayout, "Block", "Everything against the margin."),
+		{ID: "signoff", Name: "Sign-off right", Note: "The sign-off sits to the right, like a written letter.", Mode: ModeSignOff},
+	},
+	"blog":  {spacedLayout, indentedLayout},
+	"essay": {spacedLayout, indentedLayout},
+	"three-panel": {
+		named(spacedLayout, "Stacked", "The three panels down the page."),
+		{ID: "strip", Name: "Strip", Note: "The panels side by side like a comic strip; stacked on phones.", Mode: ModeStrip},
+	},
+}
+
+func init() {
+	for i := range forms {
+		forms[i].Layouts = layouts[forms[i].ID]
+	}
+}
 
 var forms = []Form{
 	{Name: "Note", Tagline: "Just a molt: a thought, a link, whatever's on your mind.", MaxChars: 280},

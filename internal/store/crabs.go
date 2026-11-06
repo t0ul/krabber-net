@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"strings"
 	"time"
 
@@ -49,6 +50,9 @@ type Crab struct {
 	// FormNote for a plain note, or "" for the site's default (a haiku). Any
 	// molt can still take another form.
 	DefaultForm string `dynamodbav:"default_form,omitempty"`
+	// FormLayouts is the layout the crab's molts in each form start in, by
+	// form ID; a form left out starts in its own default layout.
+	FormLayouts map[string]string `dynamodbav:"form_layouts,omitempty"`
 
 	UsernameChangedAt int64 `dynamodbav:"username_changed_at,omitempty"` // Unix seconds of the last rename
 
@@ -108,6 +112,9 @@ type ContentFilters struct {
 type Appearance struct {
 	LightMode    bool `dynamodbav:"light_mode,omitempty"`
 	DyslexicMode bool `dynamodbav:"dyslexic_mode,omitempty"` // OpenDyslexic everywhere
+	// PlainLayouts shows every poem and post flush left, whatever layout its
+	// writer chose: easier on small screens and screen readers.
+	PlainLayouts bool `dynamodbav:"plain_layouts,omitempty"`
 }
 
 // SetAppearance saves the crab's theme choices.
@@ -117,7 +124,7 @@ func (s *Store) SetAppearance(ctx context.Context, c *Crab, a Appearance) error 
 	for _, f := range []struct {
 		attr string
 		on   bool
-	}{{"light_mode", a.LightMode}, {"dyslexic_mode", a.DyslexicMode}} {
+	}{{"light_mode", a.LightMode}, {"dyslexic_mode", a.DyslexicMode}, {"plain_layouts", a.PlainLayouts}} {
 		if f.on {
 			set, values[":t"] = append(set, f.attr+" = :t"), boolean(true)
 		} else {
@@ -595,6 +602,30 @@ func (s *Store) SetVerified(ctx context.Context, c *Crab, on bool) error {
 
 // FormNote is the DefaultForm of a crab whose molts start as plain notes.
 const FormNote = "note"
+
+// SetFormLayouts saves the layout the crab's molts start in for each form,
+// by form ID, replacing what was there; an empty map clears them.
+func (s *Store) SetFormLayouts(ctx context.Context, c *Crab, layouts map[string]string) error {
+	in := &dynamodb.UpdateItemInput{
+		TableName:           s.tableName(),
+		Key:                 keyOf(c.PK, c.SK),
+		UpdateExpression:    aws.String("REMOVE form_layouts"),
+		ConditionExpression: aws.String("attribute_exists(PK)"),
+	}
+	if len(layouts) > 0 {
+		m, err := attributevalue.Marshal(layouts)
+		if err != nil {
+			return err
+		}
+		in.UpdateExpression = aws.String("SET form_layouts = :l")
+		in.ExpressionAttributeValues = map[string]types.AttributeValue{":l": m}
+	}
+	if _, err := s.db.UpdateItem(ctx, in); err != nil {
+		return fmt.Errorf("set form layouts: %w", err)
+	}
+	c.FormLayouts = maps.Clone(layouts)
+	return nil
+}
 
 // SetDefaultForm saves the writing form the crab's molts start on: a form
 // ID, FormNote, or "" for the site's default.

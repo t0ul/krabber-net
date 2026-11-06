@@ -22,5 +22,8 @@ func TestSeedsFitTheirForms(t *testing.T) {
 		if broken := writing.Broken(f.Check(sd.text), false); len(broken) > 0 {
 			t.Errorf("%s is not a %s: %s (%s)", name, f.Name, broken[0].Rule, broken[0].Note)
 		}
+		if _, ok := f.Layout(sd.layout); sd.layout != "" && !ok {
+			t.Errorf("%s: a %s has no %q layout", name, f.Name, sd.layout)
+		}
 	}
 }

@@ -19,7 +19,8 @@
 </div>
 </div>
 {{ if .IsAuthenticated }}{{ template "modals" . }}
-<script type="application/json" id="kb-shapes">{{ shapes }}</script>{{ end }}
+<script type="application/json" id="kb-shapes">{{ shapes }}</script>
+<script type="application/json" id="kb-my-layouts">{{ .MyLayouts }}</script>{{ end }}
 </body>
 </html>
 {{end}}

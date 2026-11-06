@@ -17,8 +17,9 @@ func (app *App) renderQuote(w http.ResponseWriter, r *http.Request, status int, 
 	if !ok {
 		return
 	}
-	if status == http.StatusOK { // a fresh quote starts on the krab's default form
+	if status == http.StatusOK { // a fresh quote starts on the krab's default form and layout
 		f.Form = app.startForm(currentCrab(r))
+		f.Layout = layoutFor(currentCrab(r), f.Form, "")
 	}
 	f.Check = app.checkMolt(f)
 	switch {
@@ -68,7 +69,8 @@ func (app *App) quoteCreatePost(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	m, err := app.store.Quote(r.Context(), currentCrab(r), quoted, f.Content, store.WithNSFW(f.NSFW), store.WithForm(f.Form))
+	c := currentCrab(r)
+	m, err := app.store.Quote(r.Context(), c, quoted, f.Content, store.WithNSFW(f.NSFW), store.WithForm(f.Form), store.WithLayout(layoutFor(c, f.Form, f.Layout)))
 	switch {
 	case errors.Is(err, store.ErrNotFound), errors.Is(err, store.ErrNotAllowed):
 		app.notFound(w, r)

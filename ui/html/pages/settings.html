@@ -112,6 +112,16 @@
             </select>
             <small class="form-text text-muted">A haiku, unless you say otherwise: every composer starts on it, and you can pick another form for any molt. <a href="/forms">How the forms work.</a></small>
         </div>
+        <fieldset class="form-group kb-layout-defaults">
+            <legend class="col-form-label pt-0">Layouts</legend>
+            <small class="form-text text-muted mt-0 mb-2">How each form is set on the page when you post it: a haiku stepped down like a staircase, a sonnet with its couplet set in. You can pick another layout for any molt.</small>
+            {{ range formGroups }}{{ range pickable . $.FormsRequired }}{{ if .Layouts }}{{ $sel := index $.FormLayouts .ID }}
+            <div class="d-flex align-items-center mb-1">
+                <label class="mb-0 mr-2 kb-layout-label" for="layout-{{ .ID }}">{{ .Name }}</label>
+                <select name="layout[{{ .ID }}]" id="layout-{{ .ID }}" class="custom-select custom-select-sm">{{ range .Layouts }}<option value="{{ .ID }}"{{ if eq .ID $sel }} selected{{ end }} title="{{ .Note }}">{{ .Name }}</option>{{ end }}</select>
+            </div>
+            {{ end }}{{ end }}{{ end }}
+        </fieldset>
         <button type="submit" class="btn btn-outline-light rounded-pill">Save</button>
     </form>
 
@@ -141,9 +151,13 @@
             <input type="checkbox" class="custom-control-input" id="light-mode" name="light_mode" value="true"{{ if .LightMode }} checked{{ end }}>
             <label class="custom-control-label" for="light-mode">Light mode</label>
         </div>
-        <div class="custom-control custom-switch mb-3">
+        <div class="custom-control custom-switch mb-2">
             <input type="checkbox" class="custom-control-input" id="dyslexic-mode" name="dyslexic_mode" value="true"{{ if .DyslexicMode }} checked{{ end }}>
             <label class="custom-control-label" for="dyslexic-mode">Dyslexic mode <span class="text-muted">(the OpenDyslexic typeface everywhere)</span></label>
+        </div>
+        <div class="custom-control custom-switch mb-3">
+            <input type="checkbox" class="custom-control-input" id="plain-layouts" name="plain_layouts" value="true"{{ if .PlainLayouts }} checked{{ end }}>
+            <label class="custom-control-label" for="plain-layouts">Ignore layouts <span class="text-muted">(every poem and post flush left, whatever layout its writer chose)</span></label>
         </div>
         <button type="submit" class="btn btn-outline-light rounded-pill">Save</button>
     </form>

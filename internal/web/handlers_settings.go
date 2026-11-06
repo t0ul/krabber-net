@@ -193,13 +193,14 @@ func (app *App) settingsAppearancePost(w http.ResponseWriter, r *http.Request) {
 	var f struct {
 		Light    bool `form:"light_mode"`
 		Dyslexic bool `form:"dyslexic_mode"`
+		Plain    bool `form:"plain_layouts"`
 	}
 	if err := app.decodePostForm(w, r, &f); err != nil {
 		app.clientError(w, http.StatusBadRequest)
 		return
 	}
 	c := *currentCrab(r)
-	if err := app.store.SetAppearance(r.Context(), &c, store.Appearance{LightMode: f.Light, DyslexicMode: f.Dyslexic}); err != nil {
+	if err := app.store.SetAppearance(r.Context(), &c, store.Appearance{LightMode: f.Light, DyslexicMode: f.Dyslexic, PlainLayouts: f.Plain}); err != nil {
 		app.serverError(w, r, err)
 		return
 	}
@@ -266,11 +267,14 @@ func (app *App) settingsContentPost(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/settings", http.StatusSeeOther)
 }
 
-// settingsWritingPost saves the writing form the crab's molts start on: a
-// form from the catalogue, or a plain note where the site allows one.
+// settingsWritingPost saves the writing form the crab's molts start on (a
+// form from the catalogue, or a plain note where the site allows one) and
+// the layout each form starts in, as layout[haiku]=stepped and so on. A
+// form's own default layout isn't stored.
 func (app *App) settingsWritingPost(w http.ResponseWriter, r *http.Request) {
 	var f struct {
-		DefaultForm string `form:"default_form"`
+		DefaultForm string            `form:"default_form"`
+		Layouts     map[string]string `form:"layout"`
 	}
 	if err := app.decodePostForm(w, r, &f); err != nil {
 		app.clientError(w, http.StatusBadRequest)
@@ -285,8 +289,23 @@ func (app *App) settingsWritingPost(w http.ResponseWriter, r *http.Request) {
 		app.clientError(w, http.StatusBadRequest)
 		return
 	}
+	layouts := map[string]string{}
+	for formID, layoutID := range f.Layouts {
+		lf, ok := writing.ByID(formID)
+		if _, fits := lf.Layout(layoutID); !ok || !fits {
+			app.clientError(w, http.StatusBadRequest)
+			return
+		}
+		if layoutID != lf.Layouts[0].ID {
+			layouts[formID] = layoutID
+		}
+	}
 	c := *currentCrab(r)
 	if err := app.store.SetDefaultForm(r.Context(), &c, f.DefaultForm); err != nil {
+		app.serverError(w, r, err)
+		return
+	}
+	if err := app.store.SetFormLayouts(r.Context(), &c, layouts); err != nil {
 		app.serverError(w, r, err)
 		return
 	}

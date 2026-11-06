@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"slices"
 	"strings"
@@ -1533,5 +1534,80 @@ func TestMoltKeepsItsForm(t *testing.T) {
 	}
 	if e, _ := s.MoltByID(ctx, essay.ID); e.Content != "On tides\n\n"+long {
 		t.Fatal("a long essay didn't come back whole")
+	}
+}
+
+func TestMoltKeepsItsLayout(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+	basho := mustCrab(t, s, "basho")
+
+	haiku := "low tide at sunrise\na krab raises one wet claw\nhello to the gulls"
+	m, err := s.CreateMolt(ctx, basho, haiku, WithForm("haiku"), WithLayout("stepped"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.MoltByID(ctx, m.ID)
+	if err != nil || got.Layout != "stepped" {
+		t.Fatalf("stored layout %q, %v", got.Layout, err)
+	}
+	// An edit keeps the layout unless the writer picks another, and can drop it.
+	if _, err := s.EditMolt(ctx, basho, got, haiku+"!"); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ = s.MoltByID(ctx, m.ID); got.Layout != "stepped" {
+		t.Fatalf("after a plain edit the layout is %q", got.Layout)
+	}
+	if _, err := s.EditMolt(ctx, basho, got, haiku, WithLayout("dropped")); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ = s.MoltByID(ctx, m.ID); got.Layout != "dropped" || got.Content != haiku {
+		t.Fatalf("after changing the layout: %q %q", got.Layout, got.Content)
+	}
+	if _, err := s.EditMolt(ctx, basho, got, haiku, WithLayout("")); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ = s.MoltByID(ctx, m.ID); got.Layout != "" {
+		t.Fatalf("after dropping the layout it is %q", got.Layout)
+	}
+	reply, err := s.Reply(ctx, basho, got, "Setup.\n\nBuild.\n\nPunch.", WithForm("three-panel"), WithLayout("strip"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r, _ := s.MoltByID(ctx, reply.ID); r.Layout != "strip" {
+		t.Fatalf("reply layout %q", r.Layout)
+	}
+}
+
+func TestLayoutSettings(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+	karen := mustCrab(t, s, "karen")
+
+	want := map[string]string{"haiku": "stepped", "sonnet": "couplet-in"}
+	if err := s.SetFormLayouts(ctx, karen, want); err != nil {
+		t.Fatal(err)
+	}
+	if fresh, _ := s.CrabByID(ctx, karen.ID); !maps.Equal(fresh.FormLayouts, want) || !maps.Equal(karen.FormLayouts, want) {
+		t.Fatalf("form layouts stored as %v", fresh.FormLayouts)
+	}
+	if err := s.SetFormLayouts(ctx, karen, nil); err != nil {
+		t.Fatal(err)
+	}
+	if fresh, _ := s.CrabByID(ctx, karen.ID); len(fresh.FormLayouts) != 0 {
+		t.Fatalf("form layouts not cleared: %v", fresh.FormLayouts)
+	}
+
+	if err := s.SetAppearance(ctx, karen, Appearance{PlainLayouts: true}); err != nil {
+		t.Fatal(err)
+	}
+	if fresh, _ := s.CrabByID(ctx, karen.ID); !fresh.PlainLayouts || fresh.LightMode {
+		t.Fatalf("appearance: %+v", fresh.Appearance)
+	}
+	if err := s.SetAppearance(ctx, karen, Appearance{}); err != nil {
+		t.Fatal(err)
+	}
+	if fresh, _ := s.CrabByID(ctx, karen.ID); fresh.PlainLayouts {
+		t.Fatal("plain layouts not cleared")
 	}
 }

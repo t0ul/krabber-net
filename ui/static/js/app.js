@@ -69,6 +69,7 @@ function moltFromModal(form, xhr) {
   if (empty) empty.remove();
   localizeTimes(list);
   syncNewMoltsSince(list);
+  fitDropped(list);
 }
 
 // A molt inserted into an empty list replaces the "nothing here" message.
@@ -88,6 +89,7 @@ document.addEventListener("htmx:afterSwap", function (event) {
   }
   initComposers(document);
   paintMeasures(document);
+  fitDropped(event.target);
 });
 
 // A molt prepended to the feed (compose) moves the "new molts" cursor so
@@ -197,6 +199,7 @@ function initComposers(root) {
     var box = form.querySelector(".kb-shape");
     var select = form.querySelector("select[name=form]");
     if (box && select && box.getAttribute("data-shape") !== select.value) buildShape(form);
+    applyLayout(form);
     updateCounter(form);
   });
 }
@@ -368,6 +371,7 @@ function buildShape(form) {
   box.hidden = false;
   textarea.hidden = true;
   syncShape(form, false);
+  applyLayout(form);
 }
 
 // syncShape writes the boxes into the textarea: lines joined by a line
@@ -410,6 +414,7 @@ function paintMeasures(root) {
       var spec = lineSpec(shape, index);
       var target = syllableTarget(spec);
       var m = input.value.trim() ? heard[next++] : null;
+      row.setAttribute("data-rhyme", m ? m.rhyme : "");
       if (!m) {
         meter.textContent = target ? "\u00b7/" + target : "";
         meter.className = "kb-line-meter";
@@ -422,6 +427,110 @@ function paintMeasures(root) {
       rhyme.textContent = spec.rhyme ? m.rhyme : "";
       rhyme.className = "kb-line-rhyme " + (m.rhyme_ok ? "kb-rhyme-ok" : "kb-rhyme-off");
     });
+    applyLayout(form);
+  });
+}
+
+// A dropped line needs the width of the whole poem: each line starts where
+// the one above ended. Where a line would wrap in the column it's shown in,
+// the poem steps instead (the CSS does the same on phones without this).
+function fitDropped(root) {
+  (root || document).querySelectorAll(".kb-layout-dropped").forEach(function (poem) {
+    poem.classList.remove("kb-dropped-narrow");
+    var lines = poem.querySelectorAll(".kb-vl");
+    if (!lines.length) return;
+    var one = lines[0].getBoundingClientRect().height;
+    for (var i = 1; i < lines.length; i++) {
+      if (lines[i].getBoundingClientRect().height > one * 1.5) {
+        poem.classList.add("kb-dropped-narrow");
+        return;
+      }
+    }
+  });
+}
+
+var fitTimer = null;
+window.addEventListener("resize", function () {
+  clearTimeout(fitTimer);
+  fitTimer = setTimeout(function () { fitDropped(document); }, 150);
+});
+window.addEventListener("load", function () { fitDropped(document); });
+
+// Layouts. Beside the form sits a list of the chosen form's layouts (they
+// come with its shape), starting on the krab's own default for that form.
+// The line boxes are set the way the layout sets the poem, using the same
+// rule the page does (indents, stanza breaks, the frame of an envelope, the
+// rhyme letters the last check heard), so a stepped haiku steps as it's
+// written. A dropped line steps here; the page sets it properly.
+var myLayouts = {};
+(function () {
+  var el = document.getElementById("kb-my-layouts");
+  try { myLayouts = el ? JSON.parse(el.textContent) : {}; } catch (e) { myLayouts = {}; }
+})();
+
+function layoutsOf(formId) {
+  var s = shapes[formId];
+  return (s && s.layouts) || [];
+}
+
+// fillLayouts lists the chosen form's layouts, starting on the krab's default.
+function fillLayouts(form) {
+  var formSelect = form.querySelector("select[name=form]");
+  var select = form.querySelector("select[name=layout]");
+  if (!formSelect || !select) return;
+  var list = layoutsOf(formSelect.value);
+  var want = myLayouts[formSelect.value];
+  select.replaceChildren();
+  list.forEach(function (l, i) {
+    var option = document.createElement("option");
+    option.value = l.id;
+    option.textContent = l.name;
+    option.title = l.note;
+    option.selected = l.id === want || (!want && i === 0);
+    option.defaultSelected = option.selected;
+    select.appendChild(option);
+  });
+  select.hidden = list.length === 0;
+}
+
+function currentLayout(form) {
+  var formSelect = form.querySelector("select[name=form]");
+  var select = form.querySelector("select[name=layout]");
+  if (!formSelect || !select) return null;
+  var list = layoutsOf(formSelect.value);
+  for (var i = 0; i < list.length; i++) {
+    if (list[i].id === select.value) return list[i];
+  }
+  return list[0] || null;
+}
+
+// applyLayout sets the composer's line boxes as the chosen layout sets the poem.
+function applyLayout(form) {
+  var box = form.querySelector(".kb-shape");
+  if (!box) return;
+  var layout = currentLayout(form);
+  box.setAttribute("data-mode", layout ? layout.mode : "");
+  var rows = box.querySelectorAll(".kb-line");
+  var order = {};
+  rows.forEach(function (row, i) {
+    var indent = 0;
+    var gap = false;
+    if (layout) {
+      if (layout.indents && i < layout.indents.length) {
+        indent = layout.indents[i];
+      } else if (layout.frame) {
+        indent = i > 0 && i < rows.length - 1 ? 1 : 0;
+      } else if (layout.by_rhyme) {
+        var letter = row.getAttribute("data-rhyme");
+        if (letter) {
+          if (!(letter in order)) order[letter] = Object.keys(order).length;
+          indent = order[letter] % 2;
+        }
+      }
+      gap = !!layout.gaps && layout.gaps.indexOf(i) !== -1 && i < rows.length - 1;
+    }
+    for (var n = 1; n <= 3; n++) row.classList.toggle("kb-in-" + n, n === indent);
+    row.classList.toggle("kb-gap", gap);
   });
 }
 
@@ -456,7 +565,13 @@ document.addEventListener("input", function (event) {
 
 document.addEventListener("change", function (event) {
   var form = event.target.form;
-  if (!form || event.target.name !== "form") return;
+  if (!form) return;
+  if (event.target.name === "layout") {
+    applyLayout(form);
+    return;
+  }
+  if (event.target.name !== "form") return;
+  fillLayouts(form);
   buildShape(form);
   updateCounter(form);
   scheduleCheck(form, 0);
@@ -465,6 +580,7 @@ document.addEventListener("change", function (event) {
 document.addEventListener("reset", function (event) {
   var form = event.target;
   setTimeout(function () {
+    fillLayouts(form);
     buildShape(form);
     updateCounter(form);
   }, 0);
@@ -615,6 +731,7 @@ function localizeTimes(root) {
 document.addEventListener("DOMContentLoaded", function () {
   localizeTimes(document);
   initComposers(document);
+  fitDropped(document);
   var filter = document.getElementById("crab-filter");
   if (!filter) return;
   var rows = document.querySelectorAll(".crab-row[data-name]");

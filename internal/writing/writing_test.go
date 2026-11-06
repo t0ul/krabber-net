@@ -406,3 +406,111 @@ func TestFitLine(t *testing.T) {
 		t.Errorf("a fitted haiku passes the haiku's own check: %s (%s)", b[0].Rule, b[0].Note)
 	}
 }
+
+func TestLayouts(t *testing.T) {
+	ids := regexp.MustCompile(`^[a-z-]+$`)
+	modes := []string{ModeLines, ModeDropped, ModeCentered, ModeInline, ModeCounts, ModeSpaced, ModeIndented, ModeSignOff, ModeStrip}
+	for _, f := range Forms() {
+		seen := map[string]bool{}
+		for _, l := range f.Layouts {
+			if !ids.MatchString(l.ID) || seen[l.ID] || l.Name == "" || l.Note == "" || !slices.Contains(modes, l.Mode) {
+				t.Errorf("form %q: bad layout %+v", f.ID, l)
+			}
+			seen[l.ID] = true
+			if n := len(l.Indents); n > 0 && len(f.Shape.Lines) > 0 && !f.Shape.Grow && n != len(f.Shape.Lines) {
+				t.Errorf("form %q layout %q: %d indents for %d lines", f.ID, l.ID, n, len(f.Shape.Lines))
+			}
+			// A layout only changes the look: the example still passes, laid out any way.
+			if got := len(f.Set(l.ID, f.Example)); got != len(Lines(f.Example)) {
+				t.Errorf("form %q layout %q: %d line sets for %d lines", f.ID, l.ID, got, len(Lines(f.Example)))
+			}
+		}
+	}
+	for _, id := range []string{"", "simile", "metaphor", "analogy"} {
+		if f, _ := ByID(id); len(f.Layouts) != 0 {
+			t.Errorf("%q should have no layouts", id)
+		}
+	}
+	h, _ := ByID("haiku")
+	if l, ok := h.Layout("stepped"); !ok || l.Name != "Stepped" {
+		t.Errorf("stepped: %+v", l)
+	}
+	if l, ok := h.Layout("strip"); ok || l.ID != "flush" {
+		t.Errorf("a layout the haiku doesn't have gives its default: %+v %v", l, ok)
+	}
+	if !Titled("On tides\n\nThe tide.") || Titled("two lines\nwith no title") {
+		t.Error("Titled")
+	}
+}
+
+func TestSet(t *testing.T) {
+	indents := func(s []LineSet) []int {
+		out := make([]int, len(s))
+		for i, l := range s {
+			out[i] = l.Indent
+		}
+		return out
+	}
+	where := func(s []LineSet, pick func(LineSet) bool) []int {
+		var out []int
+		for i, l := range s {
+			if pick(l) {
+				out = append(out, i)
+			}
+		}
+		return out
+	}
+	gaps := func(s []LineSet) []int { return where(s, func(l LineSet) bool { return l.Gap }) }
+
+	h, _ := ByID("haiku")
+	if got := indents(h.Set("stepped", h.Example)); !slices.Equal(got, []int{0, 1, 2}) {
+		t.Errorf("stepped: %v", got)
+	}
+	if got := indents(h.Set("flush", h.Example)); !slices.Equal(got, []int{0, 0, 0}) {
+		t.Errorf("flush: %v", got)
+	}
+	if got := indents(h.Set("nonsense", h.Example)); !slices.Equal(got, []int{0, 0, 0}) {
+		t.Errorf("an unknown layout sets every line flush: %v", got)
+	}
+	// The writer's own stanza break is kept, in any layout.
+	if got := gaps(h.Set("stepped", "low tide at sunrise\n\na krab raises one wet claw\nhello to the gulls")); !slices.Equal(got, []int{0}) {
+		t.Errorf("the writer's stanza break: %v", got)
+	}
+
+	c, _ := ByID("couplet")
+	if got := indents(c.Set("second-in", c.Example)); !slices.Equal(got, []int{0, 1}) {
+		t.Errorf("second line in: %v", got)
+	}
+	l, _ := ByID("limerick")
+	if got := indents(l.Set("short-in", l.Example)); !slices.Equal(got, []int{0, 0, 1, 1, 0}) {
+		t.Errorf("short lines in: %v", got)
+	}
+	if got := where(l.Set("lear", l.Example), func(l LineSet) bool { return l.Join }); !slices.Equal(got, []int{2}) {
+		t.Errorf("Lear runs line 3 into line 4: %v", got)
+	}
+	s, _ := ByID("sonnet")
+	if got := gaps(s.Set("quatrains", s.Example)); !slices.Equal(got, []int{3, 7, 11}) {
+		t.Errorf("quatrains: %v", got)
+	}
+	cin := s.Set("couplet-in", s.Example)
+	if got := where(cin, func(l LineSet) bool { return l.Indent > 0 }); !slices.Equal(got, []int{12, 13}) || !slices.Equal(gaps(cin), []int{3, 7, 11}) {
+		t.Errorf("couplet in: %+v", cin)
+	}
+	e, _ := ByID("envelope")
+	if got := indents(e.Set("framed", e.Example)); !slices.Equal(got, []int{0, 1, 1, 1, 0}) {
+		t.Errorf("framed: %v", got)
+	}
+	r, _ := ByID("rhyme")
+	if got := indents(r.Set("by-rhyme", "Roses by the sea\na krab in the sand\nwaves running free\na claw in my hand")); !slices.Equal(got, []int{0, 1, 0, 1}) {
+		t.Errorf("by rhyme, ABAB: %v", got)
+	}
+	if got := indents(r.Set("by-rhyme", r.Example)); !slices.Equal(got, []int{0, 0, 1, 1}) {
+		t.Errorf("by rhyme, AABB: %v", got)
+	}
+	if got := indents(r.Set("by-rhyme", "The sea comes back to me\nit always does, it did\nwhatever the moon had hid\nand sets the sea gulls free")); !slices.Equal(got, []int{0, 1, 1, 0}) {
+		t.Errorf("by rhyme, ABBA: %v", got)
+	}
+	if len(h.Set("stepped", "")) != 0 {
+		t.Error("nothing to set in an empty text")
+	}
+}

@@ -8,11 +8,12 @@
 {{define "counter"}}<span class="mini-character-counter text-muted my-auto mr-3 d-none">280</span>{{end}}
 
 {{/* The writing-form dropdown: a plain note, then every form by group. Each
-     option carries its own length, which app.js gives the counter. Takes a
-     dict: Selected (the form's ID) and Required (MOLT_FORMS=required: no
-     plain note, and a haiku to start on). The "?" opens the page that
-     explains the rules. */}}
-{{define "form-picker"}}{{ $sel := .Selected }}{{ $required := .Required }}{{ if and $required (not $sel) }}{{ $sel = defaultForm }}{{ end }}
+     option carries its own length, which app.js gives the counter. Beside it,
+     the layouts of the chosen form (app.js swaps them when the form changes).
+     Takes a dict: Selected (the form's ID), Layout (the layout's ID; "" for
+     the form's own) and Required (MOLT_FORMS=required: no plain note, and a
+     haiku to start on). The "?" opens the page that explains the rules. */}}
+{{define "form-picker"}}{{ $sel := .Selected }}{{ $lay := .Layout }}{{ $required := .Required }}{{ if and $required (not $sel) }}{{ $sel = defaultForm }}{{ end }}
 <span class="kb-form-picker mr-2">
     <select name="form" class="custom-select custom-select-sm kb-form-select" aria-label="Writing form" title="Writing form">
         {{ if not $required }}{{ range forms }}{{ if not .ID }}<option value=""{{ if eq $sel "" }} selected{{ end }} data-max="{{ .MaxChars }}">{{ .Name }}</option>{{ end }}{{ end }}{{ end }}
@@ -21,6 +22,9 @@
             {{ range . }}<option value="{{ .ID }}"{{ if eq $sel .ID }} selected{{ end }} data-max="{{ .MaxChars }}">{{ .Name }}</option>{{ end }}
         </optgroup>
         {{ end }}{{ end }}
+    </select>
+    <select name="layout" class="custom-select custom-select-sm kb-form-select kb-layout-select" aria-label="Layout" title="Layout"{{ if not (formLayouts $sel) }} hidden{{ end }}>
+        {{ range formLayouts $sel }}<option value="{{ .ID }}"{{ if eq .ID $lay }} selected{{ end }} title="{{ .Note }}">{{ .Name }}</option>{{ end }}
     </select>
     <a href="/forms" class="kb-forms-help text-muted" title="How the writing forms work" aria-label="How the writing forms work">?</a>
 </span>
@@ -79,7 +83,7 @@
             </div>
             {{ template "form-feedback" (freshCheck .StartForm) }}
             <div class="mini-molt-actions d-flex flex-row justify-content-end w-100 compose-button-row">
-                {{ template "form-picker" (dict "Selected" .StartForm "Required" .FormsRequired) }}
+                {{ template "form-picker" (dict "Selected" .StartForm "Layout" .StartLayout "Required" .FormsRequired) }}
                 {{ template "nsfw-toggle" "nsfw-compose" }}
                 {{ template "counter" }}
                 <button type="submit" class="btn btn-primary rounded-pill"><strong>Molt</strong></button>
@@ -109,7 +113,7 @@
                     </div>
                     {{ template "form-feedback" (freshCheck .StartForm) }}
                     <div class="mini-molt-actions d-flex flex-row justify-content-end w-100 compose-button-row">
-                        {{ template "form-picker" (dict "Selected" .StartForm "Required" .FormsRequired) }}
+                        {{ template "form-picker" (dict "Selected" .StartForm "Layout" .StartLayout "Required" .FormsRequired) }}
                         {{ template "nsfw-toggle" "nsfw-compose-modal" }}
                         {{ template "counter" }}
                         <button type="submit" class="btn btn-primary rounded-pill"><strong>Molt</strong></button>
@@ -138,7 +142,7 @@
     {{ with .Form }}{{ template "form-feedback" .Check }}{{ else }}{{ template "form-feedback" (freshCheck .StartForm) }}{{ end }}
     {{ template "quoted-molt" .Molt }}
     <div class="mini-molt-actions d-flex flex-row justify-content-end w-100 compose-button-row">
-        {{ template "form-picker" (dict "Selected" .Form.Form "Required" .FormsRequired) }}
+        {{ template "form-picker" (dict "Selected" .Form.Form "Layout" .Form.Layout "Required" .FormsRequired) }}
         {{ template "nsfw-toggle" "nsfw-quote" }}
         {{ template "counter" }}
         <button type="submit" class="btn btn-primary rounded-pill"><strong>Quote</strong></button>
@@ -170,7 +174,7 @@
     </div>
     {{ with .Form }}{{ template "form-feedback" .Check }}{{ else }}{{ template "form-feedback" (freshCheck .StartForm) }}{{ end }}
     <div class="mini-molt-actions d-flex flex-row justify-content-end w-100 compose-button-row">
-        {{ template "form-picker" (dict "Selected" .Form.Form "Required" .FormsRequired) }}
+        {{ template "form-picker" (dict "Selected" .Form.Form "Layout" .Form.Layout "Required" .FormsRequired) }}
         {{ template "counter" }}
         <button type="submit" class="btn btn-primary rounded-pill"><strong>Save</strong></button>
     </div>

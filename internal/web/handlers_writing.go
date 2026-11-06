@@ -26,20 +26,31 @@ type moltCheck struct {
 	Overridable bool
 }
 
-// shapesJSON is every form's shape by ID, for the composer's script.
+// shapesJSON is every form's shape and layouts by ID, for the composer's
+// script.
 var shapesJSON = func() template.JS {
-	shapes := map[string]writing.Shape{}
+	type composerForm struct {
+		writing.Shape
+		Layouts []writing.Layout `json:"layouts,omitempty"`
+	}
+	forms := map[string]composerForm{}
 	for _, f := range writing.Forms() {
-		if !f.Shape.Free() {
-			shapes[f.ID] = f.Shape
+		if !f.Shape.Free() || len(f.Layouts) > 0 {
+			forms[f.ID] = composerForm{Shape: f.Shape, Layouts: f.Layouts}
 		}
 	}
-	b, err := json.Marshal(shapes)
+	return jsonScript(forms)
+}()
+
+// jsonScript marshals v for a <script type="application/json"> block.
+// encoding/json escapes <, > and &, so the text can't close the element.
+func jsonScript(v any) template.JS {
+	b, err := json.Marshal(v)
 	if err != nil {
 		panic(err)
 	}
-	return template.JS(b) //nolint:gosec // our own catalogue, marshalled by encoding/json
-}()
+	return template.JS(b) //nolint:gosec // marshalled by encoding/json, which escapes <, > and &
+}
 
 // jsonAttr marshals v for a data attribute; the template escapes it.
 func jsonAttr(v any) string {

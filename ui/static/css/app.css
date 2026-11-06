@@ -908,6 +908,164 @@ textarea.kb-part-field {
   vertical-align: baseline;
 }
 
+/* Layouts: a poem or a post set the way its writer chose. Lines are blocks
+   (no whitespace between them, so the molt text's pre-wrap adds none);
+   indents are steps of 1.5em. A dropped line puts the lines above it, set
+   invisibly, in front of it; on a phone that gets too wide, so it steps. */
+.kb-arranged,
+.kb-vl,
+.kb-para {
+  display: block;
+}
+
+.kb-vl.kb-in-1 {
+  padding-left: 1.5em;
+}
+
+.kb-vl.kb-in-2 {
+  padding-left: 3em;
+}
+
+.kb-vl.kb-in-3 {
+  padding-left: 4.5em;
+}
+
+.kb-vl.kb-gap {
+  margin-bottom: 1em;
+}
+
+.kb-layout-centered .kb-vl {
+  text-align: center;
+}
+
+.kb-layout-dropped .kb-vl {
+  padding-left: 0;
+}
+
+.kb-ghost {
+  visibility: hidden;
+  user-select: none;
+}
+
+/* app.js marks a dropped poem too wide for its column; it steps instead. */
+.kb-dropped-narrow .kb-ghost {
+  display: none;
+}
+
+.kb-dropped-narrow .kb-vl.kb-in-1 {
+  padding-left: 1.5em;
+}
+
+.kb-dropped-narrow .kb-vl.kb-in-2 {
+  padding-left: 3em;
+}
+
+.kb-layout-counts .kb-vl {
+  display: flex;
+  gap: 1rem;
+  align-items: baseline;
+}
+
+.kb-vt {
+  flex: 1;
+  min-width: 0;
+}
+
+.kb-count {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-style: normal;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--light-faded);
+}
+
+.kb-slash {
+  color: var(--light-faded);
+}
+
+.kb-layout-signoff .kb-para {
+  margin-bottom: 1em;
+}
+
+.kb-layout-signoff .kb-para:last-child {
+  margin-bottom: 0;
+}
+
+.kb-signoff {
+  padding-left: 50%;
+}
+
+.kb-layout-indented .kb-para-title {
+  margin-bottom: 0.75em;
+}
+
+.kb-para.kb-indent {
+  text-indent: 1.5em;
+}
+
+.kb-layout-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.kb-panel {
+  border: 1px solid var(--dark-less);
+  border-radius: 0.5rem;
+  padding: 0.4rem 0.6rem;
+}
+
+/* The composer sets its line boxes the same way. */
+.kb-layout-select {
+  max-width: 9rem;
+}
+
+.kb-shape .kb-line.kb-in-1 .kb-line-input {
+  margin-left: 1.5em;
+}
+
+.kb-shape .kb-line.kb-in-2 .kb-line-input {
+  margin-left: 3em;
+}
+
+.kb-shape .kb-line.kb-in-3 .kb-line-input {
+  margin-left: 4.5em;
+}
+
+.kb-shape .kb-line.kb-gap {
+  margin-bottom: 1rem;
+}
+
+.kb-shape[data-mode="centered"] .kb-line-input {
+  text-align: center;
+}
+
+.kb-layout-label {
+  min-width: 8rem;
+}
+
+@media (max-width: 575.98px) {
+  .kb-layout-dropped .kb-ghost {
+    display: none;
+  }
+
+  .kb-layout-dropped .kb-vl.kb-in-1 {
+    padding-left: 1.5em;
+  }
+
+  .kb-layout-dropped .kb-vl.kb-in-2 {
+    padding-left: 3em;
+  }
+
+  .kb-layout-strip {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .kb-signoff {
+    padding-left: 30%;
+  }
+}
+
 .kb-form-badge {
   font-size: 0.72rem;
   text-transform: lowercase;

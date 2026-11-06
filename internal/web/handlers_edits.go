@@ -16,7 +16,7 @@ func (app *App) editPage(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	app.renderEdit(w, r, http.StatusOK, m, moltForm{Content: m.Content, Form: m.Form})
+	app.renderEdit(w, r, http.StatusOK, m, moltForm{Content: m.Content, Form: m.Form, Layout: m.Layout})
 }
 
 func (app *App) renderEdit(w http.ResponseWriter, r *http.Request, status int, m *store.Molt, f moltForm) {
@@ -43,12 +43,18 @@ func (app *App) editPost(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	f.CheckField(f.Content != m.Content || f.Form != m.Form, "content", "No changes were made")
+	// An edit that names no layout keeps the molt's, as far as the form allows.
+	if r.PostForm.Has("layout") {
+		f.Layout = layoutFor(currentCrab(r), f.Form, f.Layout)
+	} else {
+		f.Layout = layoutFor(nil, f.Form, m.Layout)
+	}
+	f.CheckField(f.Content != m.Content || f.Form != m.Form || f.Layout != m.Layout, "content", "No changes were made")
 	if !f.Valid() || app.checkMolt(f).Message != "" {
 		app.renderEdit(w, r, http.StatusUnprocessableEntity, m, f)
 		return
 	}
-	edited, err := app.store.EditMolt(r.Context(), currentCrab(r), m, f.Content, store.WithForm(f.Form))
+	edited, err := app.store.EditMolt(r.Context(), currentCrab(r), m, f.Content, store.WithForm(f.Form), store.WithLayout(f.Layout))
 	switch {
 	case errors.Is(err, store.ErrNotAllowed):
 		app.sessions.Put(r.Context(), sessionFlash, notEditable)

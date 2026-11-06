@@ -64,7 +64,7 @@
         <div class="kb-reply-text">{{ template "molt-text" (dict "Rows" 2 "Placeholder" "Molt your reply" "Label" (print "Reply to @" .Author) "Content" "" "Autofocus" false) }}</div>
         {{ template "form-feedback" (freshCheck $d.StartForm) }}
         <div class="d-flex flex-row justify-content-end">
-            {{ template "form-picker" (dict "Selected" $d.StartForm "Required" $d.FormsRequired) }}
+            {{ template "form-picker" (dict "Selected" $d.StartForm "Layout" $d.StartLayout "Required" $d.FormsRequired) }}
             {{ template "nsfw-toggle" "nsfw-reply" }}
             {{ template "counter" }}
             <button type="submit" class="btn btn-sm btn-primary rounded-pill">Reply</button>
