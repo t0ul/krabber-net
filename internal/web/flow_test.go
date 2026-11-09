@@ -2,6 +2,7 @@ package web
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"html"
@@ -3495,5 +3496,195 @@ func TestLayouts(t *testing.T) {
 	}
 	if _, body, _ := h.get("/sea"); strings.Contains(body, "kb-arranged") || !strings.Contains(body, "hello to the gulls") {
 		t.Error("with plain layouts the Sea shows every molt as written")
+	}
+}
+
+// TestExportMolts: a krab can download everything they wrote from Settings,
+// as plain text to read or JSON to keep, all of it or just some forms, with
+// or without their replies. Remolts are other krabs' words and deleted molts
+// are gone, so neither is in the file.
+func TestExportMolts(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	h.signupAndActivate("plankton", "plankton@krabber.test", "chum-bucket-1")
+	h.login("plankton@krabber.test", "chum-bucket-1")
+	tok := h.csrf("/trench")
+	if status, _, _ := h.post("/molt/create", url.Values{"csrf_token": {tok}, "content": {"Chum is metabolic fuel"}}, "HX-Request", "true"); status != http.StatusOK {
+		t.Fatalf("plankton's molt: %d", status)
+	}
+	theirs, _ := h.store.MoltsByOwner(ctx, currentID(t, h, "plankton"), 1)
+	theirID := theirs[0].ID
+
+	h.client = h.newClient()
+	h.signupAndActivate("basho", "basho@krabber.test", "old-silent-pond")
+	h.login("basho@krabber.test", "old-silent-pond")
+	tok = h.csrf("/trench")
+	post := func(path string, form url.Values) string {
+		t.Helper()
+		form.Set("csrf_token", tok)
+		status, body, _ := h.post(path, form, "HX-Request", "true")
+		if status != http.StatusOK {
+			t.Fatalf("%s: %d %s", path, status, body)
+		}
+		m := moltIDRX.FindStringSubmatch(body)
+		if m == nil {
+			t.Fatalf("%s: no molt in the response", path)
+		}
+		return m[1]
+	}
+	haiku, limerick := formOf("haiku").Example, formOf("limerick").Example
+	frog := "the old pond is still\na frog jumps into the dark\nthe sound of water"
+	haikuID := post("/molt/create", url.Values{"content": {haiku}, "form": {"haiku"}, "layout": {"stepped"}})
+	frogID := post("/molt/create", url.Values{"content": {frog}, "form": {"haiku"}, "override": {"true"}})
+	post("/molt/create", url.Values{"content": {limerick}, "form": {"limerick"}})
+	post("/molt/create", url.Values{"content": {"just a thought"}, "form": {""}})
+	post("/molt/reply/"+haikuID, url.Values{"content": {"a reply, in plain words"}, "form": {""}})
+	if status, _, _ := h.post("/molt/quote/"+theirID, url.Values{"csrf_token": {tok}, "content": {"Chum again?"}, "form": {""}}, "HX-Request", "true"); status != http.StatusNoContent {
+		t.Fatalf("quote: %d", status)
+	}
+	if status, _, _ := h.post("/remolt/"+theirID, url.Values{"csrf_token": {tok}}, "HX-Request", "true"); status != http.StatusOK {
+		t.Fatalf("remolt: %d", status)
+	}
+	if status, _, _ := h.post("/molt/delete/"+frogID, url.Values{"csrf_token": {tok}}, "HX-Request", "true"); status != http.StatusOK {
+		t.Fatalf("delete: %d", status)
+	}
+
+	// The section sits above Delete account, offers every form plus notes
+	// and replies, and downloads in two formats.
+	_, body, _ := h.get("/settings")
+	for _, want := range []string{`action="/settings/export"`, `name="form" value="haiku"`, `name="form" value="limerick"`, `name="form" value="note"`, `name="replies"`, `name="format" value="txt"`, `name="format" value="json"`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("settings should have %s", want)
+		}
+	}
+	if x, d := strings.Index(body, "Export your molts"), strings.Index(body, "Delete account"); x < 0 || d < 0 || x > d {
+		t.Error("the export section should come before Delete account")
+	}
+
+	export := func(form url.Values) (int, string, http.Header) {
+		t.Helper()
+		form.Set("csrf_token", tok)
+		return h.post("/settings/export", form)
+	}
+
+	// Everything, as text: grouped by form, poems first and notes last,
+	// each with the date, form, layout and link above the words as written.
+	status, body, hdr := export(url.Values{"form": {"note", "haiku", "limerick"}, "replies": {"true"}, "format": {"txt"}})
+	if status != http.StatusOK || hdr.Get("Content-Type") != "text/plain; charset=utf-8" {
+		t.Fatalf("text export: %d %s %s", status, hdr.Get("Content-Type"), body)
+	}
+	if cd := hdr.Get("Content-Disposition"); !strings.HasPrefix(cd, `attachment; filename="krabber-basho-`) || !strings.HasSuffix(cd, `.txt"`) {
+		t.Errorf("Content-Disposition %q", cd)
+	}
+	for _, want := range []string{haiku, limerick, "just a thought", "a reply, in plain words", "Chum again?", "Stepped", "in reply to @basho", "quoting @plankton", "/molt/view/" + haikuID, "Molts by @basho"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("the text export should have %q", want)
+		}
+	}
+	for _, bad := range []string{"Chum is metabolic fuel", "a frog jumps"} {
+		if strings.Contains(body, bad) {
+			t.Errorf("the text export should leave out %q", bad)
+		}
+	}
+	if hi, li, ni := strings.Index(body, "HAIKU"), strings.Index(body, "LIMERICK"), strings.Index(body, "NOTES"); hi < 0 || li < 0 || ni < 0 || hi > li || li > ni {
+		t.Errorf("sections should run poems first, notes last: haiku %d limerick %d notes %d", hi, li, ni)
+	}
+
+	// Just the haiku, without replies.
+	status, body, _ = export(url.Values{"form": {"haiku"}, "format": {"txt"}})
+	if status != http.StatusOK || !strings.Contains(body, haiku) {
+		t.Fatalf("haiku export: %d", status)
+	}
+	for _, bad := range []string{limerick, "just a thought", "a reply, in plain words", "Chum again?"} {
+		if strings.Contains(body, bad) {
+			t.Errorf("the haiku export should leave out %q", bad)
+		}
+	}
+
+	// Notes with replies: the plain molt, the reply and the quote.
+	status, body, _ = export(url.Values{"form": {"note"}, "replies": {"true"}, "format": {"txt"}})
+	if status != http.StatusOK || strings.Contains(body, haiku) {
+		t.Fatalf("notes export: %d", status)
+	}
+	for _, want := range []string{"just a thought", "a reply, in plain words", "Chum again?"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("the notes export should have %q", want)
+		}
+	}
+
+	// JSON keeps every field, for machines and for moving the poems elsewhere.
+	status, body, hdr = export(url.Values{"form": {"note", "haiku"}, "replies": {"true"}, "format": {"json"}})
+	if status != http.StatusOK || hdr.Get("Content-Type") != "application/json" || !strings.HasSuffix(hdr.Get("Content-Disposition"), `.json"`) {
+		t.Fatalf("json export: %d %s %s", status, hdr.Get("Content-Type"), hdr.Get("Content-Disposition"))
+	}
+	var got struct {
+		Krab  struct{ Username, Name, URL string } `json:"krab"`
+		Forms []string                             `json:"forms"`
+		Molts []struct {
+			ID        string    `json:"id"`
+			URL       string    `json:"url"`
+			CreatedAt time.Time `json:"created_at"`
+			Form      string    `json:"form"`
+			FormName  string    `json:"form_name"`
+			Layout    string    `json:"layout"`
+			Text      string    `json:"text"`
+			ReplyTo   *struct {
+				ID, Author, URL string
+			} `json:"reply_to"`
+			QuoteOf *struct {
+				ID, Author, URL string
+			} `json:"quote_of"`
+		} `json:"molts"`
+	}
+	if err := json.Unmarshal([]byte(body), &got); err != nil {
+		t.Fatalf("json export: %v\n%s", err, body)
+	}
+	if got.Krab.Username != "basho" || !strings.HasSuffix(got.Krab.URL, "/krabs/basho") || !slices.Equal(got.Forms, []string{"haiku", "note"}) {
+		t.Errorf("krab %+v forms %v", got.Krab, got.Forms)
+	}
+	if len(got.Molts) != 4 {
+		t.Fatalf("%d molts in the JSON, want 4:\n%s", len(got.Molts), body)
+	}
+	byText := map[string]int{}
+	for i, m := range got.Molts {
+		byText[m.Text] = i
+		if m.ID == "" || !strings.HasSuffix(m.URL, "/molt/view/"+m.ID) || m.CreatedAt.IsZero() {
+			t.Errorf("molt %+v should have its ID, link and date", m)
+		}
+	}
+	if m := got.Molts[byText[haiku]]; m.Form != "haiku" || m.FormName != "Haiku" || m.Layout != "stepped" || m.ReplyTo != nil {
+		t.Errorf("haiku %+v", m)
+	}
+	if m := got.Molts[byText["a reply, in plain words"]]; m.Form != "" || m.FormName != "Note" || m.ReplyTo == nil || m.ReplyTo.ID != haikuID || m.ReplyTo.Author != "basho" || !strings.HasSuffix(m.ReplyTo.URL, "/molt/view/"+haikuID) {
+		t.Errorf("reply %+v", m)
+	}
+	if m := got.Molts[byText["Chum again?"]]; m.QuoteOf == nil || m.QuoteOf.ID != theirID || m.QuoteOf.Author != "plankton" {
+		t.Errorf("quote %+v", m)
+	}
+
+	// Nothing picked, or a format we don't write, is refused.
+	if status, body, _ := export(url.Values{"format": {"txt"}}); status != http.StatusUnprocessableEntity || !strings.Contains(body, "Pick at least one form") {
+		t.Errorf("no forms: %d", status)
+	}
+	if status, _, _ := export(url.Values{"form": {"haiku"}, "format": {"pdf"}}); status != http.StatusBadRequest {
+		t.Errorf("pdf: %d", status)
+	}
+
+	// A whole timeline is a big read, so exports are counted like writes.
+	old := writeLimits["export"]
+	writeLimits["export"] = 1
+	t.Cleanup(func() { writeLimits["export"] = old })
+	h.app.writes = &writeLimiter{}
+	if status, _, _ := export(url.Values{"form": {"haiku"}, "format": {"txt"}}); status != http.StatusOK {
+		t.Errorf("first export under the limit: %d", status)
+	}
+	if status, _, _ := export(url.Values{"form": {"haiku"}, "format": {"txt"}}); status != http.StatusTooManyRequests {
+		t.Errorf("second export past the limit: %d", status)
+	}
+
+	// Signed out, there's nothing to download.
+	h.client = h.newClient()
+	if status, _, hdr := h.post("/settings/export", url.Values{"form": {"haiku"}, "format": {"txt"}}); status == http.StatusOK || hdr.Get("Content-Disposition") != "" {
+		t.Errorf("signed out: %d", status)
 	}
 }

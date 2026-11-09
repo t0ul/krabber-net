@@ -204,6 +204,45 @@
         {{ end }}
     </div>
 
+    {{ $x := .Form.Export }}
+    <form class="px-3 py-3 border-bottom border-dark kb-settings" method="POST" action="/settings/export">
+        <input type='hidden' name='csrf_token' value='{{ .CSRFToken }}'>
+        <h2 class="h6 font-weight-bold mb-3">Export your molts</h2>
+        <p class="small mb-3">
+            Download everything you've written, or just some forms: a text file to read, or JSON to keep.
+            Each molt comes with its date, form, layout and link, its words exactly as you wrote them.
+            Remolts are other krabs' words, so they stay out.
+        </p>
+        {{ with $x.FieldErrors.form }}<div class="error small">{{ . }}</div>{{ end }}
+        <fieldset class="form-group kb-export-forms">
+            <legend class="col-form-label pt-0">Forms</legend>
+            {{ range formGroups }}
+            <div class="mb-2">
+                <div class="small text-muted">{{ . }}</div>
+                {{ range pickable . false }}
+                <div class="custom-control custom-checkbox custom-control-inline">
+                    <input type="checkbox" class="custom-control-input" name="form" value="{{ .ID }}" id="export-{{ .ID }}" checked>
+                    <label class="custom-control-label" for="export-{{ .ID }}">{{ .Name }}</label>
+                </div>
+                {{ end }}
+            </div>
+            {{ end }}
+            <div class="mb-2">
+                <div class="small text-muted">Plain</div>
+                <div class="custom-control custom-checkbox custom-control-inline">
+                    <input type="checkbox" class="custom-control-input" name="form" value="{{ noteForm }}" id="export-note" checked>
+                    <label class="custom-control-label" for="export-note">Notes</label>
+                </div>
+            </div>
+        </fieldset>
+        <div class="custom-control custom-checkbox mb-3">
+            <input type="checkbox" class="custom-control-input" name="replies" value="true" id="export-replies" checked>
+            <label class="custom-control-label" for="export-replies">Replies too</label>
+        </div>
+        <button type="submit" name="format" value="txt" class="btn btn-outline-light rounded-pill">Download as text</button>
+        <button type="submit" name="format" value="json" class="btn btn-outline-light rounded-pill ml-2">Download as JSON</button>
+    </form>
+
     {{ $del := .Form.Delete }}
     <form class="px-3 py-3 border-bottom border-dark kb-settings" method="POST" action="/settings/delete" novalidate>
         <input type='hidden' name='csrf_token' value='{{ .CSRFToken }}'>

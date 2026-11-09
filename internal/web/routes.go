@@ -66,6 +66,7 @@ func (app *App) Routes() http.Handler {
 	mux.HandleFunc("POST /settings/appearance", app.requireAuthentication(app.settingsAppearancePost))
 	mux.HandleFunc("POST /settings/password", app.requireAuthentication(app.settingsPasswordPost))
 	mux.HandleFunc("POST /settings/delete", app.requireAuthentication(app.settingsDeletePost))
+	mux.HandleFunc("POST /settings/export", app.requireAuthentication(app.settingsExportPost))
 	mux.HandleFunc("GET /krabs", app.requireAuthentication(app.allCrabs))
 	mux.HandleFunc("GET /krabs/{name}", app.firstPageSignedOut(app.profile))
 	mux.HandleFunc("GET /krabs/{name}/replies", app.firstPageSignedOut(app.profileReplies))
