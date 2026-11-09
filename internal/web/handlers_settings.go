@@ -97,6 +97,7 @@ type settingsForms struct {
 	Username    usernameForm
 	Password    passwordForm
 	Delete      deleteForm
+	Export      exportForm
 	AvatarError string
 	// NextRename is when the crab may change their username again, as a
 	// date; empty when they may now.

@@ -1611,3 +1611,69 @@ func TestLayoutSettings(t *testing.T) {
 		t.Fatal("plain layouts not cleared")
 	}
 }
+
+// TestEachMoltByOwner: walking everything a crab wrote gives their molts and
+// quotes, and their replies when asked, page after page; never a remolt,
+// never a deleted molt. It stops at the first error the callback gives back.
+func TestEachMoltByOwner(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+	old := eachPage
+	eachPage = 2
+	t.Cleanup(func() { eachPage = old })
+
+	a, b := mustCrab(t, s, "basho"), mustCrab(t, s, "plankton")
+	theirs, err := s.CreateMolt(ctx, b, "Chum is metabolic fuel")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var molts []*Molt
+	for i := range 5 {
+		m, err := s.CreateMolt(ctx, a, fmt.Sprintf("molt %d", i))
+		if err != nil {
+			t.Fatal(err)
+		}
+		molts = append(molts, m)
+	}
+	if _, err := s.Reply(ctx, a, theirs, "a reply"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Quote(ctx, a, theirs, "a quote"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Remolt(ctx, a, theirs); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.DeleteMolt(ctx, a, molts[2]); err != nil {
+		t.Fatal(err)
+	}
+
+	walk := func(replies bool) []string {
+		t.Helper()
+		var got []string
+		err := s.EachMoltByOwner(ctx, a.ID, replies, func(m Molt) error {
+			if m.OwnerID != a.ID || m.Remolt || m.Deleted {
+				t.Errorf("walked %+v", m)
+			}
+			got = append(got, m.Content)
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		slices.Sort(got)
+		return got
+	}
+	if got, want := walk(false), []string{"a quote", "molt 0", "molt 1", "molt 3", "molt 4"}; !slices.Equal(got, want) {
+		t.Errorf("molts: %q, want %q", got, want)
+	}
+	if got, want := walk(true), []string{"a quote", "a reply", "molt 0", "molt 1", "molt 3", "molt 4"}; !slices.Equal(got, want) {
+		t.Errorf("with replies: %q, want %q", got, want)
+	}
+
+	stop := errors.New("stop")
+	calls := 0
+	if err := s.EachMoltByOwner(ctx, a.ID, true, func(Molt) error { calls++; return stop }); !errors.Is(err, stop) || calls != 1 {
+		t.Errorf("stopping: err %v after %d calls", err, calls)
+	}
+}

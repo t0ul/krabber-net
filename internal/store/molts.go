@@ -480,6 +480,41 @@ func (s *Store) RepliesByOwnerPage(ctx context.Context, crabID, after string, li
 	return s.ownerMolts(ctx, crabID, replySK(""), after, limit)
 }
 
+// eachPage is how many molts EachMoltByOwner reads at a time; a var so tests
+// can walk several pages without writing hundreds of molts.
+var eachPage = 200
+
+// EachMoltByOwner calls fn with every molt a crab wrote that still stands,
+// newest first: their molts and quotes, and their replies when asked.
+// Remolts are other krabs' words, so they're skipped. It reads the timeline a
+// page at a time and stops at the first error fn gives back.
+func (s *Store) EachMoltByOwner(ctx context.Context, crabID string, replies bool, fn func(Molt) error) error {
+	prefixes := []string{moltSK("")}
+	if replies {
+		prefixes = append(prefixes, replySK(""))
+	}
+	for _, prefix := range prefixes {
+		for after := ""; ; {
+			p, err := s.ownerMolts(ctx, crabID, prefix, after, eachPage)
+			if err != nil {
+				return err
+			}
+			for _, m := range p.Molts {
+				if m.Remolt {
+					continue
+				}
+				if err := fn(m); err != nil {
+					return err
+				}
+			}
+			if after = p.Next; after == "" {
+				break
+			}
+		}
+	}
+	return nil
+}
+
 func (s *Store) ownerMolts(ctx context.Context, crabID, prefix, after string, limit int) (Page, error) {
 	p, err := s.queryMolts(ctx, &dynamodb.QueryInput{
 		TableName:                 s.tableName(),

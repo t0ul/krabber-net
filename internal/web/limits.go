@@ -16,6 +16,7 @@ var writeLimits = map[string]int{
 	"bookmark": 300,
 	"block":    100, // each block also touches the other krab's item
 	"edit":     200, // pins and NSFW labels
+	"export":   20,  // downloads of everything a krab wrote: each reads their whole timeline
 }
 
 // writeLimiter counts each krab's writes this hour. The counts live in
