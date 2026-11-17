@@ -13,12 +13,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/t0ul/krabber-net/internal/avatar"
-	"github.com/t0ul/krabber-net/internal/linkcard"
-	"github.com/t0ul/krabber-net/internal/richtext"
-	"github.com/t0ul/krabber-net/internal/store"
-	"github.com/t0ul/krabber-net/internal/trophies"
-	"github.com/t0ul/krabber-net/internal/writing"
+	"github.com/t0ul/krabber-net/engine/avatar"
+	"github.com/t0ul/krabber-net/engine/richtext"
+	"github.com/t0ul/krabber-net/engine/rules"
+	"github.com/t0ul/krabber-net/engine/store"
+	"github.com/t0ul/krabber-net/engine/trophies"
+	"github.com/t0ul/krabber-net/engine/writing"
 	"github.com/t0ul/krabber-net/ui"
 )
 
@@ -466,18 +466,8 @@ func firstYouTube(content string) string {
 	return ""
 }
 
-// cardURL is the address a molt's card is cached under: its first link that
-// isn't a YouTube video (those get the player), when that's a plain HTTPS
-// address.
-func cardURL(content string) string {
-	for _, link := range richtext.URLs(content) {
-		if richtext.YouTubeID(link) == "" {
-			u, _ := linkcard.Normalize(link)
-			return u
-		}
-	}
-	return ""
-}
+// cardURL is the address a molt's card is cached under (the engine's rule).
+func cardURL(content string) string { return rules.CardURL(content) }
 
 // withCards attaches the cached card for each molt's first link, and asks for
 // the ones not fetched yet. Cards are extras: a failed lookup only logs.
@@ -506,11 +496,7 @@ func (app *App) withCards(r *http.Request, molts []store.Molt) {
 }
 
 // enqueueCard asks for the card of a molt's first link, if it has one.
-func (app *App) enqueueCard(u string) {
-	if u != "" && app.cards != nil {
-		app.cards.EnqueueCard(u)
-	}
-}
+func (app *App) enqueueCard(u string) { app.rules.EnqueueCard(u) }
 
 // withQuoted attaches the quoted molt to each quote. A quoted molt that was
 // deleted, removed or written by a hidden crab stays nil.

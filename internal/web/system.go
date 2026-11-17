@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/t0ul/krabber-net/internal/auth"
-	"github.com/t0ul/krabber-net/internal/store"
-	"github.com/t0ul/krabber-net/internal/writing"
+	"github.com/t0ul/krabber-net/engine/auth"
+	"github.com/t0ul/krabber-net/engine/store"
+	"github.com/t0ul/krabber-net/engine/writing"
 )
 
 // @system is a verified krab that molts the site's status: once when a new

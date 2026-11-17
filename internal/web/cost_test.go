@@ -10,9 +10,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/t0ul/krabber-net/internal/auth"
+	"github.com/t0ul/krabber-net/engine/auth"
+	"github.com/t0ul/krabber-net/engine/store"
 	"github.com/t0ul/krabber-net/internal/config"
-	"github.com/t0ul/krabber-net/internal/store"
 )
 
 // requestCosts keeps the DynamoDB units of the last request the server logged.

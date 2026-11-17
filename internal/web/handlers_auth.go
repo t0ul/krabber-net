@@ -7,26 +7,17 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/t0ul/krabber-net/internal/auth"
+	"github.com/t0ul/krabber-net/engine/auth"
+	"github.com/t0ul/krabber-net/engine/mail"
+	"github.com/t0ul/krabber-net/engine/rules"
+	"github.com/t0ul/krabber-net/engine/store"
+	"github.com/t0ul/krabber-net/engine/validator"
 	"github.com/t0ul/krabber-net/internal/config"
-	"github.com/t0ul/krabber-net/internal/mail"
-	"github.com/t0ul/krabber-net/internal/store"
-	"github.com/t0ul/krabber-net/internal/validator"
 )
 
-const (
-	activationTTL = 3 * 24 * time.Hour
-
-	loginIPLimit      = 20 // attempts per IP per window
-	loginFailureLimit = 5  // failed passwords per email and network per window
-	// loginEmailFailureLimit caps guesses at one email from everywhere, high
-	// enough that a stranger can't lock the owner out with a few tries.
-	loginEmailFailureLimit = 50
-	loginWindow            = 15 * time.Minute
-	signupIPLimit          = 3 // accounts per IP per hour
-	resendIPLimit          = 5 // resend requests per IP per hour
-	resendEmailLimit       = 3 // resends per email per day
-)
+// The account flows' limits and lifetimes are the engine's (rules.Login…,
+// rules.SignupIPLimit…): their counters live in the table, so every front
+// end shares them.
 
 type signupForm struct {
 	Name                string `form:"name"`
@@ -94,7 +85,7 @@ func (app *App) signupPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if ok, err := app.underLimit(r, "signup-ip", clientNet(r), signupIPLimit, time.Hour); err != nil {
+	if ok, err := app.underLimit(r, "signup-ip", clientNet(r), rules.SignupIPLimit, time.Hour); err != nil {
 		app.serverError(w, r, err)
 		return
 	} else if !ok {
@@ -124,12 +115,7 @@ func (app *App) signupPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	hash, err := auth.HashPassword(f.Password)
-	if err != nil {
-		app.serverError(w, r, err)
-		return
-	}
-	crab, err := app.store.CreateCrab(r.Context(), f.Name, f.Email, hash, f.Code)
+	crab, err := app.rules.SignUp(r.Context(), f.Name, f.Email, f.Password, f.Code)
 	switch {
 	case errors.Is(err, store.ErrInvalidInvite):
 		f.AddFieldError("code", "That invite code doesn't work")
@@ -164,7 +150,7 @@ func (app *App) signupPost(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *App) sendActivation(ctx context.Context, c *store.Crab) error {
-	token, err := app.store.NewToken(ctx, c.ID, store.ScopeActivation, activationTTL)
+	token, err := app.rules.ActivationToken(ctx, c)
 	if err != nil {
 		return err
 	}
@@ -194,7 +180,7 @@ func (app *App) activatePost(w http.ResponseWriter, r *http.Request) {
 		app.clientError(w, http.StatusBadRequest)
 		return
 	}
-	tok, err := app.store.ConsumeToken(r.Context(), store.ScopeActivation, f.Token)
+	crabID, err := app.rules.Activate(r.Context(), f.Token)
 	switch {
 	case errors.Is(err, store.ErrInvalidToken):
 		f.AddFieldError("token", "That token is invalid or has expired. Request a new one below.")
@@ -206,11 +192,7 @@ func (app *App) activatePost(w http.ResponseWriter, r *http.Request) {
 		app.serverError(w, r, err)
 		return
 	}
-	if err := app.store.ActivateCrab(r.Context(), tok.CrabID); err != nil {
-		app.serverError(w, r, err)
-		return
-	}
-	if c, err := app.store.CrabByID(r.Context(), tok.CrabID); err == nil {
+	if c, err := app.store.CrabByID(r.Context(), crabID); err == nil {
 		c.Activated = true
 		app.dir.putCrab(*c)
 	}
@@ -229,7 +211,7 @@ func (app *App) resendPost(w http.ResponseWriter, r *http.Request) {
 	email := store.NormalizeEmail(f.Email)
 	const done = "If that account exists and isn't active yet, we've sent a new activation email."
 
-	ipOK, err := app.underLimit(r, "resend-ip", clientNet(r), resendIPLimit, time.Hour)
+	ipOK, err := app.underLimit(r, "resend-ip", clientNet(r), rules.ResendIPLimit, time.Hour)
 	if err != nil {
 		app.serverError(w, r, err)
 		return
@@ -245,14 +227,8 @@ func (app *App) resendPost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	app.afterResponse(func(ctx context.Context) {
-		crab, err := app.store.CrabByEmail(ctx, email)
-		if err != nil || crab.Activated || crab.Banned || crab.Deleted {
-			if err != nil && !errors.Is(err, store.ErrNotFound) {
-				app.log.Warn("resend lookup", "err", err)
-			}
-			return
-		}
-		if n, err := app.store.Hit(ctx, "resend-email", email, 24*time.Hour); err != nil || n > resendEmailLimit {
+		crab := app.rules.ResendTo(ctx, email)
+		if crab == nil {
 			return
 		}
 		if err := app.sendActivation(ctx, crab); err != nil && !errors.Is(err, mail.ErrDailyCapReached) {
@@ -286,74 +262,31 @@ func (app *App) loginPost(w http.ResponseWriter, r *http.Request) {
 	const tooMany = "Too many attempts. Please wait a few minutes and try again."
 	const incorrect = "Email or password is incorrect"
 
-	if ok, err := app.underLimit(r, "login-ip", clientNet(r), loginIPLimit, loginWindow); err != nil {
+	// The engine runs the sign-in in its fixed order (the network's tries,
+	// the form, the email's guesses, the password, the account's state) on
+	// counters every front end shares; Krabber words the outcome.
+	crab, result, err := app.rules.Login(r.Context(), f.Email, f.Password, clientNet(r))
+	if err != nil {
 		app.serverError(w, r, err)
 		return
-	} else if !ok {
+	}
+	switch result {
+	case rules.TooManyTries:
 		fail(http.StatusTooManyRequests, tooMany)
 		return
-	}
-
-	f.CheckField(validator.Matches(f.Email, validator.EmailRX), "email", "This field must be a valid email address")
-	f.CheckField(validator.NotBlank(f.Password), "password", "This field cannot be blank")
-	f.CheckField(validator.MaxBytes(f.Password, auth.MaxPasswordLength), "password", "This field must be at most 72 bytes long")
-	if !f.Valid() {
+	case rules.Invalid:
+		f.CheckField(validator.Matches(f.Email, validator.EmailRX), "email", "This field must be a valid email address")
+		f.CheckField(validator.NotBlank(f.Password), "password", "This field cannot be blank")
+		f.CheckField(validator.MaxBytes(f.Password, auth.MaxPasswordLength), "password", "This field must be at most 72 bytes long")
 		fail(http.StatusUnprocessableEntity, incorrect)
 		return
-	}
-
-	// Wrong passwords are counted per email and network, so someone else
-	// can't lock an account out, and per email overall at a much higher
-	// limit. Each attempt is counted before bcrypt runs, so concurrent
-	// guesses can't all get in under the limit, and given back if right.
-	perNet := f.Email + " " + clientNet(r)
-	tries, err := app.store.Hit(r.Context(), "login-fail", perNet, loginWindow)
-	if err != nil {
-		app.serverError(w, r, err)
-		return
-	}
-	anywhere, err := app.store.Hit(r.Context(), "login-fail-email", f.Email, loginWindow)
-	if err != nil {
-		app.serverError(w, r, err)
-		return
-	}
-	if tries > loginFailureLimit || anywhere > loginEmailFailureLimit {
-		fail(http.StatusTooManyRequests, tooMany)
-		return
-	}
-	forgive := func() {
-		for action, key := range map[string]string{"login-fail": perNet, "login-fail-email": f.Email} {
-			if err := app.store.Unhit(r.Context(), action, key, loginWindow); err != nil {
-				app.log.Warn("login limit", "err", err)
-			}
-		}
-	}
-
-	crab, err := app.store.CrabByEmail(r.Context(), f.Email)
-	var hash []byte
-	switch {
-	case errors.Is(err, store.ErrNotFound):
-	case err != nil:
-		app.serverError(w, r, err)
-		return
-	default:
-		hash = crab.PasswordHash
-	}
-	match, err := auth.CheckPassword(hash, f.Password)
-	if err != nil {
-		app.serverError(w, r, err)
-		return
-	}
-	if !match {
+	case rules.Incorrect:
 		fail(http.StatusUnprocessableEntity, incorrect)
 		return
-	}
-	forgive()
-	switch {
-	case crab.Banned || crab.Deleted:
+	case rules.Unavailable:
 		fail(http.StatusUnprocessableEntity, "This account is unavailable.")
 		return
-	case !crab.Activated:
+	case rules.NotActivated:
 		fail(http.StatusUnprocessableEntity, "Please activate your account first. Check your email, or request a new link on the activation page.")
 		return
 	}
@@ -378,12 +311,5 @@ func (app *App) logoutPost(w http.ResponseWriter, r *http.Request) {
 
 // underLimit counts one attempt and reports whether it's within limit.
 func (app *App) underLimit(r *http.Request, action, key string, limit int, window time.Duration) (bool, error) {
-	if key == "" {
-		key = "unknown"
-	}
-	n, err := app.store.Hit(r.Context(), action, key, window)
-	if err != nil {
-		return false, err
-	}
-	return n <= limit, nil
+	return app.rules.Under(r.Context(), action, key, limit, window)
 }

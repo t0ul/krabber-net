@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/t0ul/krabber-net/internal/store"
+	"github.com/t0ul/krabber-net/engine/store"
 )
 
 // hidden reports whether the viewer must not see a crab or anything by them:

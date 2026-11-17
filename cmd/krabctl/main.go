@@ -23,17 +23,18 @@ import (
 	"os"
 	"time"
 
-	"github.com/t0ul/krabber-net/internal/auth"
-	"github.com/t0ul/krabber-net/internal/platform"
-	"github.com/t0ul/krabber-net/internal/store"
-	"github.com/t0ul/krabber-net/internal/trophies"
-	"github.com/t0ul/krabber-net/internal/writing"
+	"github.com/t0ul/krabber-net/engine/auth"
+	"github.com/t0ul/krabber-net/engine/platform"
+	"github.com/t0ul/krabber-net/engine/store"
+	"github.com/t0ul/krabber-net/engine/trophies"
+	"github.com/t0ul/krabber-net/engine/writing"
 )
 
 const usage = `usage: krabctl role <username> <admin|moderator|none>
        krabctl verify <username> <on|off>
        krabctl trophy <username> <trophy-id>
        krabctl bot <username> <email> [display] [bio]  create an activated bot account
+       krabctl bot-mark <username> <on|off>      mark an existing account as a bot (Kusaza never shows bots)
        krabctl profile <username> <display> [bio]       set a crab's display name (and bio)
        krabctl apikey <username> <name> [scope]  mint an API key (shown once); default scope write:molts
        krabctl apikeys <username>                list a crab's API keys
@@ -60,7 +61,7 @@ func main() {
 	s := store.New(platform.DynamoDB(cfg, os.Getenv("DYNAMO_ENDPOINT")), table)
 
 	switch cmd {
-	case "role", "verify", "trophy":
+	case "role", "verify", "trophy", "bot-mark":
 		runModeration(ctx, s, table, args)
 	case "bot":
 		runBot(ctx, s, table, args)
@@ -79,7 +80,7 @@ func main() {
 	}
 }
 
-// runModeration handles the role, verify and trophy commands.
+// runModeration handles the role, verify, trophy and bot-mark commands.
 func runModeration(ctx context.Context, s *store.Store, table string, args []string) {
 	if len(args) != 3 {
 		log.Fatal(usage)
@@ -88,7 +89,7 @@ func runModeration(ctx context.Context, s *store.Store, table string, args []str
 	_, isTrophy := trophies.Get(value)
 	switch {
 	case cmd == "role" && (value == store.RoleAdmin || value == store.RoleModerator || value == "none"):
-	case cmd == "verify" && (value == "on" || value == "off"):
+	case (cmd == "verify" || cmd == "bot-mark") && (value == "on" || value == "off"):
 	case cmd == "trophy" && isTrophy:
 	default:
 		log.Fatal(usage)
@@ -120,6 +121,12 @@ func runModeration(ctx context.Context, s *store.Store, table string, args []str
 	case "trophy":
 		grant = value
 		entry.Action, entry.Note = "award_trophy", value
+	case "bot-mark":
+		err = s.SetBot(ctx, c, value == "on")
+		entry.Action = "mark_bot"
+		if value == "off" {
+			entry.Action = "unmark_bot"
+		}
 	}
 	if err != nil {
 		log.Fatal(err)
@@ -177,6 +184,9 @@ func runBot(ctx context.Context, s *store.Store, table string, args []string) {
 	}
 	if err := s.ActivateCrab(ctx, c.ID); err != nil {
 		log.Fatal(err)
+	}
+	if err := s.SetBot(ctx, c, true); err != nil {
+		log.Printf("warning: created but not marked a bot (run krabctl bot-mark %s on): %v", name, err)
 	}
 	// Set the display name / bio only if given; otherwise the crab shows as
 	// @username. (No hardcoded default, so bots aren't all named alike.)

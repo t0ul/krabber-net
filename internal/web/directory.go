@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/t0ul/krabber-net/internal/platform"
-	"github.com/t0ul/krabber-net/internal/store"
+	"github.com/t0ul/krabber-net/engine/platform"
+	"github.com/t0ul/krabber-net/engine/store"
 )
 
 const (

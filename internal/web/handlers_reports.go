@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/t0ul/krabber-net/internal/mail"
-	"github.com/t0ul/krabber-net/internal/store"
-	"github.com/t0ul/krabber-net/internal/validator"
+	"github.com/t0ul/krabber-net/engine/mail"
+	"github.com/t0ul/krabber-net/engine/store"
+	"github.com/t0ul/krabber-net/engine/validator"
 )
 
 const (

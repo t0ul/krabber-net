@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/t0ul/krabber-net/internal/writing"
+	"github.com/t0ul/krabber-net/engine/writing"
 )
 
 // @system's molts are haikus the site's own counter accepts, whatever the

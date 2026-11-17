@@ -8,8 +8,9 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/t0ul/krabber-net/internal/store"
-	"github.com/t0ul/krabber-net/internal/validator"
+	"github.com/t0ul/krabber-net/engine/rules"
+	"github.com/t0ul/krabber-net/engine/store"
+	"github.com/t0ul/krabber-net/engine/validator"
 )
 
 // pageSize is how many molts a feed shows before "Load more". Tests shrink it.
@@ -98,13 +99,12 @@ func (app *App) moltCreatePost(w http.ResponseWriter, r *http.Request) {
 	if !app.underWriteLimit(w, r, "molt") {
 		return
 	}
-	c := currentCrab(r)
-	m, err := app.store.CreateMolt(r.Context(), c, f.Content, store.WithNSFW(f.NSFW), store.WithForm(f.Form), store.WithLayout(layoutFor(c, f.Form, f.Layout)))
+	m, err := app.rules.Post(r.Context(), currentCrab(r), f.draft(), blocksOf(r).Hides)
 	if err != nil {
 		app.serverError(w, r, err)
 		return
 	}
-	app.publish(r, m, "")
+	app.published(r, m)
 
 	if !isHTMX(r) {
 		http.Redirect(w, r, moltReturnPath(r), http.StatusSeeOther)
@@ -114,19 +114,23 @@ func (app *App) moltCreatePost(w http.ResponseWriter, r *http.Request) {
 		map[string]any{"M": m, "D": app.newTemplateData(r)})
 }
 
+// draft is the form as the engine takes it.
+func (f moltForm) draft() rules.Draft {
+	return rules.Draft{Content: f.Content, Form: f.Form, Layout: f.Layout, NSFW: f.NSFW}
+}
+
 // publish sends a molt the signed-in crab just wrote to the feeds and tells
-// the crabs it mentions (except skipMention). The own trench is written here
-// so a refresh shows the molt immediately; follower fan-out stays in the
-// background (and writes the owner again).
+// the crabs it mentions (except skipMention), the engine's way, then does
+// what Krabber's own pages need.
 func (app *App) publish(r *http.Request, m *store.Molt, skipMention string) {
-	if err := app.store.AddToTrenches(r.Context(), m, []string{m.OwnerID}); err != nil {
-		app.log.Warn("write own trench", "err", err, "molt", m.ID)
-	}
-	app.fanout.Enqueue(m)
-	app.enqueueCard(cardURL(m.Content))
+	app.rules.Publish(r.Context(), currentCrab(r), m, skipMention, blocksOf(r).Hides)
+	app.published(r, m)
+}
+
+// published does what Krabber's own pages need once the signed-in crab's
+// molt is out: the directory knows it, and it displays as theirs.
+func (app *App) published(r *http.Request, m *store.Molt) {
 	app.dir.addMolt(*m)
-	app.notifyMentions(r, m, skipMention)
-	app.awardMolt(r.Context(), currentCrab(r), m)
 	app.displayOne(r, m)
 	if m.AuthorName == "" {
 		m.AuthorName = currentCrab(r).Name()
@@ -136,25 +140,10 @@ func (app *App) publish(r *http.Request, m *store.Molt, skipMention string) {
 	}
 }
 
-// notifyMentions tells the crabs mentioned in m, except skipID (who already
-// gets a reply or quote notification for it) and the names in told (already
-// mentioned before an edit).
+// notifyMentions tells the crabs mentioned in m, except skipID and the
+// names in told: the engine's rule, from the signed-in crab.
 func (app *App) notifyMentions(r *http.Request, m *store.Molt, skipID string, told ...string) {
-	for _, name := range m.Mentions {
-		if slices.Contains(told, name) {
-			continue
-		}
-		c, err := app.store.CrabByUsername(r.Context(), name)
-		if err != nil {
-			if !errors.Is(err, store.ErrNotFound) {
-				app.log.Warn("mention lookup", "err", err, "name", name)
-			}
-			continue
-		}
-		if c.ID != skipID && c.CanSignIn() {
-			app.notify(r, c.ID, store.NotifyMention, m.ID, m.Content)
-		}
-	}
+	app.rules.NotifyMentions(r.Context(), currentCrab(r), blocksOf(r).Hides, m, skipID, told...)
 }
 
 // moltReturnPath sends a non-htmx compose back to the feed it was posted from.
@@ -180,17 +169,13 @@ func (app *App) moltLikePost(w http.ResponseWriter, r *http.Request) {
 	if !ok || !app.underWriteLimit(w, r, "like") {
 		return
 	}
-	liked, err := app.store.ToggleLike(r.Context(), currentCrab(r), m)
+	liked, err := app.rules.Like(r.Context(), currentCrab(r), m, blocksOf(r).Hides)
 	if errors.Is(err, store.ErrNotFound) {
 		app.notFound(w, r)
 		return
 	} else if err != nil {
 		app.serverError(w, r, err)
 		return
-	}
-	if liked {
-		app.notify(r, m.AuthorID, store.NotifyLike, m.ID, m.Content)
-		app.awardLike(r.Context(), currentCrab(r), m)
 	}
 	app.renderActions(w, r, m, actionState{liked: &liked})
 }
@@ -203,7 +188,7 @@ func (app *App) remoltPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var st actionState
-	re, err := app.store.Remolt(r.Context(), currentCrab(r), m)
+	re, err := app.rules.Remolt(r.Context(), currentCrab(r), m, blocksOf(r).Hides)
 	switch {
 	case errors.Is(err, store.ErrAlreadyExists), errors.Is(err, store.ErrNotAllowed):
 	case err != nil:
@@ -211,8 +196,6 @@ func (app *App) remoltPost(w http.ResponseWriter, r *http.Request) {
 		return
 	default:
 		st.remoltedAs = &re.ID
-		app.fanout.Enqueue(re)
-		app.notify(r, m.AuthorID, store.NotifyRemolt, m.ID, m.Content)
 	}
 	app.renderActions(w, r, m, st)
 }
@@ -239,20 +222,10 @@ func (app *App) unremoltPost(w http.ResponseWriter, r *http.Request) {
 	app.renderActions(w, r, m, actionState{remoltedAs: &none})
 }
 
-// notify queues a notification from the signed-in crab to recipientID.
+// notify queues a notification from the signed-in crab to recipientID: the
+// engine's rule, unless either has blocked the other.
 func (app *App) notify(r *http.Request, recipientID, kind, moltID, text string) {
-	c := currentCrab(r)
-	if app.notifier == nil || c == nil || blocksOf(r).Hides(recipientID) {
-		return
-	}
-	app.notifier.Notify(store.Notification{
-		RecipientID: recipientID,
-		Type:        kind,
-		ActorID:     c.ID,
-		Actor:       c.UserName,
-		MoltID:      moltID,
-		Snippet:     store.Snippet(text),
-	})
+	app.rules.Notify(currentCrab(r), blocksOf(r).Hides, recipientID, kind, moltID, text)
 }
 
 // moltDeletePost deletes the viewer's own molt, or undoes their remolt when
@@ -499,8 +472,7 @@ func (app *App) replyCreatePost(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	c := currentCrab(r)
-	reply, err := app.store.Reply(r.Context(), c, parent, f.Content, store.WithNSFW(f.NSFW), store.WithForm(f.Form), store.WithLayout(layoutFor(c, f.Form, f.Layout)))
+	reply, err := app.rules.Reply(r.Context(), currentCrab(r), parent, f.draft(), blocksOf(r).Hides)
 	switch {
 	case errors.Is(err, store.ErrNotFound), errors.Is(err, store.ErrNotAllowed):
 		app.notFound(w, r)
@@ -509,9 +481,6 @@ func (app *App) replyCreatePost(w http.ResponseWriter, r *http.Request) {
 		app.serverError(w, r, err)
 		return
 	}
-	app.notify(r, parent.AuthorID, store.NotifyReply, reply.ID, f.Content)
-	app.notifyMentions(r, reply, parent.AuthorID)
-	app.enqueueCard(cardURL(reply.Content))
 
 	if !isHTMX(r) {
 		http.Redirect(w, r, "/molt/view/"+parent.ID, http.StatusSeeOther)

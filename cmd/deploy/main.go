@@ -25,7 +25,7 @@ import (
 	ebtypes "github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 
-	"github.com/t0ul/krabber-net/internal/platform"
+	"github.com/t0ul/krabber-net/engine/platform"
 )
 
 func main() {

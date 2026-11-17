@@ -12,9 +12,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/segmentio/ksuid"
 
-	"github.com/t0ul/krabber-net/internal/linkcard"
-	"github.com/t0ul/krabber-net/internal/platform"
-	"github.com/t0ul/krabber-net/internal/store"
+	"github.com/t0ul/krabber-net/engine/linkcard"
+	"github.com/t0ul/krabber-net/engine/platform"
+	"github.com/t0ul/krabber-net/engine/store"
 )
 
 func newStore(t *testing.T) *store.Store {
@@ -105,6 +105,41 @@ func TestFanoutAndSweep(t *testing.T) {
 	}
 	if pending, _ := s.PendingFanouts(ctx, time.Now().Add(time.Minute), 10); len(pending) != 0 {
 		t.Fatalf("still pending: %+v", pending)
+	}
+}
+
+// A second front end on the table runs only the queues: its posts still
+// reach followers' feeds and its notifications still land.
+func TestStartQueues(t *testing.T) {
+	s := newStore(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	r := New(s, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	r.StartQueues(ctx)
+	t.Cleanup(func() { cancel(); r.Wait(5 * time.Second) })
+
+	author := crab(t, s, "kingler")
+	fan := crab(t, s, "wiley")
+	if err := s.Follow(ctx, fan, author); err != nil {
+		t.Fatal(err)
+	}
+	m, err := s.CreateMolt(ctx, author, "honey locust trees\ngrieve the passing of summer\na cortege of yellows")
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.Enqueue(m)
+	r.Notify(store.Notification{RecipientID: fan.ID, Type: store.NotifyMention, ActorID: author.ID, Actor: author.UserName, MoltID: m.ID})
+
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		trench, _ := s.Trench(ctx, fan.ID, 10)
+		notes, _ := s.Notifications(ctx, fan.ID, 10)
+		if len(trench) == 1 && trench[0].ID == m.ID && len(notes) == 1 {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("after 5s: trench %+v, notifications %+v", trench, notes)
+		}
+		time.Sleep(50 * time.Millisecond)
 	}
 }
 

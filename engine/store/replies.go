@@ -9,7 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 
-	"github.com/t0ul/krabber-net/internal/richtext"
+	"github.com/t0ul/krabber-net/engine/richtext"
 )
 
 // moltPointer lists a reply on its parent's thread, or a quote on the quoted

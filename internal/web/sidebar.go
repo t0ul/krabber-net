@@ -5,8 +5,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/t0ul/krabber-net/internal/richtext"
-	"github.com/t0ul/krabber-net/internal/store"
+	"github.com/t0ul/krabber-net/engine/richtext"
+	"github.com/t0ul/krabber-net/engine/store"
 )
 
 const (

@@ -14,10 +14,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/t0ul/krabber-net/internal/linkcard"
-	"github.com/t0ul/krabber-net/internal/platform"
-	"github.com/t0ul/krabber-net/internal/store"
-	"github.com/t0ul/krabber-net/internal/trophies"
+	"github.com/t0ul/krabber-net/engine/linkcard"
+	"github.com/t0ul/krabber-net/engine/platform"
+	"github.com/t0ul/krabber-net/engine/store"
+	"github.com/t0ul/krabber-net/engine/trophies"
 )
 
 // CardFetcher reads the card for a web page.
@@ -144,16 +144,28 @@ func (r *Runner) Enqueue(m *store.Molt) {
 	}
 }
 
-// Start launches the workers. They stop when ctx is cancelled.
+// Start launches the workers and the table-wide sweeps. They stop when ctx
+// is cancelled. Exactly one process on the table runs Start (Krabber's
+// website); any other front end runs StartQueues.
 func (r *Runner) Start(ctx context.Context) {
-	r.wg.Add(6)
-	go r.fanoutWorker(ctx)
-	go r.notifyWorker(ctx)
-	go r.cardWorker(ctx)
+	r.StartQueues(ctx)
+	r.wg.Add(4)
 	go r.every(ctx, fanoutSweepEvery, 5*time.Second, r.sweepFanouts)
 	go r.every(ctx, purgeSweepEvery, 15*time.Second, r.sweepPurges)
 	go r.every(ctx, awardShowEvery, 2*time.Minute, r.awardShow)
 	go r.every(ctx, signupSweepEvery, 5*time.Minute, r.expireSignups)
+}
+
+// StartQueues launches only the queue workers — fan-out, notifications and
+// link cards — for a second front end on the same table, such as Kusaza's
+// haiku network. The sweeps are table-wide and run where Start runs: a post
+// this process couldn't fan out (a full queue, a restart) is left pending
+// in the table, and that fan-out sweep picks it up within a minute.
+func (r *Runner) StartQueues(ctx context.Context) {
+	r.wg.Add(3)
+	go r.fanoutWorker(ctx)
+	go r.notifyWorker(ctx)
+	go r.cardWorker(ctx)
 }
 
 // expireSignups frees the usernames and emails of signups nobody activated.

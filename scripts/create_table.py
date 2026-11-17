@@ -2,7 +2,7 @@
 """Create Krabber's DynamoDB table.
 
 The same table that Terraform (infra/modules/table) and the Go code
-(internal/store/schema.go, used for DynamoDB Local) define. A Go test
+(engine/store/schema.go, used for DynamoDB Local) define. A Go test
 (TestPythonSchemaMatches) runs this script with --print and fails if the two
 ever disagree.
 
@@ -20,7 +20,7 @@ import sys
 
 REGION = "us-east-2"
 
-# Every key format lives in internal/store/keys.go; see PLAN.md section 4.2
+# Every key format lives in engine/store/keys.go; see PLAN.md section 4.2
 # for what each index is for.
 #
 #   GSI2  ID#<crabID>            crab by ID, list crabs (the directory)

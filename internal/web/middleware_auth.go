@@ -5,8 +5,8 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/t0ul/krabber-net/internal/avatar"
-	"github.com/t0ul/krabber-net/internal/store"
+	"github.com/t0ul/krabber-net/engine/avatar"
+	"github.com/t0ul/krabber-net/engine/store"
 )
 
 // Session keys.

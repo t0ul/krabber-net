@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/t0ul/krabber-net/internal/store"
-	"github.com/t0ul/krabber-net/internal/validator"
-	"github.com/t0ul/krabber-net/internal/writing"
+	"github.com/t0ul/krabber-net/engine/store"
+	"github.com/t0ul/krabber-net/engine/validator"
+	"github.com/t0ul/krabber-net/engine/writing"
 )
 
 // exportForm is the Settings form that downloads what a krab has written.

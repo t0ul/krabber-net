@@ -16,8 +16,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/segmentio/ksuid"
 
-	"github.com/t0ul/krabber-net/internal/avatar"
-	"github.com/t0ul/krabber-net/internal/platform"
+	"github.com/t0ul/krabber-net/engine/avatar"
+	"github.com/t0ul/krabber-net/engine/platform"
 )
 
 // newTestStore creates a fresh table in DynamoDB Local. Tests are skipped when
@@ -1380,6 +1380,30 @@ func TestVerified(t *testing.T) {
 	}
 	if fresh, _ := s.CrabByID(ctx, karen.ID); fresh.Verified {
 		t.Fatal("still verified")
+	}
+}
+
+func TestBot(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+	gm := mustCrab(t, s, "gm")
+	if fresh, _ := s.CrabByID(ctx, gm.ID); fresh.Bot {
+		t.Fatal("a new account starts as a bot")
+	}
+	if err := s.SetBot(ctx, gm, true); err != nil {
+		t.Fatal(err)
+	}
+	if fresh, err := s.CrabByUsername(ctx, "gm"); err != nil || !fresh.Bot {
+		t.Fatalf("after marking: %+v %v", fresh, err)
+	}
+	if err := s.SetBot(ctx, gm, false); err != nil {
+		t.Fatal(err)
+	}
+	if fresh, _ := s.CrabByID(ctx, gm.ID); fresh.Bot || gm.Bot {
+		t.Fatal("still a bot")
+	}
+	if err := s.SetBot(ctx, &Crab{PK: "C#nobody@example.com", SK: "C#"}, true); err == nil {
+		t.Fatal("marked an account that doesn't exist")
 	}
 }
 

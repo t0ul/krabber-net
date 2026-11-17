@@ -6,26 +6,16 @@ import (
 	"html/template"
 	"strings"
 
-	"github.com/t0ul/krabber-net/internal/store"
-	"github.com/t0ul/krabber-net/internal/writing"
+	"github.com/t0ul/krabber-net/engine/rules"
+	"github.com/t0ul/krabber-net/engine/store"
+	"github.com/t0ul/krabber-net/engine/writing"
 )
 
-// layoutFor picks the layout a molt in a form is set in: the one asked for
-// if the form has it, else the krab's default for the form, else the form's
-// own. It gives "" for the form's own default, which is how a molt stores it.
+// layoutFor picks the layout a molt in a form is set in: the engine's rule
+// (the one asked for, else the krab's default, else the form's own; "" for
+// the form's own).
 func layoutFor(c *store.Crab, formID, asked string) string {
-	f := formOf(formID)
-	if len(f.Layouts) == 0 {
-		return ""
-	}
-	l, ok := f.Layout(asked)
-	if !ok && c != nil {
-		l, _ = f.Layout(c.FormLayouts[formID])
-	}
-	if l.ID == f.Layouts[0].ID {
-		return ""
-	}
-	return l.ID
+	return rules.LayoutFor(c, formID, asked)
 }
 
 // layoutDefaults is the layout the krab's molts in each form start in, by

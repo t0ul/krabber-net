@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/t0ul/krabber-net/internal/auth"
-	"github.com/t0ul/krabber-net/internal/store"
+	"github.com/t0ul/krabber-net/engine/auth"
+	"github.com/t0ul/krabber-net/engine/store"
 )
 
 // apiPost sends a JSON body to the API with an optional bearer key. It uses the

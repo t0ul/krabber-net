@@ -7,7 +7,7 @@ import (
 
 	"github.com/segmentio/ksuid"
 
-	"github.com/t0ul/krabber-net/internal/store"
+	"github.com/t0ul/krabber-net/engine/store"
 )
 
 func TestDirectoryKeepsChangesMadeDuringAReload(t *testing.T) {

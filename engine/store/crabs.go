@@ -13,7 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 
-	"github.com/t0ul/krabber-net/internal/avatar"
+	"github.com/t0ul/krabber-net/engine/avatar"
 )
 
 // Crab is a user account.
@@ -38,6 +38,9 @@ type Crab struct {
 	DeletedAt int64  `dynamodbav:"deleted_at,omitempty"` // Unix seconds
 	Role      string `dynamodbav:"role,omitempty"`       // RoleAdmin, RoleModerator or empty
 	Verified  bool   `dynamodbav:"verified,omitempty"`   // set by an admin; shows the badge
+	// Bot marks an account a program posts from (krabctl bot, bot-mark).
+	// Krabber shows bots like anyone; Kusaza's haiku network never shows them.
+	Bot bool `dynamodbav:"bot,omitempty"`
 
 	Profile
 
@@ -597,6 +600,26 @@ func (s *Store) SetVerified(ctx context.Context, c *Crab, on bool) error {
 		return fmt.Errorf("set verified: %w", err)
 	}
 	c.Verified = on
+	return nil
+}
+
+// SetBot marks a crab as an account a program posts from, or clears the
+// mark.
+func (s *Store) SetBot(ctx context.Context, c *Crab, on bool) error {
+	in := &dynamodb.UpdateItemInput{
+		TableName:           s.tableName(),
+		Key:                 keyOf(c.PK, c.SK),
+		UpdateExpression:    aws.String("REMOVE bot"),
+		ConditionExpression: aws.String("attribute_exists(PK)"),
+	}
+	if on {
+		in.UpdateExpression = aws.String("SET bot = :t")
+		in.ExpressionAttributeValues = map[string]types.AttributeValue{":t": boolean(true)}
+	}
+	if _, err := s.db.UpdateItem(ctx, in); err != nil {
+		return fmt.Errorf("set bot: %w", err)
+	}
+	c.Bot = on
 	return nil
 }
 

@@ -4,7 +4,7 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/t0ul/krabber-net/internal/store"
+	"github.com/t0ul/krabber-net/engine/store"
 )
 
 // quotePage shows the form for quoting the molt in the URL.
@@ -69,8 +69,7 @@ func (app *App) quoteCreatePost(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	c := currentCrab(r)
-	m, err := app.store.Quote(r.Context(), c, quoted, f.Content, store.WithNSFW(f.NSFW), store.WithForm(f.Form), store.WithLayout(layoutFor(c, f.Form, f.Layout)))
+	m, err := app.rules.Quote(r.Context(), currentCrab(r), quoted, f.draft(), blocksOf(r).Hides)
 	switch {
 	case errors.Is(err, store.ErrNotFound), errors.Is(err, store.ErrNotAllowed):
 		app.notFound(w, r)
@@ -79,8 +78,7 @@ func (app *App) quoteCreatePost(w http.ResponseWriter, r *http.Request) {
 		app.serverError(w, r, err)
 		return
 	}
-	app.publish(r, m, quoted.AuthorID)
-	app.notify(r, quoted.AuthorID, store.NotifyQuote, m.ID, f.Content)
+	app.published(r, m)
 	redirect(w, r, "/molt/view/"+m.ID)
 }
 

@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/t0ul/krabber-net/internal/richtext"
+	"github.com/t0ul/krabber-net/engine/richtext"
 )
 
 // crabtagPage lists the molts using a crabtag, newest first.

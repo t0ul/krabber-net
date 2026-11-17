@@ -7,17 +7,15 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/t0ul/krabber-net/internal/auth"
-	"github.com/t0ul/krabber-net/internal/mail"
-	"github.com/t0ul/krabber-net/internal/store"
-	"github.com/t0ul/krabber-net/internal/validator"
+	"github.com/t0ul/krabber-net/engine/auth"
+	"github.com/t0ul/krabber-net/engine/mail"
+	"github.com/t0ul/krabber-net/engine/rules"
+	"github.com/t0ul/krabber-net/engine/store"
+	"github.com/t0ul/krabber-net/engine/validator"
 )
 
-const (
-	resetTTL        = time.Hour
-	resetIPLimit    = 5 // reset requests per IP per hour
-	resetEmailLimit = 3 // reset emails per address per day
-)
+// The reset flow's limits and the link's lifetime are the engine's
+// (rules.ResetIPLimit, rules.ResetEmailLimit, rules.ResetTTL).
 
 type forgotForm struct {
 	Email               string `form:"email"`
@@ -53,7 +51,7 @@ func (app *App) forgotPost(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/krab/reset", http.StatusSeeOther)
 	}
 
-	ipOK, err := app.underLimit(r, "reset-ip", clientNet(r), resetIPLimit, time.Hour)
+	ipOK, err := app.underLimit(r, "reset-ip", clientNet(r), rules.ResetIPLimit, time.Hour)
 	if err != nil {
 		app.serverError(w, r, err)
 		return
@@ -68,14 +66,8 @@ func (app *App) forgotPost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	app.afterResponse(func(ctx context.Context) {
-		crab, err := app.store.CrabByEmail(ctx, email)
-		if err != nil || !crab.CanSignIn() {
-			if err != nil && !errors.Is(err, store.ErrNotFound) {
-				app.log.Warn("reset lookup", "err", err)
-			}
-			return
-		}
-		if n, err := app.store.Hit(ctx, "reset-email", email, 24*time.Hour); err != nil || n > resetEmailLimit {
+		crab := app.rules.ResetTo(ctx, email)
+		if crab == nil {
 			return
 		}
 		if err := app.sendReset(ctx, crab); err != nil && !errors.Is(err, mail.ErrDailyCapReached) {
@@ -86,7 +78,7 @@ func (app *App) forgotPost(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *App) sendReset(ctx context.Context, c *store.Crab) error {
-	token, err := app.store.NewToken(ctx, c.ID, store.ScopePasswordReset, resetTTL)
+	token, err := app.rules.ResetToken(ctx, c)
 	if err != nil {
 		return err
 	}
@@ -131,36 +123,15 @@ func (app *App) resetPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tok, err := app.store.ConsumeToken(r.Context(), store.ScopePasswordReset, f.Token)
+	// A password change or reset after the link was sent retires it (and any
+	// other links still in someone's mailbox): the engine's rule.
+	_, err := app.rules.ResetPassword(r.Context(), f.Token, f.Password)
 	switch {
-	case errors.Is(err, store.ErrInvalidToken):
+	case errors.Is(err, store.ErrInvalidToken), errors.Is(err, store.ErrNotFound):
 		f.AddFieldError("token", "That token is invalid or has expired. Request a new link below.")
 		rerender(http.StatusUnprocessableEntity)
 		return
 	case err != nil:
-		app.serverError(w, r, err)
-		return
-	}
-	crab, err := app.store.CrabByID(r.Context(), tok.CrabID)
-	// A password change or reset after the link was sent retires it (and any
-	// other links still in someone's mailbox).
-	if err == nil && (!crab.CanSignIn() || tok.IssuedAt < crab.SessionsValidAfter) {
-		err = store.ErrNotFound
-	}
-	if errors.Is(err, store.ErrNotFound) {
-		f.AddFieldError("token", "That token is invalid or has expired. Request a new link below.")
-		rerender(http.StatusUnprocessableEntity)
-		return
-	} else if err != nil {
-		app.serverError(w, r, err)
-		return
-	}
-	hash, err := auth.HashPassword(f.Password)
-	if err != nil {
-		app.serverError(w, r, err)
-		return
-	}
-	if _, err := app.store.SetPassword(r.Context(), crab, hash); err != nil {
 		app.serverError(w, r, err)
 		return
 	}

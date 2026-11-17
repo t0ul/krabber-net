@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	"github.com/t0ul/krabber-net/internal/writing"
+	"github.com/t0ul/krabber-net/engine/writing"
 )
 
 // Every seed follows its form's exact rules, so the seeds stand when the

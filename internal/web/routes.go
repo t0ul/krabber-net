@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/t0ul/krabber-net/internal/store"
+	"github.com/t0ul/krabber-net/engine/store"
 )
 
 // Routes returns the full handler. Order, outermost first:

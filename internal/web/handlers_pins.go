@@ -4,7 +4,7 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/t0ul/krabber-net/internal/store"
+	"github.com/t0ul/krabber-net/engine/store"
 )
 
 // pinPost pins the viewer's own molt to the top of their profile. htmx

@@ -8,9 +8,9 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/t0ul/krabber-net/internal/store"
-	"github.com/t0ul/krabber-net/internal/trophies"
-	"github.com/t0ul/krabber-net/internal/validator"
+	"github.com/t0ul/krabber-net/engine/store"
+	"github.com/t0ul/krabber-net/engine/trophies"
+	"github.com/t0ul/krabber-net/engine/validator"
 )
 
 const (
@@ -301,7 +301,7 @@ func (app *App) crabminCrabPost(w http.ResponseWriter, r *http.Request) {
 				done("@" + target.UserName + " doesn't have " + t.Title + ".")
 				return
 			}
-			app.trophiesHeld.set(target.ID, t.ID, false)
+			app.rules.Awards.Forget(target.ID, t.ID)
 			msg = "Took " + t.Title + " back from @" + target.UserName + "."
 		}
 	default:

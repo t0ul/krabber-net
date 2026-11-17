@@ -15,11 +15,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sesv2"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 
+	"github.com/t0ul/krabber-net/engine/jobs"
+	"github.com/t0ul/krabber-net/engine/mail"
+	"github.com/t0ul/krabber-net/engine/platform"
+	"github.com/t0ul/krabber-net/engine/store"
 	"github.com/t0ul/krabber-net/internal/config"
-	"github.com/t0ul/krabber-net/internal/jobs"
-	"github.com/t0ul/krabber-net/internal/mail"
-	"github.com/t0ul/krabber-net/internal/platform"
-	"github.com/t0ul/krabber-net/internal/store"
 	"github.com/t0ul/krabber-net/internal/web"
 )
 

@@ -13,7 +13,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/t0ul/krabber-net/internal/store"
+	"github.com/t0ul/krabber-net/engine/store"
 	"github.com/t0ul/krabber-net/ui"
 )
 
@@ -403,24 +403,8 @@ func (app *App) unfollowPost(w http.ResponseWriter, r *http.Request) {
 	app.setFollow(w, r, false)
 }
 
-// backfillMolts is how many of a newly followed krab's molts go straight
-// into the follower's Trench (one batch write).
-const backfillMolts = 10
-
-// backfill puts followee's latest molts in the viewer's Trench, which
-// otherwise only gets what they post from now on. It's a bonus, so a
-// failure is only logged.
-func (app *App) backfill(r *http.Request, followee *store.Crab) {
-	molts, err := app.store.MoltsByOwner(r.Context(), followee.ID, backfillMolts)
-	if err == nil {
-		err = app.store.BackfillTrench(r.Context(), currentCrab(r).ID, molts)
-	}
-	if err != nil {
-		app.log.Warn("trench backfill", "err", err, "followee", followee.ID)
-	}
-}
-
-// setFollow follows or unfollows, then returns the updated button.
+// setFollow follows or unfollows (the engine tells, awards and backfills),
+// then returns the updated button.
 func (app *App) setFollow(w http.ResponseWriter, r *http.Request, follow bool) {
 	followee, ok := app.crabFromPath(w, r)
 	if !ok || !app.underWriteLimit(w, r, "follow") {
@@ -428,20 +412,12 @@ func (app *App) setFollow(w http.ResponseWriter, r *http.Request, follow bool) {
 	}
 	var err error
 	if follow {
-		err = app.store.Follow(r.Context(), currentCrab(r), followee)
-		if err == nil {
-			app.notify(r, followee.ID, store.NotifyFollow, "", "")
-			app.awardFollow(r.Context(), currentCrab(r), followee, true)
-			app.backfill(r, followee)
-		}
+		err = app.rules.Follow(r.Context(), currentCrab(r), followee, blocksOf(r).Hides)
 		if errors.Is(err, store.ErrBlocked) {
 			follow = false
 		}
 	} else {
-		err = app.store.Unfollow(r.Context(), currentCrab(r), followee)
-		if err == nil {
-			app.awardFollow(r.Context(), currentCrab(r), followee, false)
-		}
+		err = app.rules.Unfollow(r.Context(), currentCrab(r), followee)
 	}
 	if err != nil && !errors.Is(err, store.ErrAlreadyExists) && !errors.Is(err, store.ErrNotAllowed) &&
 		!errors.Is(err, store.ErrNotFound) && !errors.Is(err, store.ErrBlocked) {

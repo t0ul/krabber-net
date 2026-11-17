@@ -13,7 +13,7 @@ import (
 
 	"github.com/justinas/nosurf"
 
-	"github.com/t0ul/krabber-net/internal/platform"
+	"github.com/t0ul/krabber-net/engine/platform"
 )
 
 // recoverPanic turns a panic into a logged 500.

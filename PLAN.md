@@ -260,7 +260,7 @@ The old README's Python script creates a table named `krabber` in **us-west-2** 
 
 ### 4.2 Access patterns
 
-As implemented in `internal/store/keys.go` (the single source for every key format). Generated IDs are KSUIDs with sub-second nanoseconds in the payload, so sorting by ID sorts by creation time.
+As implemented in `engine/store/keys.go` (the single source for every key format). Generated IDs are KSUIDs with sub-second nanoseconds in the payload, so sorting by ID sorts by creation time.
 
 | Entity | PK | SK | Index use |
 |---|---|---|---|
@@ -290,7 +290,7 @@ As implemented in `internal/store/keys.go` (the single source for every key form
 | **Pending fan-out marker** | on the molt item | | GSI8 `Q#fanout` / `<moltID>` until fanned out, then the attributes are removed |
 | **Report** (Phase 5) | `R#<moltID>` | `R#<reporterCrabID>` | GSI8 `Q#report` / `<time>` while open |
 
-GSI8 is **sparse**: only items with a pending job carry `GSI8PK`, so it stays tiny and cheap to query. The table starts empty, so none of the key changes from the old code need a data migration. `internal/store/keys.go` stays the authority for every key format.
+GSI8 is **sparse**: only items with a pending job carry `GSI8PK`, so it stays tiny and cheap to query. The table starts empty, so none of the key changes from the old code need a data migration. `engine/store/keys.go` stays the authority for every key format.
 
 ### 4.3 Cost review (2026-09-25)
 
@@ -316,7 +316,7 @@ It also stops storing each molt three times. The only code change was the Sea de
 
 **Where the money goes, at about 100 active krabs** (first pass, before the second pass below): about 25,000 write units a day (fan-out and likes are most of it) and 350,000 read units a day (page views, plus the directory reload every 2 minutes). That's roughly $0.50 a month in writes and $1.30 in reads; storage stays inside the free 25 GB because trench entries, notifications, link cards, sessions, tokens and rate-limit windows all expire (TTL deletes are free). After the second pass the model (section 2.2) puts 100 daily active krabs at about $0.45 a month for DynamoDB.
 
-**Second pass, for 1,000 to 10,000 daily active krabs (2026-09-25).** Measured first: a meter on the DynamoDB client (`internal/platform/meter.go`) asks for consumed capacity on every call (free) and adds it per request, counting at least what AWS bills, because DynamoDB Local reports reads of missing items as free and AWS doesn't. `TestCostProfile` seeds 25 krabs and records every main page, poll and action; it now fails when one goes over its budget. Read units, before → after:
+**Second pass, for 1,000 to 10,000 daily active krabs (2026-09-25).** Measured first: a meter on the DynamoDB client (`engine/platform/meter.go`) asks for consumed capacity on every call (free) and adds it per request, counting at least what AWS bills, because DynamoDB Local reports reads of missing items as free and AWS doesn't. `TestCostProfile` seeds 25 krabs and records every main page, poll and action; it now fails when one goes over its budget. Read units, before → after:
 
 | Request | Before | After | What changed |
 |---|---|---|---|
@@ -348,7 +348,7 @@ Other changes in the same pass:
 
 ## 5. Sessions in DynamoDB
 
-The site keeps `alexedwards/scs`, with a custom `scs.Store` in `internal/store/sessions.go` in place of the in-memory default.
+The site keeps `alexedwards/scs`, with a custom `scs.Store` in `engine/store/sessions.go` in place of the in-memory default.
 
 ### 5.1 Item design
 | Attribute | Value |
@@ -416,7 +416,7 @@ All work is a port of `krabber-net-main` into this repo.
 1. **Login ignores `activated` and `banned`.** `crabLoginPost` never checks either. Fix: reject both with the generic message; `authenticate` treats banned crabs as logged out.
 2. **Emails aren't normalized.** `C#<email>` as typed allows `Bob@x.com` and `bob@x.com` as two accounts. Fix: lowercase and trim everywhere.
 3. **An unused auth token is created on every login** (`Tokens.New(crab, ScopeAuthentication)`, result discarded, never expires). Fix: remove.
-4. **Remolts never reach the sea.** `moltRemoltPost` writes `GSI3PK` as an RFC3339 timestamp, but the sea reads by day (`cmd/web/molts.go`, around line 130). Fix: one key builder in `internal/store/keys.go`.
+4. **Remolts never reach the sea.** `moltRemoltPost` writes `GSI3PK` as an RFC3339 timestamp, but the sea reads by day (`cmd/web/molts.go`, around line 130). Fix: one key builder in `engine/store/keys.go`.
 5. **`Sea()` ignores its `GetItem` error** and panics when a shard doesn't exist yet (`internal/models/seas.go`).
 6. **The sea only reads the current day** (`latest()` in `internal/models/molts.go` queries only today's `GSI3PK`), so it goes empty at midnight. Fix: today and yesterday.
 7. **Unfollow needs the followee's email** to update counters, as the code's own comment "need the email..." notes (`internal/models/follows.go`, around line 200). Verify in tests.
@@ -657,7 +657,7 @@ Also:
 |---|---|---|---|
 | **0. Account** ✅ | M1–M4b: root MFA, billing access for IAM, IAM user `t` with MFA + `aws login`, Cost Explorer, remove root CLI profile | Done 2026-09-23 | — |
 | **1. Bootstrap** ✅ (except M6) | `infra/bootstrap` applied 2026-09-23 (29 resources: state bucket, OIDC, CI roles, workload roles, account settings); its state migrated to `s3://krabber-tfstate-381466680812/bootstrap/terraform.tfstate`. Still open: M6 (`gh auth login`, GitHub environment and branch protection if your plan allows), and the security contact once you give a phone number. | Done | — |
-| **2. App port + security** ✅ | Done 2026-09-23. Repo layout, Go 1.26.8, `internal/store`, DynamoDB sessions, config (env + SSM), SES + daily cap, background jobs, the bugs in section 6.4, section 7 app controls, tests (store, sessions, web flows over HTTPS, jobs, config, mail), local dev. `golangci-lint`: 0 issues; `govulncheck`: 0 affecting. Moved to Phase 5: password reset UI and reports. | Done | — |
+| **2. App port + security** ✅ | Done 2026-09-23. Repo layout, Go 1.26.8, `engine/store`, DynamoDB sessions, config (env + SSM), SES + daily cap, background jobs, the bugs in section 6.4, section 7 app controls, tests (store, sessions, web flows over HTTPS, jobs, config, mail), local dev. `golangci-lint`: 0 issues; `govulncheck`: 0 affecting. Moved to Phase 5: password reset UI and reports. | Done | — |
 | **3. Infra + pipeline** ✅ (except support@) | Done 2026-09-25: `infra/prod` (57 resources; one root module split by file rather than the planned `modules/`), `ci.yml`/`deploy.yml` (deploys run through the `krabber` GitHub environment), `cmd/deploy` for app versions, first deploy, certificate and SES identity verified, M5 submitted. Still open: `support@krabber.net` receiving and forwarder (needs a bootstrap role for the Lambda), the uptime canary. | Me; you review the first plan | — |
 | **4. Launch checks** ✅ | Done 2026-09-25 on `https://krabber.net`: signup → activation → login → post → Trench → Sea (you); maintenance switch on (403 within 20 s) and off; WAF login rate limit (403 on `/krab/` while the rest served); point-in-time restore into a scratch table (same items and indexes, then deleted); each of the 6 alarms fired once. | Together | — |
 | **5. Product and legal** | Privacy, terms, account deletion, reports and bans, password reset UI, error and maintenance pages. Runs together with P1 (delete molt, notifications, settings, block). | Me | 0.5–1 day (2–3 with P1) |

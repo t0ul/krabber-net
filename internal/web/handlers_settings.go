@@ -11,11 +11,11 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/t0ul/krabber-net/internal/auth"
-	"github.com/t0ul/krabber-net/internal/store"
-	"github.com/t0ul/krabber-net/internal/trophies"
-	"github.com/t0ul/krabber-net/internal/validator"
-	"github.com/t0ul/krabber-net/internal/writing"
+	"github.com/t0ul/krabber-net/engine/auth"
+	"github.com/t0ul/krabber-net/engine/store"
+	"github.com/t0ul/krabber-net/engine/trophies"
+	"github.com/t0ul/krabber-net/engine/validator"
+	"github.com/t0ul/krabber-net/engine/writing"
 )
 
 const (

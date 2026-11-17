@@ -1,5 +1,5 @@
 # The single table (PLAN.md section 4). Keys and projections match
-# internal/store/schema.go and scripts/create_table.py.
+# engine/store/schema.go and scripts/create_table.py.
 
 locals {
   index_projections = {

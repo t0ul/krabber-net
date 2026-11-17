@@ -5,7 +5,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/t0ul/krabber-net/internal/store"
+	"github.com/t0ul/krabber-net/engine/store"
 )
 
 // statsPage is Crabber's Stats page, worked out from the directory snapshot

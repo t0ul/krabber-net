@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/t0ul/krabber-net/internal/store"
+	"github.com/t0ul/krabber-net/engine/store"
 )
 
 // maxAPIBodyBytes caps a JSON request body. A molt is at most
@@ -154,7 +154,7 @@ func (app *App) apiCreateMolt(w http.ResponseWriter, r *http.Request) {
 		}
 		layout = layoutFor(nil, form, *in.Layout)
 	}
-	if !app.writes.allow(c.ID, "molt") {
+	if !app.writes.Allow(c.ID, "molt") {
 		w.Header().Set("Retry-After", "3600")
 		apiError(w, http.StatusTooManyRequests, "rate limit reached, try again later")
 		return

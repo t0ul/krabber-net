@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/t0ul/krabber-net/internal/store"
+	"github.com/t0ul/krabber-net/engine/store"
 )
 
 const notEditable = "Molt is no longer editable (must be less than 5 minutes old)"

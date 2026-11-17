@@ -7,9 +7,10 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/t0ul/krabber-net/internal/store"
-	"github.com/t0ul/krabber-net/internal/validator"
-	"github.com/t0ul/krabber-net/internal/writing"
+	"github.com/t0ul/krabber-net/engine/rules"
+	"github.com/t0ul/krabber-net/engine/store"
+	"github.com/t0ul/krabber-net/engine/validator"
+	"github.com/t0ul/krabber-net/engine/writing"
 )
 
 // moltCheck is what the composer's feedback box shows: the chosen writing
@@ -126,33 +127,28 @@ func (app *App) checkMolt(f moltForm) moltCheck {
 	return checkMoltForm(f, app.cfg.FormsRequired())
 }
 
-// checkMoltForm is checkMolt with the site's mode spelled out.
+// checkMoltForm is checkMolt with the site's mode spelled out: the engine
+// decides, and Krabber says it in its own words.
 func checkMoltForm(f moltForm, required bool) moltCheck {
-	form, ok := writing.ByID(f.Form)
-	if !ok {
+	ck := rules.CheckDraft(f.Form, f.Content, f.Override, rules.Policy{Required: required, Allowed: formAllowed})
+	c := moltCheck{Form: ck.Form, Results: ck.Results, Lines: ck.Lines, Blank: ck.Blank, Overridable: ck.Overridable}
+	switch ck.Reason {
+	case rules.UnknownForm:
 		return moltCheck{Message: "That is not a form Krabber knows."}
-	}
-	if required && !formAllowed(form) {
-		if form.ID == "" {
-			return moltCheck{Message: "Pick a form."}
-		}
-		return moltCheck{Message: fmt.Sprintf("Pick another form: %s is not written here.", strings.ToLower(formSubject(form)))}
-	}
-	c := moltCheck{Form: form, Results: form.Check(f.Content), Lines: form.Measure(f.Content), Blank: !validator.NotBlank(f.Content)}
-	switch {
-	case c.Blank:
+	case rules.NeedsForm:
+		return moltCheck{Message: "Pick a form."}
+	case rules.FormNotHere:
+		return moltCheck{Message: fmt.Sprintf("Pick another form: %s is not written here.", strings.ToLower(formSubject(ck.Form)))}
+	case rules.Blank:
 		c.Message = "Molt text cannot be blank."
-	case !validator.MaxChars(f.Content, form.MaxChars):
-		c.Message = fmt.Sprintf("%s can be up to %s characters.", formSubject(form), commas(form.MaxChars))
-	default:
-		if broken := writing.Broken(c.Results, f.Override); len(broken) > 0 {
-			rule := strings.TrimSuffix(broken[0].Rule, ".")
-			if broken[0].Note != "" {
-				rule += " (" + broken[0].Note + ")"
-			}
-			c.Message = fmt.Sprintf("Not quite %s yet: %s.", strings.ToLower(formSubject(form)), rule)
-			c.Overridable = len(writing.Broken(c.Results, true)) == 0
+	case rules.TooLong:
+		c.Message = fmt.Sprintf("%s can be up to %s characters.", formSubject(ck.Form), commas(ck.Form.MaxChars))
+	case rules.RuleBroken:
+		rule := ck.Rule
+		if ck.Note != "" {
+			rule += " (" + ck.Note + ")"
 		}
+		c.Message = fmt.Sprintf("Not quite %s yet: %s.", strings.ToLower(formSubject(ck.Form)), rule)
 	}
 	return c
 }

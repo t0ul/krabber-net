@@ -14,25 +14,19 @@ import (
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-playground/form/v4"
 
+	"github.com/t0ul/krabber-net/engine/mail"
+	"github.com/t0ul/krabber-net/engine/rules"
+	"github.com/t0ul/krabber-net/engine/store"
 	"github.com/t0ul/krabber-net/internal/config"
-	"github.com/t0ul/krabber-net/internal/mail"
-	"github.com/t0ul/krabber-net/internal/store"
 )
 
-// FanoutQueue hands new molts to the background fan-out worker.
-type FanoutQueue interface {
-	Enqueue(m *store.Molt)
-}
-
-// Notifier hands notifications to the background writer.
-type Notifier interface {
-	Notify(n store.Notification)
-}
-
-// CardQueue asks the background worker for a link card.
-type CardQueue interface {
-	EnqueueCard(url string)
-}
+// The background queues are the engine's: every front end hands its posts,
+// notifications and link cards to them the same way.
+type (
+	FanoutQueue = rules.FanoutQueue
+	Notifier    = rules.Notifier
+	CardQueue   = rules.CardQueue
+)
 
 // App holds the website's dependencies.
 type App struct {
@@ -44,15 +38,15 @@ type App struct {
 	templates map[string]*template.Template
 	forms     *form.Decoder
 	fanout    FanoutQueue
-	notifier  Notifier
-	cards     CardQueue
-	turnstile *turnstile
-	dir       *directory
-	fof       *suggestions
-	writes    *writeLimiter
-	apiRate   *minuteLimiter
-	// trophiesHeld skips award attempts for trophies a krab already has.
-	trophiesHeld *heldTrophies
+	// rules is the write side Krabber shares with every front end on its
+	// table: what posts, replies, likes and follows set in motion, trophies,
+	// and the account flows' limits.
+	rules        *rules.Service
+	turnstile    *turnstile
+	dir          *directory
+	fof          *suggestions
+	writes       *rules.Limiter
+	apiRate      *minuteLimiter
 	strangersSea *seaForStrangers
 
 	version string    // the build's commit, for @system's molts
@@ -122,15 +116,19 @@ func New(d Deps) (*App, error) {
 		templates: templates,
 		forms:     form.NewDecoder(),
 		fanout:    d.Fanout,
-		notifier:  d.Notifier,
-		cards:     d.Cards,
+		rules: rules.New(rules.Deps{
+			Store:    d.Store,
+			Log:      d.Log,
+			Fanout:   d.Fanout,
+			Notifier: d.Notifier,
+			Cards:    d.Cards,
+		}),
 		turnstile: newTurnstile(d.Config.TurnstileSecret),
 		dir:       &directory{},
 		fof:       &suggestions{},
-		writes:    &writeLimiter{},
+		writes:    &rules.Limiter{},
 		apiRate:   &minuteLimiter{},
 
-		trophiesHeld: &heldTrophies{},
 		strangersSea: &seaForStrangers{},
 		version:      cmp.Or(d.Version, "dev"),
 		started:      time.Now(),

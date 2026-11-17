@@ -179,7 +179,7 @@ func rewrite(raw []byte, from, tag string) ([]byte, error) {
 }
 
 // count adds one to today's forward counter, a rate-limit item in the app's
-// table (the same RL# key format as internal/store), and returns it.
+// table (the same RL# key format as engine/store), and returns it.
 func (f forwarder) count(ctx context.Context) (int, error) {
 	day := time.Now().UTC().Truncate(24 * time.Hour)
 	res, err := f.db.UpdateItem(ctx, &dynamodb.UpdateItemInput{

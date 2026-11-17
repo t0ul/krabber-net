@@ -11,7 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 
-	"github.com/t0ul/krabber-net/internal/avatar"
+	"github.com/t0ul/krabber-net/engine/avatar"
 )
 
 // Deleting an account takes two steps. DeleteAccount runs in the request: it

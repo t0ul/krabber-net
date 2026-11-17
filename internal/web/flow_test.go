@@ -25,13 +25,14 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/segmentio/ksuid"
 
-	"github.com/t0ul/krabber-net/internal/auth"
-	"github.com/t0ul/krabber-net/internal/avatar"
+	"github.com/t0ul/krabber-net/engine/auth"
+	"github.com/t0ul/krabber-net/engine/avatar"
+	"github.com/t0ul/krabber-net/engine/mail"
+	"github.com/t0ul/krabber-net/engine/platform"
+	"github.com/t0ul/krabber-net/engine/rules"
+	"github.com/t0ul/krabber-net/engine/store"
+	"github.com/t0ul/krabber-net/engine/writing"
 	"github.com/t0ul/krabber-net/internal/config"
-	"github.com/t0ul/krabber-net/internal/mail"
-	"github.com/t0ul/krabber-net/internal/platform"
-	"github.com/t0ul/krabber-net/internal/store"
-	"github.com/t0ul/krabber-net/internal/writing"
 )
 
 // These tests run the whole site over HTTPS against DynamoDB Local, with a
@@ -1506,11 +1507,11 @@ func TestLoginRules(t *testing.T) {
 	h.signupAndActivate("karen", "karen@krabber.test", "computer-wife")
 
 	// Five wrong passwords lock the email for the window.
-	for i := 0; i < loginFailureLimit; i++ {
+	for i := 0; i < rules.LoginFailureLimit; i++ {
 		h.login("karen@krabber.test", "nope")
 	}
 	if status, body := h.login("karen@krabber.test", "computer-wife"); status != http.StatusTooManyRequests || !strings.Contains(body, "Too many attempts") {
-		t.Fatalf("after %d failures: %d", loginFailureLimit, status)
+		t.Fatalf("after %d failures: %d", rules.LoginFailureLimit, status)
 	}
 
 	// Someone else's wrong guesses don't lock karen out from her own network.
@@ -2665,9 +2666,9 @@ func TestWriteLimits(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	old := writeLimits["like"]
-	writeLimits["like"] = 2
-	t.Cleanup(func() { writeLimits["like"] = old })
+	old := rules.Limits["like"]
+	rules.Limits["like"] = 2
+	t.Cleanup(func() { rules.Limits["like"] = old })
 
 	h.login("karen@krabber.test", "computer-wife!")
 	tok := h.csrf("/trench")
@@ -3671,10 +3672,10 @@ func TestExportMolts(t *testing.T) {
 	}
 
 	// A whole timeline is a big read, so exports are counted like writes.
-	old := writeLimits["export"]
-	writeLimits["export"] = 1
-	t.Cleanup(func() { writeLimits["export"] = old })
-	h.app.writes = &writeLimiter{}
+	old := rules.Limits["export"]
+	rules.Limits["export"] = 1
+	t.Cleanup(func() { rules.Limits["export"] = old })
+	h.app.writes = &rules.Limiter{}
 	if status, _, _ := export(url.Values{"form": {"haiku"}, "format": {"txt"}}); status != http.StatusOK {
 		t.Errorf("first export under the limit: %d", status)
 	}

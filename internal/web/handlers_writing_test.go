@@ -3,7 +3,7 @@ package web
 import (
 	"testing"
 
-	"github.com/t0ul/krabber-net/internal/writing"
+	"github.com/t0ul/krabber-net/engine/writing"
 )
 
 func TestCheckMoltFormRequired(t *testing.T) {

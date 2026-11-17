@@ -45,17 +45,25 @@ python3 scripts/cost_model.py 1000 5000 10000   # daily active krabs
 
 ## Layout
 
+`engine/` is the part of Krabber another program may import: the table and
+its key formats (`engine/store`), accounts and passwords, the writing forms,
+mail, the background jobs, and the write rules every front end must keep
+(`engine/haiku`). Kusaza's haiku network (kusaza.com/haiku) runs on it
+against the same table, so there is exactly one copy of each rule. Table
+changes are additive and ship here first. `internal/` is Krabber's own
+website, configuration and bots.
+
 | Path | What |
 |---|---|
 | `cmd/web` | The website (Beanstalk runs this) |
 | `cmd/devseed` | Dev only: create the table in DynamoDB Local and add sample krabs |
 | `cmd/krabctl` | Operator commands run from your machine (set a krab's role, verify a krab) |
-| `scripts/create_table.py` | Create the DynamoDB table with boto3 (`--local` for DynamoDB Local, `--print` for the JSON definition); a Go test keeps it matching `internal/store/schema.go` |
-| `internal/store` | All DynamoDB access; every key format is in `keys.go` |
+| `scripts/create_table.py` | Create the DynamoDB table with boto3 (`--local` for DynamoDB Local, `--print` for the JSON definition); a Go test keeps it matching `engine/store/schema.go` |
+| `engine/store` | All DynamoDB access; every key format is in `keys.go` |
 | `internal/web` | Routes, handlers, templates, security middleware |
-| `internal/writing` | The writing forms a molt can take (haiku, sonnet, letter, three-panel joke…): their rules, length limits and the checks behind the composer's checklist and `/forms` |
-| `internal/jobs` | Trench fan-out worker and sea refresh |
-| `internal/mail` | Email templates, SES sender, daily cap |
+| `engine/writing` | The writing forms a molt can take (haiku, sonnet, letter, three-panel joke…): their rules, length limits and the checks behind the composer's checklist and `/forms` |
+| `engine/jobs` | Trench fan-out worker and sea refresh |
+| `engine/mail` | Email templates, SES sender, daily cap |
 | `internal/config` | Environment + SSM Parameter Store settings |
 | `ui/` | Embedded HTML templates and static assets |
 | `infra/` | Terraform (`bootstrap/` is applied once, by hand) |
