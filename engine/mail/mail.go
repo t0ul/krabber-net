@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
+	"io/fs"
 	"log/slog"
 	textTemplate "text/template"
 	"time"
@@ -43,21 +44,33 @@ type Counter interface {
 
 // Mailer renders templates and sends them through a Sender.
 type Mailer struct {
-	sender   Sender
-	counter  Counter
-	dailyCap int
-	log      *slog.Logger
+	sender    Sender
+	counter   Counter
+	dailyCap  int
+	log       *slog.Logger
+	templates fs.FS // holds templates/<name>.tmpl
 }
 
-// New returns a Mailer. dailyCap 0 disables sending entirely.
+// New returns a Mailer with Krabber's own templates. dailyCap 0 disables
+// sending entirely.
 func New(sender Sender, counter Counter, dailyCap int, log *slog.Logger) *Mailer {
-	return &Mailer{sender: sender, counter: counter, dailyCap: dailyCap, log: log}
+	return &Mailer{sender: sender, counter: counter, dailyCap: dailyCap, log: log, templates: templateFS}
+}
+
+// WithTemplates is a copy of m that renders another front end's emails, in
+// its own words: fsys holds templates/<name>.tmpl, each defining subject,
+// plainBody and htmlBody. The daily cap's counter is the same one, so every
+// front end on the table shares one day's budget.
+func (m *Mailer) WithTemplates(fsys fs.FS) *Mailer {
+	c := *m
+	c.templates = fsys
+	return &c
 }
 
 // Send renders the named template (for example "activation") with data and
 // sends it, unless today's cap is reached.
 func (m *Mailer) Send(ctx context.Context, to, name string, data any) error {
-	msg, err := render(to, name, data)
+	msg, err := render(m.templates, to, name, data)
 	if err != nil {
 		return err
 	}
@@ -77,13 +90,13 @@ func (m *Mailer) Send(ctx context.Context, to, name string, data any) error {
 	return nil
 }
 
-func render(to, name string, data any) (Message, error) {
+func render(fsys fs.FS, to, name string, data any) (Message, error) {
 	file := "templates/" + name + ".tmpl"
-	textT, err := textTemplate.ParseFS(templateFS, file)
+	textT, err := textTemplate.ParseFS(fsys, file)
 	if err != nil {
 		return Message{}, fmt.Errorf("parse %s: %w", file, err)
 	}
-	htmlT, err := template.ParseFS(templateFS, file)
+	htmlT, err := template.ParseFS(fsys, file)
 	if err != nil {
 		return Message{}, fmt.Errorf("parse %s: %w", file, err)
 	}

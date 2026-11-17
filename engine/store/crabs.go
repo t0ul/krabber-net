@@ -411,9 +411,10 @@ func (s *Store) ListCrabs(ctx context.Context, limit int) ([]Crab, map[string]bo
 		TableName:              s.tableName(),
 		IndexName:              aws.String(gsiCrabByID),
 		ReturnConsumedCapacity: types.ReturnConsumedCapacityTotal,
-		ProjectionExpression:   aws.String("#id, #un, #frc, #fgc, #mc, #act, #ban, #del, #ca, #dn, #bio, #av, #ver, #inv, #tr"),
+		ProjectionExpression:   aws.String("#id, #un, #frc, #fgc, #mc, #act, #ban, #del, #ca, #dn, #bio, #av, #ver, #inv, #tr, #bot"),
 		ExpressionAttributeNames: map[string]string{
 			"#ver": "verified",
+			"#bot": "bot",
 			"#inv": "invites",
 			"#tr":  "trophies",
 			"#dn":  "display_name",

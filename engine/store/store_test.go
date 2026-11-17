@@ -1396,6 +1396,10 @@ func TestBot(t *testing.T) {
 	if fresh, err := s.CrabByUsername(ctx, "gm"); err != nil || !fresh.Bot {
 		t.Fatalf("after marking: %+v %v", fresh, err)
 	}
+	// The directory listing carries the mark too: front ends hide bots by it.
+	if crabs, _, err := s.ListCrabs(ctx, 10); err != nil || len(crabs) != 1 || !crabs[0].Bot {
+		t.Fatalf("listed: %+v %v", crabs, err)
+	}
 	if err := s.SetBot(ctx, gm, false); err != nil {
 		t.Fatal(err)
 	}

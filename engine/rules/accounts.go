@@ -3,6 +3,7 @@ package rules
 import (
 	"context"
 	"errors"
+	"net/netip"
 	"time"
 
 	"github.com/t0ul/krabber-net/engine/auth"
@@ -30,6 +31,18 @@ const (
 	ResetIPLimit     = 5 // reset requests per network per hour
 	ResetEmailLimit  = 3 // reset emails per address per day
 )
+
+// Net is the network a client's address counts against: the address itself
+// for IPv4, its /64 for IPv6 (one household or phone holds a whole /64).
+// Every front end keys its sign-up, sign-in and reset counters by it, so
+// the shared counters agree on who is asking.
+func Net(ip string) string {
+	addr, err := netip.ParseAddr(ip)
+	if err != nil || addr.Is4() || addr.Is4In6() {
+		return ip
+	}
+	return netip.PrefixFrom(addr, 64).Masked().String()
+}
 
 // Under counts one attempt at action by key and reports whether it is
 // within limit for window.
